@@ -1,0 +1,165 @@
+# RESULTS — Phase 0 技术验证结果
+
+> 更新：2026-10-29（离线 JVM 验证 + 对 `luxiang@192.168.5.8` 的只读在线验证）
+> 对应文档：`herdr-android-client-research-v2.md`（v2.1）、`herdr-android-spike-plan.md`
+> 环境报告：`spike/results/environment-report.md`
+>
+> 状态词（本轮起统一使用英文标记）：**VERIFIED** / **FAILED** / **BLOCKED** / **NOT TESTED**
+> （分别对应之前的「已验证 / 验证失败 / 尚未验证」；`BLOCKED` 专指“被外部前置条件卡住”，`NOT TESTED` 指“本轮范围内但没开始”）
+
+## 0. 结论摘要
+
+| 项目 | 状态 | 一句话 |
+| --- | --- | --- |
+| 文档修订（7 项 P0 + 5 项事实错误） | VERIFIED | 已改完，见 §6 |
+| 离线 JVM 验证（指纹/写账本/SFTP Tailer） | VERIFIED | 22/22 单测通过 |
+| SSH 连接 + 主机指纹显式校验 | VERIFIED | 真机 fail-closed，指纹与 `ssh-keygen -lf` 完全一致 |
+| SSH 冷连接 / 单次 exec 延迟 | VERIFIED | 一次性往返 P50 ≈ 1107 ms，TCP ≈ 108 ms |
+| sshj 0.41.2 用户认证（RSA key） | **FAILED** | `Exhausted available authentication methods`，卡住所有通道级测量 |
+| herdr 版本 / 协议 / schema / 会话清单 | VERIFIED | **0.9.0**，protocol 22，`test` 会话**不存在** |
+| `ping` / `snapshot` / `subscribe` | **BLOCKED** | 需要 `test` 会话的 socket；创建会话需批准 |
+| `remote-api-bridge`（文档方案 A） | **FAILED**（在 0.9.0 上） | `unknown command: remote-api-bridge`；需 `socat`/`nc`/streamlocal 替代 |
+| API 语义静态事实（无锁/无幂等键/无协作原语/订阅粒度） | VERIFIED | 在 **0.9.0** 上复验，与 0.9.3 一致 |
+| MaxSessions / 通道并发 / 延迟分解 | **BLOCKED** | 依赖 sshj 单连接多 channel |
+| 写操作、Unknown、故障注入、Agent、Pane 行为 | NOT TESTED | 需批准 + 会话 + 可用客户端 |
+| Spike 3–8 | NOT TESTED | 本轮范围外 |
+
+## 1. 环境
+
+完整报告见 `spike/results/environment-report.md`。要点：
+
+| 项目 | 值 |
+| --- | --- |
+| 主机 | Ubuntu 24.04.5 LTS，x86_64，24 vCPU，31.8 GiB RAM，886 GB 可用，load ≈ 1.2 |
+| herdr | **0.9.0**（`~/.local/bin/herdr`，非交互 PATH 里没有） |
+| 现有会话 | `default`（running，其他项目）、`ljn`（stopped）、**`test` 不存在** |
+| Claude Code | 2.1.312，`~/.claude/settings.json` 无 hook，未设 `CLAUDE_CONFIG_DIR` |
+| sshd | OpenSSH 9.6p1；仅允许 `rsa-sha2-512/256`（无 `ssh-rsa`） |
+| 本机执行环境 | Windows 11 / JDK 17.0.3 / Gradle 9.4.1 / sshj 0.41.2 / JUnit 5.11.4 |
+| Android 设备 | 仅 `emulator-5554`，**无真机** |
+
+## 2. S1-OFFLINE：离线 JVM 验证（VERIFIED）
+
+证据：`spike/results/s1-local-unit-tests.txt`（22 PASSED / 0 FAILED，可重跑：`spike/jvm` → `gradle test`）。
+
+| ID | 项 | 状态 | 证据 |
+| --- | --- | --- | --- |
+| OFF-1 | 未知主机不被自动信任（禁止 TOFU），信任库保持为空 | VERIFIED | `HostKeyTrustTest > F1` |
+| OFF-2 | 显式确认后 pin，再次连接不再询问 | VERIFIED | `F2`、`F3` |
+| OFF-3 | 篡改已 pin 的指纹 → 拒绝且不覆写 | VERIFIED | `F4` |
+| OFF-4 | 算法变化视为不同身份，绝不自动信任 | VERIFIED | `F5` |
+| OFF-5 | 写操作超时 → `Unknown`；永不自动重试；只有正向证据可升级；重发换新 id | VERIFIED | `WriteLedgerTest` ×6 |
+| OFF-6 | SFTP Tailer：UTF-8 跨块、非法字节、截断、更大文件替换、偏移恢复、恢复校验失败、半行、短读、大文件读预算 | VERIFIED | `SftpTailTest` ×10 |
+| OFF-7 | NDJSON 编解码：忽略未知字段、未知错误码原样透传 | VERIFIED | `Ndjson` + 自检 |
+
+## 3. S1-ONLINE：对真实主机的只读验证
+
+### 3.1 已通过（VERIFIED）
+
+| ID | 项 | 实测 | 证据 |
+| --- | --- | --- | --- |
+| ON-1 | 主机指纹带外核对 | `ssh-keyscan` + `ssh-keygen -lf` 得到 ED25519 `SHA256:lfFYDnJNKAPT1jtyrA6bU89XDcKtHQiy7PPdiX0G0T8`，与 OpenSSH 实际握手用的 host key 一致 | `results/environment-report.md` §4 |
+| ON-2 | F1 未知主机 fail-closed（真机） | 抛 `HostKeyUnknownException`，**未发送任何凭据**，信任库**未写入**，耗时 338 ms（仅 KEX） | `RESULT,F1,...store_written=false` |
+| ON-3 | F4 篡改指纹（真机） | 抛 `HostKeyMismatchException`，pin 记录**未被改写** | `RESULT,F4,...pin_unchanged=true` |
+| ON-4 | F2/F3 显式确认后静默通过（真机） | 提示次数 = 1；写入 `192.168.5.8:22:ssh-ed25519 SHA256:lfFY...` | `RESULT,F2/F3,prompts=1` |
+| ON-5 | 指纹实现与 OpenSSH 一致 | 我们算出的指纹与 `ssh-keygen -lf` **逐字符相同**（踩坑：sshj 的 `getEncoded()` 是 X.509，`SecurityUtils.getFingerprint()` 是 MD5） | `spike/jvm/.../trust/SshjVerifier.kt` |
+| ON-6 | TCP 22 建连延迟 | 10 次平均 **108.5 ms** | `results/s1-tcp-latency.csv` |
+| ON-7 | 一次性 SSH 往返（TCP+KEX+auth+exec+exit） | 10 次 **1040–1139 ms**，P50 ≈ **1107 ms** | `results/s1-ssh-cli-latency.csv` |
+| ON-8 | herdr 版本/协议/schema | 0.9.0 / protocol 22 / schema_version 1 / 102 方法 | `results/herdr-api.remote-0.9.0.schema.json` |
+| ON-9 | `test` 会话是否存在 | `herdr session list` 只有 `default`、`ljn`；`sessions/test/` 不存在 | 同上 §2 |
+| ON-10 | `remote-api-bridge` 可用性 | **不存在**（`unknown command`），rc=2 | `results/environment-report.md` §2 |
+| ON-11 | 0.9.0 的 API 语义不变量 | `agent.wait` 无锁参数、写操作无幂等键、`pane.agent_status_changed` 必带 `pane_id`、协作原语 0 命中 | `results/herdr-schema-summary.md` + 差异对比 |
+
+### 3.2 失败（FAILED）
+
+| ID | 项 | 现象 | 已排除的可能 |
+| --- | --- | --- | --- |
+| ON-12 | sshj 0.41.2 公钥认证（RSA 3072/4096） | 三次 `publickey` 尝试后 `UserAuthException: Exhausted available authentication methods` | ① 不是密钥未授权：同一私钥用 OpenSSH 客户端（`IdentitiesOnly=yes`、`IdentityAgent=none`）可登录；② 不是密钥解析错：sshj 导出的公钥指纹 `SHA256:LiY1T1l9W1yMOCam/EPG1SlrjIDlmQp9zhzP27CcXpE` 与 `ssh-keygen -lf id_rsa.pub` **完全一致**；③ 不是 host key 校验导致：F1/F2/F4 均正常 |
+
+证据：`results/s1-sshj-auth-debug.log`（含 `Server supports signature algorithms: [... rsa-sha2-512, rsa-sha2-256]`、三次 `Attempting authentication using OpenSSHKeyV1KeyFile`、最终 `publickey auth failed`）。
+
+已尝试且**无效**的修法：`SecurityUtils.registerSecurityProvider(null)` 注册 BC；`DefaultConfig.keyAlgorithms` 把 `rsa-sha2-512/256` 提前；`OpenSSHKeyV1KeyFile().init(privateKey, publicKey)` 双文件初始化；改用 PKCS#1 的 `luxiang_rsa`（该 key sshj 连解析都失败，报 `No provider available for Unknown key file`）。
+
+**影响**：所有需要“单连接多 channel”的测量（MaxSessions、exec 并发、每请求延迟、NDJSON 往返）都被卡住。**产品技术选型风险**：如果 Phase 1 前解决不了，sshj 这个选择本身要重新评估（备选 Apache MINA SSHD / JSch）。
+
+## 4. S2-SCHEMA：API 静态事实（VERIFIED，已在 0.9.0 目标主机复验）
+
+证据：`results/herdr-api.remote-0.9.0.schema.json`（远端导出，275 KB）+ `results/herdr-schema-summary.md`（本地 0.9.3 摘要）。
+
+| ID | 事实 | 状态 |
+| --- | --- | --- |
+| SCH-1 | `agent.wait` 参数 = `{target, timeout_ms, until}`，**无锁、无 ownership 字段** | VERIFIED（0.9.0 + 0.9.3 一致） |
+| SCH-2 | `pane.send_keys` = `{pane_id, keys}`；`pane.send_text` = `{pane_id, text}`；`agent.prompt` = `{target, text, wait}` → **无前置条件、无请求 id、无幂等键** | VERIFIED（两版本一致） |
+| SCH-3 | `pane.agent_status_changed` **必带 `pane_id`**；`pane.created/closed/updated/exited/agent_detected/focused/moved`、`tab.*`、`workspace.*`、`layout.updated` **只接受 `type`** | VERIFIED（两版本一致） |
+| SCH-4 | 102 个方法中 `presence`/`lease`/`owner`/`lock` 出现 **0 次** | VERIFIED（两版本一致） |
+| SCH-5 | `ping.capabilities` 是 5–6 个 boolean 特性开关，**不是方法清单**（0.9.0 少 `ssh_agent_registration`） | VERIFIED |
+| SCH-6 | `ErrorBody.code` 是自由字符串；`events_lost` / `agent_blocked` 不在 schema 枚举中 | VERIFIED |
+| SCH-7 | 版本漂移：0.9.0 有 `pane.graphics.*`，0.9.3 有 `pane.clear` / `pane.link.resolve` / `server.ssh_agent.register` | VERIFIED |
+
+## 5. 被阻塞 / 未测试
+
+| ID | 项 | 状态 | 阻塞原因 |
+| --- | --- | --- | --- |
+| S2-ON-1 | `ping` / `session.snapshot` / `events.subscribe` | BLOCKED | `test` 会话未创建 → socket 不存在；创建需批准 |
+| S2-ON-2 | 订阅与快照初始一致性 | BLOCKED | 同上 |
+| S2-ON-3 | `events_lost` 复现与恢复 | NOT TESTED | 需要 pane 事件源（故障注入需批准） |
+| S2-ON-4 | 写操作语义在线验证（`agent.prompt` / `send_keys` / `send_text`） | NOT TESTED | 需 Agent pane + 输入，需批准 |
+| S2-ON-5 | 断线注入 / `Unknown` 判定 | NOT TESTED | 同上 |
+| S2-ON-6 | pane id 移动/关闭/复用 | NOT TESTED | 需创建/关闭 pane，需批准 |
+| S2-ON-7 | MaxSessions 实际值、并发上限、超限报错 | BLOCKED | 需要 sshj 单连接多 channel（ON-12 失败） |
+| S2-ON-8 | `terminal session observe` 只读帧 | NOT TESTED | 需 pane |
+| S3 / S4 / S5 / S6 / S7 / S8 | Claude JSONL 定位、增量解析渲染、审批安全、后台、性能、ACP | NOT TESTED | 本轮范围外；S3 需先创建隔离 `CLAUDE_CONFIG_DIR` |
+
+## 6. 第一阶段（文档修订）结果
+
+| P0 | 修订位置 | 状态 |
+| --- | --- | --- |
+| P0-1 指纹显式校验、禁止 TOFU | 调研 v2「安全」；任务书 Spike 1 代码 + F1–F4；本轮 ON-2/3/4 真机验证 | VERIFIED（规则 + 实现 + 真机行为） |
+| P0-2 `agent.wait` 不是锁 | 调研 v2「写操作语义」专节；Spike 2 并发实验 | VERIFIED（静态事实，0.9.0/0.9.3 一致） |
+| P0-3 审批 TOCTOU 不得宣称绝对安全 | 调研 v2「审批安全子系统」+ 时序图 + 三项验收；Spike 5 重写 | VERIFIED（口径），错题率数值 NOT TESTED |
+| P0-4 PermissionRequest Hook 契约 | 调研 v2 新增契约小节；Spike 5 步骤 5 | VERIFIED（契约文本），hook 行为 NOT TESTED |
+| P0-5 写操作 Unknown 语义 | 调研 v2「写操作语义」；Spike 2 步骤 6；`WriteLedger` 单测 | VERIFIED（实现 + 单测），在线注入 NOT TESTED |
+| P0-6 SFTP Tailer 契约 | 调研 v2「SFTP Tailer 契约」8 条；Spike 4 重写；`SftpTail` 10 单测 | VERIFIED（离线），真实 SFTP NOT TESTED |
+| P0-7 团队 Presence/Lease/Ownership | 调研 v2 新增章节；差异化/roadmap 降级 | VERIFIED（0.9.0/0.9.3 均无原语） |
+| F-1…F-5 事实修正 | capabilities 非方法清单、订阅粒度、`recent_unwrapped`、错误码、平台路径 | VERIFIED |
+
+## 7. 待验证项状态
+
+| 编号 | 事项 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| 1 | sshj streamlocal 支持 | BLOCKED | 需 sshj 可用 + 会话 socket |
+| 2 | bridge 延迟 / MaxSessions | BLOCKED | sshj 认证失败；且 0.9.0 无 `remote-api-bridge` |
+| 3 | `remote-api-bridge` 兼容性 | **FAILED（0.9.0）** | 子命令不存在；需 ≥ 某版本或改走 socat |
+| 4 | pane id 复用/移动 | NOT TESTED | 需创建 pane |
+| 5 | `CLAUDE_CONFIG_DIR` 发现 | NOT TESTED | 需 Agent pane |
+| 6 | 子 agent transcript 路径 | NOT TESTED | — |
+| 7 | Claude JSONL 行结构 | NOT TESTED | — |
+| 8 | SFTP vs tail 延迟/耗电 | NOT TESTED | 离线契约已验证，在线未测 |
+| 9 | 读屏审批竞态 | NOT TESTED | 需 pane |
+| 10 | 前台服务 / 耗电 | NOT TESTED | 无真机 |
+| 11 | 性能基线 | NOT TESTED | 无真机 |
+| 12 | herdr-acp / ACP SDK | NOT TESTED | 需装 Node.js |
+| 20 | bridge 单请求语义 | BLOCKED | 同 #2 |
+| 21 | 超 MaxSessions 报错 | BLOCKED | 同 #2 |
+| 22 | `events_lost` / `agent_blocked` 真实码 | BLOCKED | 需会话 |
+| 23 | 新 pane 补订阅必要性 | 静态 VERIFIED | 代价未测 |
+| 24 | `agent.wait` 不互斥 | 静态 VERIFIED | 并发实证未测 |
+| 25 | L2 错题率 / T2→T3 延迟 | NOT TESTED | — |
+| 26 | hook 超时默认行为 | NOT TESTED | — |
+| 27 | SFTP 身份字段（inode） | 部分 VERIFIED | 前缀判定已实现；在线待测 |
+| 28 | 未公开协作原语 | 部分 VERIFIED | 0.9.0 无 |
+
+## 8. 证据索引
+
+| 文件 | 内容 |
+| --- | --- |
+| `spike/results/environment-report.md` | 本轮只读环境报告（主机、herdr、Claude、SSH） |
+| `spike/results/herdr-api.remote-0.9.0.schema.json` | 目标主机 herdr 0.9.0 的 schema 导出 |
+| `spike/results/herdr-api.schema.json` | 本机 herdr 0.9.3 的 schema 导出 |
+| `spike/results/herdr-schema-summary.md` | 从 schema 自动生成的摘要 |
+| `spike/results/s1-local-unit-tests.txt` | 22 个单测输出 |
+| `spike/results/s1-ssh-cli-latency.csv` | 一次性 SSH 往返 10 次 |
+| `spike/results/s1-tcp-latency.csv` | TCP 22 建连 10 次 |
+| `spike/results/s1-sshj-auth-debug.log` | sshj 认证失败的 debug 日志（ON-12） |
+| `spike/results/s1-local-env.txt` | 本机执行环境 |
+| `spike/jvm/` | 可重跑工程（`gradle test` / `gradle installDist` + `--mode hostkey|connect|channels|bridge`） |

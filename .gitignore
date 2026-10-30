@@ -1,0 +1,18 @@
+# 本机环境变量（含主机名/密钥路径/指纹）
+spike/.env
+
+# Gradle 构建产物与缓存
+spike/jvm/.gradle/
+spike/jvm/build/
+.gradle/
+build/
+
+# 本地信任库 / 指纹固定文件（属于运行期状态，不入库）
+known_hosts.spike
+*.spike
+
+# 编辑器 / 系统
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
