@@ -759,3 +759,23 @@ HOME=~/spike-sandbox/pihome herdr integration install pi
 - Compose UI 测试在 MIUI 上仍挂起（I-59）；`BoardScreenTest` 已更新到多主机 API 并能编译，但只能在非 MIUI 设备跑。
 - 主机排序 / 分组 / 搜索、跨主机聚合视图（当前是“选中一台看一台”）。
 - 每主机独立的“只连活动主机/全部连接”开关（目前默认全部连接）。
+
+---
+
+# 13. M2-2A：性能基线 v0（2026-10-31，真机 Redmi 22021211RC / 120 Hz）
+
+> 说明：这是**轻量基线**（`am start -W` + `dumpsys gfxinfo`），不是 Macrobenchmark；后者留给 M3。
+> 测试时只保留一台主机（.5.8），避免失败重连污染数据。
+
+| 指标 | 实测 | 目标 | 结论 |
+| --- | --- | --- | --- |
+| 冷启动 `TotalTime`（5 次） | 555 / 519 / 562 / 539 / 558 ms，**中位 555 ms** | P50 < 600 ms | ✅ 达标 |
+| 看板滚动（12 次 swipe，667 帧） | **Janky 6 帧 = 0.90%**；50th 9 ms / 90th 11 ms / 95th 12 ms / 99th 18 ms | jank < 1% | ✅ 达标（简单列表） |
+| Missed Vsync / Slow UI thread | 2 / 6（667 帧） | — | 可接受，M3 再看 |
+| 显示刷新率 | **120 Hz**（`renderFrameRate 120.00001`） | — | 设备符合预期 |
+| 键盘动画 | 未测（看板无输入框） | 0 帧 > 16.7 ms | ⛔ NOT TESTED（留给 M3/输入栏） |
+
+证据：`spike/results/m2-coldstart.txt`、`spike/results/m2-scroll-jank.txt`。
+
+下一步（M3）：引入 `:benchmark` + Macrobenchmark（StartupTiming / FrameTiming）、Baseline Profile，
+并把“流式输出时的滚动”纳入测量（现在没有流式数据源）。
