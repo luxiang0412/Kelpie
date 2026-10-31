@@ -525,3 +525,11 @@
 - **现象**：容易让人以为“集成没装”，实际可能只是“这个 pane 启动早于安装/未上报”。
 - **建议**：改成“这个 pane 没有上报会话路径（重启 pi 或检查集成）”。
 - **状态**：待改（D47）。
+
+## I-73 启动时自触发一次重连（每次打开 App 白连一次）
+
+- **现象**：日志里 **13 次 `manual reconnect`**，每次冷启动都是 `generation=1` 紧接着 `generation=2`。
+- **原因**：`HerdrApplication.onCreate` 调 `manager.startAll()`；`MonitorService.onStartCommand` 又调一次 `startAll()` → `reload()` 保留 runtime 后执行 `ensureStarted()` → 因为 `supervisor != null` 直接 `reconnectNow()`。
+- **影响**：多一次连接（≈0.5–1 s）、状态条闪一下"重连中"、通知的 completion 基线被重置（可能漏一次完成提醒）。
+- **修复建议**：`startAll()` 幂等——已连接的主机不调用 `reconnectNow()`；只有显式"重连"按钮才重连。
+- **状态**：待修（记录在 `DESIGN-REVIEW-BRIEF.md` 问题 1）。
