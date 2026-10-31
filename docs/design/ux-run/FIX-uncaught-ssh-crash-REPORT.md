@@ -21,4 +21,5 @@
   - **已实现但未验证**：真实断链下不再崩溃（需要设备侧复现；且需要 USB adb 或本地网络控制手段）
   - **未实现**：SSH 会话层主动探活/自动重建的加固（仍依赖既有重连逻辑）
   - **已知问题**：崩溃是**传输层**异常，全局 handler 只是兜底；若异常发生在 SshJ 内部线程且被 rethrow 到 `async`，仍需逐个 `runCatching`
-- rollback：`git revert <commit>`
+- 说明：该修复与 UX-00a 的组件改动**落在同一个提交** `7cc5112`（提交时未拆开）；如需单独回滚，按文件回滚 `HerdrApplication.kt`/`MonitorService.kt`/`HostsViewModel.kt` 三处。
+- rollback：`git revert 7cc5112`（会同时回滚图标组件）或按文件回滚上述三个文件
