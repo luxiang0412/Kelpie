@@ -341,3 +341,74 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 | ON2-37 | 收尾 | `ctrl+c`×3 与 `/exit` 都没退出 TUI；最终 `kill` 掉自己的测试进程（pid 1012435），pane 回到 shell（`agent=None`） |
 
 上一条的“状态轨迹”说明：**pi 完成后是 `done` 而不是 `idle`**；`agent.wait` 的 `until` 必须包含 `done`，否则会白等到超时。
+
+## 9.11 R-1 / R-2 / R-3（2026-10-31 16:00–16:20）
+
+### 关键前提更正：网络不是「局域网 1 ms」
+
+`ping 192.168.5.8` = **RTT 50 ms（0% 丢包）**。之前写的“局域网”应改为「同网段 WiFi，RTT 50 ms」。
+这解释了：单个 exec channel ≈ 200 ms、API 请求 ≈ 248 ms、SFTP 单次操作 ≈ 50 ms。
+
+### R-1a 用 pi 诱导 `blocked`：**不可行**（NOT TESTED）
+
+让 pi 执行 `touch ~/spike-sandbox/probe-r1.txt`：**pi 直接执行，没有确认**。
+`agent_status` 时间线：`unknown` → `working`(2.7 s) → `done`(5.7 s)，**从未出现 `blocked`**。
+
+→ 结论：pi 默认设置下不产生审批确认，无法用它验证 `blocked` 态与 L1。
+要拿到 `blocked` 只有两条路：① 用 Claude（需登录/额度）；② 给 pi 写一个会调用 `ctx.ui.confirm` 的扩展（会写 pi 配置目录，需单独批准）。
+
+### R-1b 合成 TUI 测 L2 读屏审批的竞态（VERIFIED，核心结论）
+
+用沙箱里的 `~/spike-sandbox/scripts/fake-tui.sh`：循环显示 `=== Qn === / 1) Allow cmd-n / 2) Deny`，每轮 **0.05–1.5 s 随机换题**，记录“按键到达时屏幕上正显示哪一题”。
+客户端直连 socket（loopback，`T2→T3` ≈ 1 ms）。
+
+| 组 | 发送 | 二次校验拦截 | 送达时题号不符 | 错题率 |
+| --- | --- | --- | --- | --- |
+| CTRL（读屏后直接发，无二次校验） | 25 | 0 | **6** | **24.0%** |
+| L2 本地（二次校验，窗口 B ≈ 1 ms） | 56 | 14 | **2** | **3.6%** |
+| L2 模拟手机（二次校验 + 250 ms 模拟 RTT） | 50 | 20 | **17** | **34.0%** |
+
+样本量小（每组 25–70 轮），不追求统计显著，但趋势明确：
+
+1. 二次校验在本机把错题率从 **24% → 3.6%**；
+2. **一旦窗口 B 变成手机的 250 ms，错题率反弹到 34%**，比不校验还糟——因为“校验通过”给了用户虚假信心；
+3. 所以 **L2 读屏审批不能做成手机上的“一键批准”**。要么只做 L1（结构化审批），要么 L2 只保留“只读提示 + 引导到电脑”。
+4. 合成 TUI 不产生 `agent_status=blocked`（herdr 不认识它），因此「状态前置条件」这一环本轮 **仍未验证**。
+
+### R-2 pi JSONL 结构（VERIFIED，小样本）
+
+一次带工具调用的会话（13 行，11 KB）：
+
+| 行 `type` | 条数 | 说明 |
+| --- | --- | --- |
+| `session` | 1 | 会话头 |
+| `model_change` | 1 | 模型切换 |
+| `thinking_level_change` | 1 | 思考级别（文档未提，新增观察） |
+| `message` | 5 | role = `system` / `user` / `assistant` / `toolResult` / `assistant` |
+
+`message` 行的顶层字段：**`id`、`parentId`、`timestamp`、`type`、`message`** → 树结构 + 自带时间戳。
+工具调用在 `message.content[]` 里以 `thinking` / `toolCall` / `toolResult` **分片**出现（不是独立行）。
+`--session-dir` 下文件是**扁平**的 `<ISO8601>_<uuid>.jsonl`，没有 `--<cwd>--` 子目录。
+
+### R-3 SFTP 实链（VERIFIED）
+
+证据：`spike/results/s4-sftp-live.csv`。
+
+| 步骤 | 结果 | 耗时 |
+| --- | --- | --- |
+| `stat` | `size=24, mtime=…, inode=null`；attrs 里**没有 inode** | — |
+| 首次读取 3 行 | 3 行，末行 `{"n":3}` | 433 ms |
+| 追加 2 行后 | 2 行，末行 `{"n":5}` | 718 ms |
+| 截断到 10 字节 | `Reset(identity-changed)` ✅ | 359 ms |
+| 截断后重读 | 1 行 `{"n":1}` | 423 ms |
+| 替换成更大文件（200 行） | `Reset(identity-changed)` ✅ | 561 ms |
+| 替换后重读 | 200 行，末行 `{"big":200}` | 506 ms |
+| 尾部回填 50 行 | `{"big":151}` … `{"big":200}` | 225 ms |
+
+发现：
+
+1. **SFTP 真的可用**（sshj 的 `canonicalize`/`ls`/`stat` 都正常）。之前 stat 全失败是我这边的 **MSYS 路径转换**把 `/home/...` 变成了 `C:/Program Files/Git/home/...`（`MSYS_NO_PATHCONV=1` 后正常）——记进 `ISSUES.md` I-42。
+2. **每次 poll 355–718 ms**：因为一次 poll 要做 `stat` + `headBytes` + `open` + `read` + `close`，在 50 ms RTT 下 ≈ 5–8 个往返。
+   → 优化方向：**复用已打开的 RemoteFile、缓存 stat、去掉多余的 headBytes**（可用 (size, mtime) 先判同文件，只在可疑时读前缀）。
+3. `FileAttributes` **没有 inode**，前缀判定是唯一可行路径（确认 I-15）。
+4. 截断被判成 `identity-changed` 而不是 `truncated`（因为先查身份后查 size）；行为正确（Reset），只是原因字符串不同，记进 `ISSUES.md` I-43。

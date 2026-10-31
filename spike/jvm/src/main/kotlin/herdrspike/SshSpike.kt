@@ -37,6 +37,7 @@ fun main(args: Array<String>) {
         "channels" -> channelConcurrency(a)
         "bridge" -> bridge(a)
         "pingloop" -> pingLoop(a)
+        "sftp" -> sftpTail(a)
         "keyinfo" -> {
             val ssh = SSHClient()
             val kp = loadKey(ssh, a.s("key")).first()
@@ -225,6 +226,60 @@ private fun pingLoop(a: Args) {
     println("RESULT,pingloop,n=${ms.size},min=%.1f,p50=%.1f,p95=%.1f,max=%.1f".format(
         ms.min(), pct(ms, 50.0), pct(ms, 95.0), ms.max()))
     runCatching { ssh.close() }
+}
+
+/**
+ * R-3：用真实 SFTP 跑 SftpTail 契约（追加 / 截断 / 替换 / 大文件回填）。
+ * 只用沙箱文件，不碰任何其他路径。
+ */
+private fun sftpTail(a: Args) {
+    val host = a.s("host"); val port = a.i("port", 22); val user = a.s("user"); val key = a.s("key")
+    val path = a.s("path")
+    val ssh = buildClient(a) { false }
+    ssh.connect(host, port)
+    ssh.authPublickey(user, loadKey(ssh, key))
+    val sftp = ssh.newSFTPClient()
+    runCatching { println("RESULT,sftp,canonicalize=" + sftp.canonicalize(".")) }
+        .onFailure { println("RESULT,sftp,canonicalize_err=" + it) }
+    runCatching { println("RESULT,sftp,ls_dot=" + sftp.ls(".").size + " entries") }
+        .onFailure { println("RESULT,sftp,ls_dot_err=" + it) }
+    val src = herdrspike.tail.SftpByteSource(sftp)
+    val tail = herdrspike.tail.SftpTail(src, path)
+    val st = src.stat(path)
+    fun sq(x: String) = "'" + x.replace("'", "'\''") + "'"
+    fun exec(cmd: String): String {
+        ssh.startSession().use { sess ->
+            val c = sess.exec(cmd)
+            val out = c.inputStream.bufferedReader().readText()
+            c.join(20, TimeUnit.SECONDS)
+            runCatching { IOUtils.readFully(c.errorStream).close() }
+            return out.trim()
+        }
+    }
+    fun drain(tag: String) {
+        val t0 = System.nanoTime()
+        val r = tail.poll()
+        val ms = (System.nanoTime() - t0) / 1_000_000.0
+        when (r) {
+            is herdrspike.tail.TailResult.Lines ->
+                println("RESULT,sftp,$tag,lines=${r.lines.size},last=${r.lines.lastOrNull()?.take(40)},ms=%.1f".format(ms))
+            else -> println("RESULT,sftp,$tag,result=$r,ms=%.1f".format(ms))
+        }
+    }
+    println("RESULT,sftp,stat=$st,attrs=${src.lastAttributes},err=${src.lastError}")
+    drain("1-initial")
+    exec("printf '%s\n' '{\"n\":4}' '{\"n\":5}' >> ${sq(path)}")
+    drain("2-append")
+    exec("truncate -s 10 ${sq(path)}")
+    drain("3-truncate")
+    drain("4-after-truncate")
+    exec("seq 1 200 | sed 's/^/{\"big\":/;s/$/}/' > ${sq(path)}")
+    drain("5-replace-larger")
+    drain("6-after-replace")
+    val t0 = System.nanoTime()
+    val back = tail.backfillLastLines(50)
+    println("RESULT,sftp,7-backfill,lines=${back.size},first=${back.firstOrNull()?.take(30)},last=${back.lastOrNull()?.take(30)},ms=%.1f".format((System.nanoTime() - t0) / 1_000_000.0))
+    runCatching { sftp.close(); ssh.close() }
 }
 
 private fun execCapture(ssh: SSHClient, cmdline: String, stdinLine: String): String {

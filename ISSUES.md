@@ -304,3 +304,34 @@
 - **现象**：`ping` 的 `capabilities.detached_server_daemon`：直连 socket = `true`，经 `remote-api-bridge` = `false`。
 - **影响**：能力协商必须在**实际使用的传输**上做，不能一次探测到处复用。
 - **建议**：写进 D8 的实现细则：每个 Transport 建立后各做一次 `ping`，结果按 Transport 缓存。
+
+## I-41 pi 默认不产生审批确认 → `blocked` 态与 L1 无法用 pi 验证
+
+- **现象**：让 pi 执行 `touch …/probe-r1.txt`，直接执行并返回结果；`agent_status` 走 `unknown → working → done`，从未 `blocked`。
+- **影响**：Spike 2 的 `agent_blocked`、Spike 5 的 L1、以及“审批是最高风险功能”的验证，都不能靠 pi 默认配置完成。
+- **建议**：① 用 Claude（需登录/额度）；② 写一个调用 `ctx.ui.confirm` 的 pi 扩展（会写 pi 配置目录，需单独批准）；③ 合成的 TUI 只能验证哈希逻辑，验证不了 `blocked` 前置条件。
+
+## I-42 MSYS 路径转换会让 SFTP 路径变成 `C:/Program Files/Git/...`
+
+- **现象**：`--path /home/luxiang/...` 到达 Java 时变成 `C:/Program Files/Git/home/luxiang/...`，`stat` 报 `No such file`，看起来像 SFTP 坏了。
+- **复现**：Git Bash 下运行 `--mode sftp --path /home/...`。
+- **建议**：Windows 上跑脚本用 `MSYS_NO_PATHCONV=1`；客户端不涉及此问题（Android 无 MSYS），但文档里要给 Linux/Windows 两套命令。
+
+## I-43 截断被归类为 `identity-changed` 而非 `truncated`
+
+- **现象**：`truncate -s 10` 后 `poll()` 返回 `Reset(reason=identity-changed)`。
+- **原因**：`poll()` 先做身份比对（前缀变了），再看 `size < offset`。
+- **影响**：无功能影响（都 Reset），但审计日志里的原因不准确。
+- **建议**：先判 `size < offset` 再判身份，或在 Reset 原因里同时带两个条件。
+
+## I-44 SFTP 每次 poll 355–718 ms（50 ms RTT 下往返次数太多）
+
+- **现象**：一次 poll 内部有 `stat` + `headBytes` + `open` + `read` + `close` 等 5–8 个往返。
+- **影响**：250 ms 轮询在 50 ms RTT 下实际变成 ~500 ms 一次，且吃电量上升。
+- **建议**：① 复用 RemoteFile 句柄；② 缓存 stat（只在 size 变化时读）；③ 身份判定用 (size, mtime) 先行，前缀只在可疑时读；④ 轮询间隔按实测调成 500 ms–1 s。
+
+## I-45 合成 TUI 无法产生 `blocked` 状态
+
+- **现象**：`fake-tui.sh` 显示选项时，`agent_status` 始终是 `unknown`（herdr 不认识这个假 agent）。
+- **影响**：L2 的“`agent_status == blocked` 前置条件”本轮无法验证，只能验证哈希/拦截逻辑。
+- **建议**：要么让假 TUI 模拟 herdr 已支持的 agent 的画面特征（脆弱、不推荐），要么等 Claude/pi 扩展把真实 `blocked` 造出来。
