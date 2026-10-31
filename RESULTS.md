@@ -248,3 +248,22 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 | pane id 移动/关闭/复用 | BLOCKED | 同上 |
 | pi 作为 Agent（Spike 3） | BLOCKED | 需在 pane 里启动 `pi`，会消耗额度，需批准 |
 | MaxSessions 的*真实*配置值 | 部分 | 无 sudo，`sshd -T` 不可用；只能给“有效上限 9”的观测值 |
+
+## 9.8 会话里已有 pane 之后的只读观察（2026-10-31 15:30）
+
+用户手动升级 herdr 并在 `test` 会话里创建了 3 个 workspace / 4 个 pane，其中 2 个 pane 在跑 `pi`（`agent_status=idle`）。
+本轮只做**只读**观察，未向任何 pane 发送输入。
+
+| ID | 项 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| ON2-12 | 有内容时的 snapshot 一致性 | bridge 与 CLI **完全一致**（4 panes / 2 agents / 3 workspaces / 4 tabs，逐项比对 `IDENTICAL: True`） | `s2-snapshot-bridge-with-panes.json`、`s2-snapshot-cli-with-panes.json` |
+| ON2-13 | `pane.read` 返回结构 | `{read:{pane_id, workspace_id, tab_id, source, format, text, revision, truncated}}`；shell pane 的 `revision = 0` | `s2-pane-read-visible.json` |
+| ON2-14 | 订阅**已存在**的 pane | 接受，返回 `subscription_started`（对比 `pane_not_found`） | `s2-subscribe-existing-pane.txt` |
+| ON2-15 | pi pane 的 `agent_session` | **null**（herdr 能靠标题识别 agent 是 pi，但没有 session path） | `pane get w1:p1` / snapshot agents |
+| ON2-16 | pi 进程信息 | `process-info` 给出 `pid=938662, argv=["pi"], cwd=/home/luxiang/project/private/herdr-gui-research` | 同次命令输出 |
+| ON2-17 | pi 会话文件 | `~/.pi/agent/sessions/--home-luxiang-project-private-herdr-gui-research--/` **存在但 0 个 `.jsonl`**（未发生对话 / 未落盘） | `ls`/`find` 结果 |
+| ON2-18 | CLI 与 API 的 `source` 命名 | CLI 接受 `recent-unwrapped`（短横线），JSON API 枚举是 `recent_unwrapped`（下划线） | `pane read --help` vs schema |
+
+**推论（写进 Spike 3 计划）**：
+- 不装 `herdr integration install pi` 时，`agent_session` 拿不到路径 → 必须自己定位：按 `foreground_cwd` 推导目录 `--<path 中非字母数字→->--`，再取该目录下最新 `.jsonl`。
+- 该目录当前为空，说明 **`pi` 可能只在首次对话后才写 session 文件** → “首次提问前没有日志”的窗口需要用时间序列测（Spike 3 步骤 7）。
