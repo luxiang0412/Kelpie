@@ -14,6 +14,8 @@ data class ChatMessage(
     val text: String,
     val toolName: String? = null,
     val timestamp: Long? = null,
+    /** toolCall 的稳定 id（用于 ToolCall↔ToolResult 配对；拿不到时为 null）。 */
+    val toolCallId: String? = null,
 ) {
     enum class Kind { USER, ASSISTANT, THINKING, TOOL_CALL, TOOL_RESULT, SYSTEM }
 }
@@ -72,6 +74,7 @@ object PiTranscriptParser {
                                     args?.let { preview(it.toString()) } ?: "",
                                     toolName = name,
                                     timestamp = ts,
+                                    toolCallId = part.str("id") ?: part.str("toolCallId") ?: part.str("tool_use_id"),
                                 )
                             }
                             else -> Unit
@@ -80,7 +83,18 @@ object PiTranscriptParser {
                 }
                 "toolResult", "tool_result" -> {
                     val text = textOf(msg)
-                    if (text.isNotBlank()) out += ChatMessage(ChatMessage.Kind.TOOL_RESULT, text, timestamp = ts)
+                    if (text.isNotBlank()) {
+                        val id = msg.str("toolCallId")
+                            ?: msg.str("tool_use_id")
+                            ?: partsOf(msg).firstNotNullOfOrNull { it.str("toolCallId") ?: it.str("tool_use_id") }
+                        out += ChatMessage(
+                            ChatMessage.Kind.TOOL_RESULT,
+                            text,
+                            timestamp = ts,
+                            toolCallId = id,
+                            toolName = msg.str("toolName"),
+                        )
+                    }
                 }
                 else -> Unit
             }

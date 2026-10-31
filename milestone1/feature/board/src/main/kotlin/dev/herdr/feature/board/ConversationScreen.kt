@@ -20,8 +20,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,9 +35,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +54,12 @@ import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.ChatMessage
 import dev.herdr.core.herdr.Pane
 import dev.herdr.core.herdr.WriteOutcome
+import dev.herdr.feature.board.conversation.ConversationItem
+import dev.herdr.feature.board.conversation.ConversationItemMapper
 import dev.herdr.feature.board.design.LocalHerdrPalette
+import dev.herdr.feature.board.design.MonoStyle
+import dev.herdr.feature.board.markdown.MarkdownText
+import kotlinx.coroutines.launch
 import dev.herdr.feature.board.design.Radius
 import dev.herdr.feature.board.design.Space
 import dev.herdr.feature.board.design.StatusText
@@ -151,27 +159,153 @@ private fun BlockedNotice() {
 
 @Composable
 private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = Space.page, vertical = Space.m),
-        verticalArrangement = Arrangement.spacedBy(Space.s),
-    ) {
-        itemsIndexed(
-            items = messages,
-            key = { index, m -> "${pane.paneId}-$index-${m.kind}" },
-            contentType = { _, m -> m.kind },
-        ) { _, message ->
-            when (message.kind) {
-                ChatMessage.Kind.USER -> UserMessage(message.text)
-                ChatMessage.Kind.ASSISTANT -> AssistantMessage(message.text)
-                ChatMessage.Kind.THINKING -> CollapsibleRow("思考过程", message.text, muted = true)
-                ChatMessage.Kind.TOOL_CALL -> CollapsibleRow(
-                    "工具 · ${message.toolName ?: "?"}",
-                    message.text.ifBlank { "(无参数)" },
-                    mono = true,
+    val palette = LocalHerdrPalette.current
+    val items = remember(messages) { ConversationItemMapper.map(messages) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    var pendingNew by remember(pane.paneId) { mutableStateOf(false) }
+    var initialised by remember(pane.paneId) { mutableStateOf(false) }
+
+    // 首次进入定位到最新；之后仅在用户处于底部附近时跟随，
+    // 否则提示「新消息」——阅读历史时不被拉回底部（B5）。
+    LaunchedEffect(items.size) {
+        if (items.isEmpty()) return@LaunchedEffect
+        if (!initialised) {
+            listState.scrollToItem(items.lastIndex)
+            initialised = true
+            return@LaunchedEffect
+        }
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        if (items.lastIndex - lastVisible <= 2) {
+            listState.animateScrollToItem(items.lastIndex)
+        } else {
+            pendingNew = true
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = Space.page, vertical = Space.m),
+            verticalArrangement = Arrangement.spacedBy(Space.m),
+        ) {
+            items(
+                items = items,
+                key = { "${pane.paneId}-${it.index}" },
+                contentType = { it.javaClass.simpleName },
+            ) { item ->
+                when (item) {
+                    is ConversationItem.User -> UserMessage(item.text)
+                    is ConversationItem.Assistant -> AssistantMessage(item.text)
+                    is ConversationItem.Thinking -> CollapsibleRow("思考过程", item.text, muted = true)
+                    is ConversationItem.Tool -> ToolRow(item)
+                    is ConversationItem.Unknown -> CollapsibleRow("未知内容", item.text, muted = true)
+                }
+            }
+        }
+        if (pendingNew) {
+            Surface(
+                color = palette.accent,
+                shape = RoundedCornerShape(Radius.chip),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = Space.l)
+                    .clickable {
+                        pendingNew = false
+                        scope.launch { listState.animateScrollToItem(items.lastIndex.coerceAtLeast(0)) }
+                    }
+                    .semantics { contentDescription = "跳到最新消息" },
+            ) {
+                Text(
+                    "↓ 新消息",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = palette.accentOn,
+                    modifier = Modifier.padding(horizontal = Space.l, vertical = Space.s),
                 )
-                ChatMessage.Kind.TOOL_RESULT -> CollapsibleRow("工具结果", message.text, mono = true, muted = true)
-                ChatMessage.Kind.SYSTEM -> CollapsibleRow("系统", message.text, muted = true)
+            }
+        }
+    }
+}
+
+/** toolCall + toolResult：名称、执行状态、参数摘要、输出按需展开（B4）。 */
+@Composable
+private fun ToolRow(item: ConversationItem.Tool) {
+    val palette = LocalHerdrPalette.current
+    var expanded by remember(item.index, item.result) { mutableStateOf(false) }
+    val hasResult = item.result != null
+    val statusColor = when {
+        item.resultError -> palette.statusFg(AgentStatus.BLOCKED)
+        hasResult -> palette.textSecondary
+        else -> palette.statusFg(AgentStatus.WORKING)
+    }
+    val statusText = when {
+        item.resultError -> "失败"
+        hasResult -> "已返回"
+        else -> "运行中"
+    }
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable { expanded = !expanded }
+                .semantics {
+                    contentDescription =
+                        "工具 ${item.name}，$statusText，${if (expanded) "已展开" else "已折叠"}，点击切换"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(if (expanded) "▾" else "▸", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+            Spacer(Modifier.width(Space.xs))
+            Text(
+                item.name,
+                style = MaterialTheme.typography.labelLarge,
+                color = palette.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.width(Space.s))
+            Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
+            if (!item.pairedById && hasResult) {
+                Spacer(Modifier.width(Space.s))
+                Text("按顺序配对", style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
+            }
+        }
+        if (item.argumentsSummary.isNotBlank()) {
+            Text(
+                item.argumentsSummary.replace('\n', ' '),
+                style = MonoStyle,
+                color = palette.textSecondary,
+                maxLines = if (expanded) 6 else 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = Space.l, end = Space.s, bottom = Space.xs),
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            val body = item.result
+            if (body == null) {
+                Text(
+                    "还没有结果",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(start = Space.l, top = Space.xs, bottom = Space.xs),
+                )
+            } else {
+                Surface(
+                    color = palette.surfaceRaised,
+                    shape = RoundedCornerShape(Radius.code),
+                    modifier = Modifier.fillMaxWidth().padding(start = Space.l).heightIn(max = 260.dp),
+                ) {
+                    Box(Modifier.padding(Space.m).verticalScroll(rememberScrollState())) {
+                        Text(
+                            body,
+                            style = MonoStyle,
+                            color = if (item.resultError) palette.statusFg(AgentStatus.BLOCKED) else palette.textPrimary,
+                        )
+                    }
+                }
             }
         }
     }
@@ -197,14 +331,14 @@ private fun UserMessage(text: String) {
 }
 
 /**
- * assistant 正文。长内容默认折叠（性能 + 可读性，报告 §11「渲染分级」）：
- * Compose 对超长 CJK 文本的 measure/layout 是长列表主要成本，先限制初始渲染量。
+ * assistant 正文：Markdown 子集渲染（标题/列表/引用/行内样式/代码块）。
+ * 超长消息折叠预览；解析在 [MarkdownText] 内部的后台线程完成。
  */
 @Composable
 private fun AssistantMessage(text: String) {
     val palette = LocalHerdrPalette.current
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
-    val collapsible = text.length > 600 || lineCount > 14
+    val collapsible = text.length > 2500 || lineCount > 40
     var expanded by remember(text) { mutableStateOf(!collapsible) }
     Column(Modifier.fillMaxWidth()) {
         Text(
@@ -213,13 +347,10 @@ private fun AssistantMessage(text: String) {
             color = palette.statusFg(AgentStatus.DONE),
             fontWeight = FontWeight.Medium,
         )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = palette.textPrimary,
-            maxLines = if (expanded) Int.MAX_VALUE else 14,
-            overflow = TextOverflow.Ellipsis,
+        Spacer(Modifier.height(Space.xs))
+        MarkdownText(
+            source = if (expanded || !collapsible) text else cutAtLine(text, 1200),
+            modifier = Modifier.fillMaxWidth(),
         )
         if (collapsible && !expanded) {
             Text(
@@ -227,12 +358,20 @@ private fun AssistantMessage(text: String) {
                 style = MaterialTheme.typography.labelMedium,
                 color = palette.statusFg(AgentStatus.WORKING),
                 modifier = Modifier
-                    .padding(top = Space.xs)
+                    .heightIn(min = 48.dp)
                     .clickable { expanded = true }
+                    .padding(top = Space.s)
                     .semantics { contentDescription = "展开这条消息的全文" },
             )
         }
     }
+}
+
+/** 折叠预览在换行处截断，避免把代码围栏切成“未闭合”。 */
+private fun cutAtLine(text: String, max: Int): String {
+    if (text.length <= max) return text
+    val cut = text.lastIndexOf('\n', max).takeIf { it > max / 2 } ?: max
+    return text.take(cut) + "\n\n…"
 }
 
 /** thinking / tool：默认折叠，一行摘要。 */

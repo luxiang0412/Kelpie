@@ -558,3 +558,21 @@
 - **现象**：长文本折叠后，同样 10 次 swipe 的渲染帧数从 344 → 252（总内容高度变小）。
 - **影响**：不能把“jank 百分比上升/下降”归因于代码改动。
 - **建议**：前后对比必须固定内容高度；否则只比较首帧/启动耗时。
+
+## I-78 MIUI 上 `dropShaderCache` 失败，阻塞 Macrobenchmark
+
+- **现象**：`MacrobenchmarkScope.dropShaderCache` 抛异常，基准在准备阶段终止。
+- **影响**：FrameTimingMetric / Perfetto 无法获得。
+- **建议**：非 MIUI 设备或 CI emulator。
+
+## I-79 流式增量未做批处理，映射仍为 O(n)
+
+- **现状**：`remember(messages) { ConversationItemMapper.map(messages) }`，每条新增消息都会重跑整表映射。
+- **风险**：长会话（>500 条）高频增量时可能掉帧。
+- **建议**：M2-C 改成增量 append + 历史条目缓存复用。
+
+## I-80 Fixture 数据集版本变更导致与 M2-A 数据不可比
+
+- **变更**：`i % 8` → `i % 10`，并加入 Markdown/不安全链接/未知内容。
+- **影响**：M2-A 的 debug 首帧（787/786/834ms）与本轮 benchmark 首帧（375/344/298ms）同时包含构建模式与数据集两处变化，不可归因。
+- **建议**：对比时必须固定数据集版本（本报告为 fixture-v2）。

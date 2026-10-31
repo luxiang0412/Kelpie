@@ -560,3 +560,28 @@ SSH/指纹、多主机看板、断线恢复、给 agent 发消息、详情页最
 - `:benchmark` 模块仍然保留，供非 MIUI 设备/CI 使用；`suppressErrors=DEBUGGABLE` 只用于“能跑起来看链路”，**不得当作 release 结论**。
 
 **状态**：`已定`。
+
+## D49. Markdown 采用「自研轻量 Parser + Compose 自定义渲染」，不引入 Markdown 库
+
+- 理由：代码块需要语言标签/复制/横向滚动/展开（库难改）、Parser 纯函数可单测、零依赖体积、主线程零解析；
+- 明确不支持表格/图片/HTML/嵌套列表，遇到未知语法按纯文本渲染；
+- `MdBlock`/`MdSpan` 按 AST 设计，若 M2-C 需要更全语法可只替换 Parser 层。
+- 详见 `docs/design/MARKDOWN-RENDERING-DECISION.md`。
+
+**状态**：`已定`。
+
+## D50. ToolCall↔ToolResult 只按稳定 id 配对，位置配对必须标注
+
+- 双方都有 `toolCallId` 才标记为精确配对；
+- id 不匹配时退化为最近未配对 call，UI 显示「按顺序配对」，不得对外声称精确；
+- 找不到 call 的结果独立渲染，绝不合并进别的工具条目。
+
+**状态**：`已定`。
+
+## D51. benchmark 构建类型基于 release（R8 + 不可调试 + 本地签名），fixture 仅进 debug/benchmark
+
+- `run-as` 验证非 debuggable；R8 开启；`androidx.profileinstaller:1.4.1` 使 `CompilationMode.Partial()` 可用；
+- fixture 源集不进 release；fixture 不写 Room、不连 SSH；
+- `suppressErrors=DEBUGGABLE` 的结果一律不得作为正式基线。
+
+**状态**：`已定`。

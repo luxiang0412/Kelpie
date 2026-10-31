@@ -12,6 +12,17 @@ android {
     }
     buildFeatures { compose = true }
     buildTypes {
+        // benchmark：基于 release 语义（不可调试 + R8），用于 Macrobenchmark 与 UI 测试。
+        // Fixture 只进入 debug 与 benchmark 变体，正式 release 包不含任何 fixture 代码。
+        create("benchmark") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
         getByName("release") {
             // M3 只用 debug 版验收；release 的 R8/Baseline Profile 留到 M4 再开
             isMinifyEnabled = false
@@ -19,6 +30,14 @@ android {
         }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    sourceSets {
+        // benchmark 变体复用 debug 源集里的 Fixture / TestHost Activity
+        getByName("benchmark") {
+            kotlin.srcDir("src/debug/kotlin")
+            java.srcDir("src/debug/kotlin")
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+        }
+    }
     packaging {
         resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/*.kotlin_module")
     }
@@ -36,4 +55,6 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     implementation("androidx.room:room-runtime:2.8.5")
+    // 让 CompilationMode.Partial()（baseline profile）可用的官方安装器
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 }

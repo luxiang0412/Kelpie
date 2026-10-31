@@ -85,14 +85,34 @@ object Fixtures {
     fun messages(count: Int): List<ChatMessage> {
         val out = ArrayList<ChatMessage>(count)
         for (i in 0 until count) {
-            out += when (i % 8) {
+            out += when (i % 10) {
                 0 -> ChatMessage(ChatMessage.Kind.USER, "第 $i 条：检查 $i 号模块的依赖关系，并给出结论（mixed English text）。")
-                1 -> ChatMessage(ChatMessage.Kind.ASSISTANT, "已检查 $i 号模块。\n\n- 依赖无环\n- 但存在 2 处未使用导入\n\n`grep -rn unused`")
+                // Markdown 全要素：标题 + 列表 + 引用 + 行内样式 + 安全链接
+                1 -> ChatMessage(
+                    ChatMessage.Kind.ASSISTANT,
+                    "## 结论 $i\n\n已检查 **$i 号模块**，`grep` 结果显示如下：\n\n" +
+                        "- 依赖无环，*没有*循环引用\n- 但存在 2 处未使用导入\n- 参考 [文档](https://example.com/module/$i)\n\n" +
+                        "> 建议：先跑一遍 `./gradlew check` 再重构。",
+                )
                 2 -> ChatMessage(ChatMessage.Kind.THINKING, "先确认 $i 号模块的入口，再决定是否需要重构。")
-                3 -> ChatMessage(ChatMessage.Kind.TOOL_CALL, "{\"command\":\"rg -n 'import' src/module$i | head -20\"}", toolName = "bash")
-                4 -> ChatMessage(ChatMessage.Kind.TOOL_RESULT, "src/module$i/Main.kt:3:import kotlinx.coroutines.*\n".repeat(6))
-                5 -> ChatMessage(ChatMessage.Kind.ASSISTANT, LONG_TEXT)
-                6 -> ChatMessage(ChatMessage.Kind.ASSISTANT, "```kotlin\n$LONG_CODE\n```")
+                // toolCall 带稳定 id，后面按 id 配对（中间隔着 4 号思考消息）
+                3 -> ChatMessage(
+                    ChatMessage.Kind.TOOL_CALL,
+                    "{\"command\":\"rg -n 'import' src/module$i | head -20\"}",
+                    toolName = "bash",
+                    toolCallId = "call-$i",
+                )
+                4 -> ChatMessage(ChatMessage.Kind.ASSISTANT, "继续看第 $i 条的 *边界情况*，顺便验证链接 [不安全示例](javascript:alert(1)) 不会被点击。")
+                5 -> ChatMessage(
+                    ChatMessage.Kind.TOOL_RESULT,
+                    "src/module$i/Main.kt:3:import kotlinx.coroutines.*\nsrc/module$i/Util.kt:9:import java.io.File\n".repeat(3) +
+                        "Error: 第 $i 条里有一个警告\n",
+                    toolCallId = "call-$i",
+                )
+                6 -> ChatMessage(ChatMessage.Kind.ASSISTANT, LONG_TEXT)
+                7 -> ChatMessage(ChatMessage.Kind.ASSISTANT, "```kotlin\n$LONG_CODE\n```")
+                // 异常/未知内容（不进渲染模型时不得崩溃）
+                8 -> ChatMessage(ChatMessage.Kind.ASSISTANT, "| 表格列 A | 表格列 B |\n|---|---|\n| $i | 未支持 |\n\n![](/nonexistent.png)")
                 else -> ChatMessage(ChatMessage.Kind.ASSISTANT, "第 $i 条结果：/home/user/project/private/herdr-gui-research/module-$i/build/outputs/logs/fixture-long-path-$i.txt")
             }
         }
