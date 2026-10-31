@@ -453,3 +453,48 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 
 单测 23/23 通过；「稳态与首轮都不得调用 `headBytes`」由计数 `ByteSource` 断言。
 优化后一次 poll = `stat`(1) + `read`(1) = **2 个往返**。
+
+## 9.14 Android 真机接入（2026-10-31）
+
+### 设备
+
+| 项目 | 值 |
+| --- | --- |
+| 型号 | Redmi **22021211RC**（Redmi K40S） |
+| Android | **14（SDK 34）** |
+| 屏幕 | 1080×2400，440 dpi，挖孔 80 px |
+| 刷新率 | 支持 **60 / 90 / 120 Hz**，当前 `renderFrameRate=120` |
+| 连接方式 | 无线调试（`adb pair` 成功，`adb connect 192.168.1.8:37687`） |
+| 设备 GUID | `adb-9b7e0bf1-J79PdI` |
+
+### 网络拓扑问题（重要）
+
+| 检查 | 结果 |
+| --- | --- |
+| 本机 IP | 同网段 `192.168.1.5` |
+| PC → 手机 | 通（adb 走 TCP） |
+| 手机 → PC（ICMP） | **100% 丢包** |
+| 手机 → herdr 主机 `192.168.5.8:22`（TCP） | **超时**（手机路由只有 `192.168.1.0/24`(wlan0)、`10.10.14.0/30`(tun0)、`10.227.209.12/30`(cellular)） |
+| 手机 → 网关 `192.168.1.1:80` | 通（说明 WiFi 本身正常） |
+
+结论：**手机和 herdr 主机不在同一可路由网络**。PC 能同时到达两边（多网卡），手机不能直达 192.168.5.8。
+
+### 测试期链路（已打通，VERIFIED）
+
+```text
+手机 App → 127.0.0.1:2222  (adb reverse)
+        → PC:2222          (ssh -L 2222:127.0.0.1:22 luxiang@192.168.5.8)
+        → 主机 127.0.0.1:22 (真实 sshd / 真实 host key)
+```
+
+验证：
+
+| 步骤 | 结果 |
+| --- | --- |
+| PC 经 2222 登录主机 | `TUNNEL_OK`，hostname `luxiang-MS-7E07` |
+| `adb reverse tcp:2222 tcp:2222` | 注册成功（`adb reverse --list` 可见） |
+| `adb reverse` 机制本身（HTTP 8899 对照） | 手机 `curl http://127.0.0.1:8899/` → **200** |
+| 手机读 SSH banner（`curl` 打 2222） | `Connected to 127.0.0.1 port 2222` + `Received HTTP/0.9 when not allowed`（= 收到了 SSH banner） |
+
+**注意**：这条链路会让延迟多一跳（adb + 本地转发），**不能用它给 Phase 1 的延迟目标定数字**；只用于功能验证（sshj 在 Android 上的可用性、指纹校验、协议往返）。
+延迟评估仍以 PC 直连为准（RTT 50 ms）。
