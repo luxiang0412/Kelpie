@@ -237,3 +237,39 @@
 - 所有远端命令用绝对路径（`/home/luxiang/.local/bin/herdr`），不依赖 PATH。
 
 **状态**：`已定`。
+
+## D17. 屏读审批只用 `promptHash`，不依赖 `revision`
+
+**决策**
+
+- `pane.read.revision` 实测恒为 0（内容变化也不变），`pane.get.revision` 只在元数据变化时变一次 → **`revision` 不能用来判断屏幕内容是否变化**。
+- L2 的判据固定为：`promptHash = hash(归一化问题文本 + 选项 + 每项命令正文)`，外加 `agent_status == blocked` 与 `(pane_id, terminal_id, agent)` 三元组未变。
+- 任何“revision 变了但哈希没变可以继续”的写法从文档中删除。
+
+**依据**：`RESULTS.md` ON2-20；`ISSUES.md` I-35。
+
+**状态**：`已定`。
+
+## D18. 写操作前必须按 schema 校验参数名
+
+**决策**
+
+- 客户端发请求前用内置 schema 校验参数（字段名、类型、枚举），**未知字段直接报错不发**。
+- 起因：`pane.split` 的正确字段是 `target_pane_id`，传 `pane_id` 被静默忽略并 split 到焦点 pane，误改了用户 workspace（已恢复）。
+- 所有写操作日志记录“请求的 pane”与“服务端响应里实际生效的 pane”，不一致就告警。
+
+**依据**：`RESULTS.md` ON2-21 与误操作记录；`ISSUES.md` I-34。
+
+**状态**：`已定`。
+
+## D19. pi 作为本阶段的结构化数据源（替代 Claude）
+
+**决策**
+
+- Spike 3/4 主数据源改为 **pi 1.4.0**：`pi --session-dir ~/spike-sandbox/pi-sessions`（扁平目录，可整体清理），不碰 `~/.pi` 配置、不装 `herdr integration install pi`。
+- 已知限制：不装集成时 herdr 的 `agent_session` 为 `null`，只能按 `foreground_cwd` + 目录/文件 mtime 定位；pi 退出后 herdr 立即丢失 agent 身份（`agent=null`）。
+- Phase 3 若要 `agent_session`，再评估装集成（会写 `~/.pi/agent/extensions/`，需单独批准）。
+
+**依据**：`RESULTS.md` ON2-25…ON2-28。
+
+**状态**：`已定`（本阶段）。

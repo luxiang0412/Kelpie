@@ -275,7 +275,7 @@
 
    ```bash
    for i in $(seq 1 200); do
-     herdr --session "$HERDR_SESSION" pane split --direction right >/dev/null 2>&1
+     herdr --session "$HERDR_SESSION" pane split --target-pane-id "$PANE" --direction right >/dev/null 2>&1
      herdr --session "$HERDR_SESSION" pane close >/dev/null 2>&1
    done
    herdr --session "$HERDR_SESSION" api snapshot >/dev/null   # 清理后核对
@@ -767,3 +767,8 @@
 > 6. 某个 Spike 超过建议用时的 1.5 倍还没结论，就记录现状和卡点，进入下一个。
 >
 > 交付：`RESULTS.md`、`DECISIONS.md`、`ISSUES.md`、`NEXT-STEPS.md` 四个文件，外加 `spike/results/` 里的原始数据。最后给一份不超过一页的总结：哪些路线确认可行、选定了哪些方案、还有哪些风险。
+
+> **v2.2 实测修正（2026-10-31）**：
+> - JSON API 的 `pane.split` 参数是 **`target_pane_id`**，不是 `pane_id`；传错会被**静默忽略**并 split 到焦点 pane（已发生过一次误操作，见 `ISSUES.md` I-34）。
+> - `pane.read.revision` 恒为 0，**不能**用来判断屏幕内容变化；L2 审批只用 `promptHash`（`ISSUES.md` I-35）。
+> - 事件载荷**无时间戳**，端到端延迟要自己配对时间（`ISSUES.md` I-37）。

@@ -267,3 +267,34 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 **推论（写进 Spike 3 计划）**：
 - 不装 `herdr integration install pi` 时，`agent_session` 拿不到路径 → 必须自己定位：按 `foreground_cwd` 推导目录 `--<path 中非字母数字→->--`，再取该目录下最新 `.jsonl`。
 - 该目录当前为空，说明 **`pi` 可能只在首次对话后才写 session 文件** → “首次提问前没有日志”的窗口需要用时间序列测（Spike 3 步骤 7）。
+
+## 9.9 专用 pane 里的写操作 / 事件 / pi（2026-10-31 15:30–15:40）
+
+已获批：A（专用 workspace + 写操作与事件测试）、P-2（在专用 pane 跑 pi）。
+专用 workspace：**`w4`**（label `spike`，cwd `~/spike-sandbox`，`--no-focus`），使用 pane **`w4:p1`**。
+用户原有 4 个 pane（`w1:p1`、`w1:p2`、`w2:p1`、`w3:p1`）**未收到任何输入**。
+
+| ID | 项 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| ON2-19 | `pane.send_text` + `pane.send_keys ["enter"]` | 返回 `{"type":"ok"}`；shell 执行；`pane.read --source visible` 看到输出 | `s2-write-basic.json` |
+| ON2-20 | **`revision` 的真实语义** | `pane.read.revision` **恒为 0**（内容变化后仍是 0）；`pane.get.revision` 0→1 一次后不再变。→ **`revision` 不是内容版本号** | 见下 |
+| ON2-21 | `pane.split` 的参数名 | schema 是 **`target_pane_id`**（不是 `pane_id`）。传 `pane_id` 会被忽略，**split 到当前焦点 pane** | schema + 误操作记录 |
+| ON2-22 | pane id 复用 | 关闭后新建得到 `w4:p3`（前一个是 `w4:p2`）→ **递增不复用** | `s2-events-pane-lifecycle.ndjson` |
+| ON2-23 | 事件载荷形态 | `{event, data:{type,...}}`；`pane_created`/`pane_updated` 带完整 pane，`pane_closed` 只有 `pane_id`+`workspace_id`，`layout_updated` 带 layout；**没有任何时间戳字段** | 同文件 |
+| ON2-24 | `terminal session observe` | 可用，返回 `{"bytes":"<base64 ANSI>","encoding":"ansi","full":true,"seq":1,"width":60,"height":20,"type":"terminal.frame"}`；不影响 pane 本身 | 命令输出 |
+| ON2-25 | pi 1.4.0 + `--session-dir` | 生效，会话文件落在**该目录直属**：`~/spike-sandbox/pi-sessions/2026-10-31T07-29-19-047Z_01a190dc-….jsonl`（**没有** `--<cwd>--` 子目录） | `ls` 结果 |
+| ON2-26 | pi JSONL 行结构（小样本） | 6 行：`session`×1、`model_change`×1、`thinking_level_change`×1、`message`×3 | 计数脚本 |
+| ON2-27 | pi 运行时的 herdr 识别 | 运行中能靠标题识别为 `pi`；**`agent_session` 始终 `null`**；退出后 `agent=null`、`agent_status=unknown` | `pane get w4:p1` |
+| ON2-28 | pi 非交互耗时 | `pi --session-dir … -p "reply with exactly: SPIKE-OK"` 在 **< 5 s** 内返回 | 轮询输出 |
+
+### 一次误操作（已恢复，如实记录）
+
+第一次 split 用了 `pane_id` 字段（文档/任务书里的写法），服务端忽略该字段、按**当前焦点 pane**（`w1:p2`）执行，结果在**用户自己的 workspace `w1`** 里建了 `w1:p3`。
+- 影响：约 40 秒内 `w1:t2` 多了一个空 shell pane（未输入任何内容）。
+- 处置：立即 `pane.close w1:p3`，`pane list` 确认回到原状（`w1:p1`、`w1:p2` 未变）。
+- 结论：**`pane.split` 必须用 `target_pane_id`**；写进 `ISSUES.md` I-34 与任务书。
+
+### 对设计的影响
+
+- 审批 L2 里“`revision` 变了但问题哈希没变就继续”的规则**不成立**：`revision` 不反映屏幕内容（ON2-20）。L2 的判据只能是 `promptHash`（对 `pane.read` 文本归一化）+ `agent_status`。
+- pi 的会话定位：`--session-dir` 时是**扁平目录**，`<ISO8601>_<uuid>.jsonl`；默认（不加 `--session-dir`）是否走 `--<cwd>--` 子目录 **未测**（不想往你的 `~/.pi` 里写样本）。

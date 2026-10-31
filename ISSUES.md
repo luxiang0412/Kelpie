@@ -255,3 +255,30 @@
 - 订阅不存在的 pane → `pane_not_found`（整条拒绝）。
 - 缺 `pane_id` 的 `agent_status_changed` → `invalid_request: missing field pane_id`。
 - **建议**：客户端把 `pane_not_found` 当作“pane 已消失”处理（触发一次快照对账），不要当致命错误。
+
+## I-34 `pane.split` 的参数是 `target_pane_id`，用 `pane_id` 会 split 到焦点 pane（已发生的误操作）
+
+- **现象**：`{"method":"pane.split","params":{"pane_id":"w4:p1","direction":"right"}}` → 在 `w1:t2` 里创建了 `w1:p3`（当前焦点 pane 所在 tab），`w4` 没有任何变化。
+- **复现**：见上方；schema `PaneSplitParams` 只有 `target_pane_id` / `workspace_id` / `direction` / `cwd` / `ratio` / `focus`，**没有 `pane_id`**。
+- **影响**：会误改**别人的 workspace**（本次已即时 `pane.close` 恢复）。
+- **建议**：① 对未知字段零容忍（客户端发请求前用 schema 校验）；② 文档/任务书把所有 `pane.split` 示例改成 `target_pane_id`；③ 写操作日志记录“实际生效的 pane”。
+- **状态**：已恢复；契约已修正。
+
+## I-35 `pane.read.revision` 恒为 0，不能当内容版本号
+
+- **现象**：同一 pane 内容变化 3 次后，`pane.read` 的 `revision` 仍是 0；`pane.get` 的 `revision` 0→1 后不再变化。
+- **影响**：审批 L2 原设计“比较 revision 判断屏幕是否变化”失效；只能用 `promptHash`（文本归一化）与 `agent_status`。
+- **建议**：文档改为“`revision` 仅作 pane 元数据版本参考，**不要**用它判断屏幕内容是否变化”；L2 的二次校验只依赖 `promptHash` + `pane.get(agent_status, agent, terminal_id)`。
+- **状态**：已记录，文档待改（本轮已改本文件与 RESULTS）。
+
+## I-36 `pi --session-dir` 是扁平目录，与默认布局不同
+
+- **现象**：`pi --session-dir ~/spike-sandbox/pi-sessions -p "…"` 产生的文件是 `~/spike-sandbox/pi-sessions/2026-10-31T07-29-19-047Z_<uuid>.jsonl`，**没有** `--<cwd>--` 子目录。
+- **影响**：定位逻辑要按“是否使用了 `--session-dir`”分两种：扁平 vs 按 cwd 分目录。默认布局本轮**未测**（避免往 `~/.pi` 写入样本）。
+- **建议**：Spike 3 明确分两路验证；产品优先要求用户/我们传 `--session-dir`（可控且可清理）。
+
+## I-37 事件没有时间戳字段
+
+- **现象**：`pane_created` / `pane_updated` / `pane_closed` / `layout_updated` 的载荷里都没有时间戳。
+- **影响**：端到端延迟只能靠“主机侧先记时间、客户端收到再回传”或时钟偏差估计；无法直接用事件自带时间。
+- **建议**：延迟测量脚本按“主机侧写入标记 + 客户端记录接收时刻 + 估算偏差”三段式；别假设事件带 ts。
