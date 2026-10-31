@@ -175,7 +175,7 @@ class BoardScreenTest {
         render(
             state(listOf(pane("w1:p1", AgentStatus.BLOCKED)), stale = true),
         )
-        rule.onNodeWithText("显示的是缓存数据", substring = true).assertExists()
+        rule.onNodeWithText("显示的是缓存内容", substring = true).assertExists()
     }
 
     @Test

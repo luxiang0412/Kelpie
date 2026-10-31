@@ -1,6 +1,12 @@
 package dev.herdr.feature.board
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import dev.herdr.feature.board.design.Space
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -60,6 +66,7 @@ private fun AppContent(vm: HostsViewModel) {
 
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
     var techSheet by rememberSaveable { mutableStateOf(false) }
+    var pendingSheet by rememberSaveable { mutableStateOf(false) }
     val pane = state.board.selectedPane
     val activeHost = state.hosts.firstOrNull { it.cfg.id == state.activeId }
 
@@ -134,9 +141,49 @@ private fun AppContent(vm: HostsViewModel) {
                         vm.openConversation(p)
                         screen = SCREEN_CONVERSATION
                     },
+                    pendingWrites = pendingWrites,
+                    onOpenPending = { pendingSheet = true },
                 )
             }
         }
+    }
+
+    // UX-02c：Unknown 写操作详情（可从工作台 Banner 直接进入，不必先进对话/技术信息）
+    if (pendingSheet) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingSheet = false },
+            title = { Text("待确认的发送（${pendingWrites.size}）") },
+            text = {
+                Column(
+                    Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Space.s),
+                ) {
+                    Text(
+                        "这些操作的结果无法确认，远端可能已经执行。不会自动重发；如需再发送同样内容，"
+                            + "由你自行确认，并会产生一条新的操作记录。",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    pendingWrites.forEach { rec ->
+                        Column {
+                            Text(
+                                "${rec.method} → ${rec.target}",
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            Text(
+                                "action ${rec.clientRequestId.take(8)} · ${rec.attempts} 次 · " +
+                                    (rec.outcome as? dev.herdr.core.herdr.WriteOutcome.Unknown)?.reason.orEmpty(),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { pendingSheet = false }) { Text("关闭") }
+            },
+        )
     }
 
     if (techSheet && pane != null) {

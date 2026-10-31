@@ -75,6 +75,8 @@ fun BoardScreen(
     onReconnect: () -> Unit,
     onOpenHosts: () -> Unit,
     onSelectAgent: (Pane) -> Unit,
+    pendingWrites: List<dev.herdr.core.herdr.WriteRecord> = emptyList(),
+    onOpenPending: () -> Unit = {},
 ) {
     val palette = LocalHerdrPalette.current
     val active = state.hosts.firstOrNull { it.cfg.id == state.activeId }
@@ -176,7 +178,7 @@ fun BoardScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            StatusLine(state, active, onReconnect)
+            StatusLine(state, active, onReconnect, pendingWrites, onOpenPending)
 
             if (approvals.isNotEmpty()) {
                 approvals.forEach { item ->
@@ -270,32 +272,64 @@ private object Palette {
 }
 
 @Composable
+/**
+ * 单条主 Banner（UX-02c / §2.3 优先级）：
+ * 安全异常 > Unknown 写操作 > 鉴权失败 / 待确认指纹 > 离线或重连中 > 缓存过期 > 正常（不显示）。
+ * 同屏只出现一条，避免多条横幅互相叠压；其余问题通过详情入口查看。
+ */
 private fun StatusLine(
     state: HostsViewModel.UiState,
     active: HostsViewModel.HostState?,
     onReconnect: () -> Unit,
+    pendingWrites: List<dev.herdr.core.herdr.WriteRecord>,
+    onOpenPending: () -> Unit,
 ) {
     val palette = LocalHerdrPalette.current
     val host = active ?: return
-    val transportTrouble = host.connKind != HostConnectionManager.ConnKind.CONNECTED
+    val kind = host.connKind
+    val transportTrouble = kind != HostConnectionManager.ConnKind.CONNECTED
     val dataStale = state.board.stale && state.board.updatedAtMs > 0
 
-    if (!transportTrouble && !dataStale) return  // 正常在线不占一条常驻横幅（报告要求）
+    data class Banner(val text: String, val color: androidx.compose.ui.graphics.Color, val action: (() -> Unit)?, val actionLabel: String)
 
-    val (text, color) = when {
-        transportTrouble -> host.connText to palette.statusFg(AgentStatus.WORKING)
-        else -> "显示的是缓存数据 · 上次同步 ${timeAgo(state.board.updatedAtMs)}" to palette.statusFg(AgentStatus.UNKNOWN)
-    }
+    val banner = when {
+        // 1) Unknown 写操作：必须能从工作台看到并进入（不能只藏在技术信息里）
+        pendingWrites.isNotEmpty() -> Banner(
+            "有 ${pendingWrites.size} 个发送结果无法确认，远端可能已执行（不会自动重发）",
+            palette.statusFg(AgentStatus.UNKNOWN),
+            onOpenPending,
+            "查看",
+        )
+        // 2) 待确认主机指纹 / 鉴权失败
+        kind == HostConnectionManager.ConnKind.AWAITING_HOST_KEY || kind == HostConnectionManager.ConnKind.FAILED ->
+            Banner(host.connText, palette.statusFg(AgentStatus.BLOCKED), onReconnect, "重试")
+        // 3) 离线 / 重连中
+        transportTrouble -> Banner(host.connText, palette.statusFg(AgentStatus.WORKING), onReconnect, "重试")
+        // 4) 在线但数据过期：保留缓存内容并明确标注
+        dataStale -> Banner(
+            "显示的是缓存内容 · 上次同步 ${timeAgo(state.board.updatedAtMs)}",
+            palette.statusFg(AgentStatus.UNKNOWN),
+            null,
+            "",
+        )
+        else -> null
+    } ?: return  // 一切正常：不占常驻横幅
+
     Surface(color = palette.surfaceRaised, modifier = Modifier.fillMaxWidth()) {
         Row(
             Modifier.padding(horizontal = Space.page, vertical = Space.s),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(8.dp).background(color, CircleShape))
-            Spacer(Modifier.width(Space.s))
-            Text(text, style = MaterialTheme.typography.labelLarge, color = palette.textSecondary, modifier = Modifier.weight(1f))
-            if (transportTrouble) {
-                TextButton(onClick = onReconnect) { Text("重试") }
+            Text(
+                banner.text,
+                style = MaterialTheme.typography.labelLarge,
+                color = banner.color,
+                modifier = Modifier.weight(1f),
+            )
+            banner.action?.let { act ->
+                TextButton(onClick = act, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(banner.actionLabel, style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
