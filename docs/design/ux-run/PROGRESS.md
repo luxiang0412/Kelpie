@@ -14,5 +14,5 @@
 | 其余 Task Packets | TODO | 待前序完成后按序执行 |
 | UX-03a 对话正文/身份头/用户气泡 | PARTIAL | 同上；UI 回归未重跑 |
 
-> 本轮结束状态见 `FINAL-REVIEW.md`：`FUNCTIONAL_PARTIAL`。`UX-03b…UX-09` 未实施（会话预算，非设备阻断）。
+> 本轮结束状态见 `FINAL-REVIEW.md`：`FUNCTIONAL_PARTIAL`（12 PASS / 6 PARTIAL / 1 SKIPPED）。
 | UX-09 全局 QA / 性能回归 | PARTIAL | 见 UX-09-QA.md |
