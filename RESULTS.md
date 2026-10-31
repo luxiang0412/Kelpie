@@ -552,3 +552,41 @@ App：`spike/android`（最小 Activity，非 Compose；源码见该目录 READM
 2. **KEX 协商**：把 `keyExchangeFactories` 限定为 `curve25519-sha256` / `ecdh-sha2-*` / `dh-group14/16/gex`。
 
 两个坑都已写进 `ISSUES.md` I-48 与 `DECISIONS.md` D27。
+
+## 9.16 Android 真机：snapshot / 订阅 / SFTP（VERIFIED，2026-10-31）
+
+同一个 App（`spike/android`）追加 phase2 / phase3，仍是直连 `192.168.5.8`。
+
+### snapshot 与订阅
+
+| 项 | 结果 |
+| --- | --- |
+| `session.snapshot` | 494 / 384 / 363 ms（P50 ≈ 384 ms），响应 5,738 B |
+| 订阅建立（`subscription_started`） | **159 ms** |
+| 自触发 `pane.split` → 收到 `pane_created` | split RTT 298 ms，事件到达 **292 ms** |
+| 自触发 `pane.close` → 收到 `pane_closed` | close RTT 389 ms，事件到达 **388 ms** |
+| 事件总数 | 3（created / updated / closed，符合预期） |
+
+解读：事件是**随请求同步推送**的，所以 `event_ms ≈ rtt_ms`；这说明“手机触发 → 手机看到事件”的端到端 ≈ 一次请求的 RTT，不需要额外等待。
+
+### SFTP + SftpTail（真机）
+
+| 步骤 | 结果 | 耗时 |
+| --- | --- | --- |
+| `stat` | `size=24, inode=null` | — |
+| 首读 3 行 | 3 行 | 355 ms |
+| 追加 2 行 | 2 行 | **353 ms** |
+| 截断 | `Reset(truncated)` | 238 ms |
+| 截断后读 | 1 行 | 187 ms |
+| 替换成更大文件 | `Reset(identity-changed)` ✅ | 477 ms |
+| 替换后读 100 行 | 100 行 | 564 ms |
+| 回填 30 行 | 30 行 | 143 ms |
+
+对比 PC：稳态 poll 195 ms → **真机 353 ms**（约 1.8×）。原因与 D28 一致（Android JCE/BC、无 JIT、VPN）。
+
+### 新发现：pane id 不是纯数字
+
+`pane.split` 返回的新 pane 是 **`w4:pA`**（不是 `w4:p10`）——**pane 序号是 base36**。
+影响：所有“按数字解析 pane id / 按数字排序”的实现都是错的；`pane_id` 必须当作**不透明字符串**处理（已在 D30 固化）。
+
+收尾核对：`pane list` = `w1:p1`、`w1:p2`、`w2:p1`、`w3:p1`、`w4:p1` —— 用户 4 个 pane 未变，phase2 创建的临时 pane 已关闭。

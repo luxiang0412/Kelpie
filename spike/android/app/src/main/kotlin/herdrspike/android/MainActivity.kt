@@ -185,7 +185,131 @@ class MainActivity : Activity() {
                 log("RESULT,PING,run=$i,ms=%.0f,resp=%s".format(ms, line.take(100)))
             }
         }
+        // 第二阶段：在真机上验证 snapshot + 双层订阅 + 端到端事件时延
+        runCatching { phase2() }.onFailure { log("PHASE2,failed=$it") }
+        runCatching { phase3Sftp() }.onFailure { log("PHASE3,failed=$it") }
         log("DONE")
+    }
+
+    /**
+     * Phase 2：snapshot 延迟、订阅建立延迟、以及“自己触发事件 → 自己收到事件”的端到端时延。
+     * 触发用 pane.split/close，只作用于 w4（我们的专用 workspace），不碰用户 pane。
+     */
+    private fun phase2() {
+        val store = TrustStore(File(filesDir, "known_hosts.spike"))
+        val ssh = connect(store) { true }
+        ssh.use {
+            // 1) snapshot x3
+            repeat(3) { i ->
+                val t0 = System.nanoTime()
+                val line = execCapture(
+                    it, "$HERDR --session $SESSION remote-api-bridge",
+                    """{"id":"s$i","method":"session.snapshot","params":{}}"""
+                )
+                val ms = (System.nanoTime() - t0) / 1e6
+                val panes = Regex("\"pane_id\":").findAll(line).count()
+                log("RESULT,SNAPSHOT,run=$i,ms=%.0f,bytes=%d,panes=%d".format(ms, line.length, panes))
+            }
+
+            // 2) 建订阅（全局生命周期 + w4:p1 状态）
+            val sess = it.startSession()
+            val cmd = sess.exec("$HERDR --session $SESSION remote-api-bridge")
+            val subJson = """{"id":"subDev","method":"events.subscribe","params":{"subscriptions":[""" +
+                """{"type":"pane.created"},{"type":"pane.closed"},{"type":"pane.updated"},""" +
+                """{"type":"pane.agent_status_changed","pane_id":"w4:p1"}]}}"""
+            val t0 = System.nanoTime()
+            cmd.outputStream.write((subJson + "\n").toByteArray())
+            cmd.outputStream.flush()
+            val lines = java.util.Collections.synchronizedList(ArrayList<Pair<Long, String>>())
+            val reader = Thread {
+                runCatching {
+                    cmd.inputStream.bufferedReader().forEachLine { l ->
+                        lines.add(Pair(System.nanoTime(), l))
+                    }
+                }
+            }.apply { isDaemon = true; start() }
+
+            fun waitFor(pred: (String) -> Boolean, timeoutMs: Long): Pair<Long, String>? {
+                val deadline = System.currentTimeMillis() + timeoutMs
+                while (System.currentTimeMillis() < deadline) {
+                    synchronized(lines) {
+                        val hit = lines.firstOrNull { pred(it.second) }
+                        if (hit != null) return hit
+                    }
+                    Thread.sleep(5)
+                }
+                return null
+            }
+
+            val started = waitFor({ it.contains("subscription_started") }, 10_000)
+            log("RESULT,SUBSCRIBE,started=%s,ms=%.0f".format(
+                started != null, (System.nanoTime() - t0) / 1e6))
+
+            // 3) 自己触发 split → 等 pane_created
+            val tSplit = System.nanoTime()
+            val splitResp = execCapture(
+                it, "$HERDR --session $SESSION remote-api-bridge",
+                """{"id":"sp","method":"pane.split","params":{"target_pane_id":"w4:p1","direction":"right","cwd":"/home/luxiang/spike-sandbox"}}"""
+            )
+            val newPane = Regex("\"pane_id\":\"([^\"]+)\"").find(splitResp)?.groupValues?.get(1) ?: "?"
+            val created = waitFor({ it.contains("pane_created") }, 10_000)
+            log("RESULT,EVENT_CREATED,pane=$newPane,split_rtt_ms=%.0f,event_ms=%.0f".format(
+                (System.nanoTime() - tSplit) / 1e6,
+                created?.let { (it.first - tSplit) / 1e6 } ?: -1.0))
+
+            // 4) 关闭 → 等 pane_closed
+            val tClose = System.nanoTime()
+            execCapture(
+                it, "$HERDR --session $SESSION remote-api-bridge",
+                """{"id":"cl","method":"pane.close","params":{"pane_id":"$newPane"}}"""
+            )
+            val closed = waitFor({ it.contains("pane_closed") }, 10_000)
+            log("RESULT,EVENT_CLOSED,pane=$newPane,close_rtt_ms=%.0f,event_ms=%.0f".format(
+                (System.nanoTime() - tClose) / 1e6,
+                closed?.let { (it.first - tClose) / 1e6 } ?: -1.0))
+
+            log("RESULT,EVENT_COUNT,total=${lines.size}")
+            runCatching { cmd.close() }
+            runCatching { sess.close() }
+        }
+    }
+
+    /** Phase 3：真机 SFTP + SftpTail（追加 / 截断 / 替换 / 回填）。只操作沙箱文件。 */
+    private fun phase3Sftp() {
+        val path = "/home/luxiang/spike-sandbox/sftp-android.jsonl"
+        val ssh = connect(TrustStore(File(filesDir, "known_hosts.spike"))) { true }
+        ssh.use {
+            execCapture(it, "printf '%s\n' '{\"n\":1}' '{\"n\":2}' '{\"n\":3}' > $path")
+            val sftp = it.newSFTPClient()
+            val src = herdrspike.tail.SftpByteSource(sftp)
+            val tail = herdrspike.tail.SftpTail(src, path)
+            fun drain(tag: String) {
+                val t0 = System.nanoTime()
+                val r = tail.poll()
+                val ms = (System.nanoTime() - t0) / 1e6
+                when (r) {
+                    is herdrspike.tail.TailResult.Lines ->
+                        log("RESULT,SFTP,$tag,lines=%d,last=%s,ms=%.0f".format(r.lines.size, r.lines.lastOrNull() ?: "", ms))
+                    else -> log("RESULT,SFTP,$tag,result=$r,ms=%.0f".format(ms))
+                }
+            }
+            val st = src.stat(path)
+            log("RESULT,SFTP,stat=$st,attrs=${src.lastAttributes},err=${src.lastError}")
+            drain("1-initial")
+            execCapture(it, "printf '%s\n' '{\"n\":4}' '{\"n\":5}' >> $path")
+            drain("2-append")
+            execCapture(it, "truncate -s 10 $path")
+            drain("3-truncate")
+            drain("4-after-truncate")
+            execCapture(it, "seq 1 100 | sed 's/^/{\"big\":/;s/$/}/' > $path")
+            drain("5-replace-larger")
+            drain("6-after-replace")
+            val t0 = System.nanoTime()
+            val back = tail.backfillLastLines(30)
+            log("RESULT,SFTP,7-backfill,lines=%d,last=%s,ms=%.0f".format(
+                back.size, back.lastOrNull() ?: "", (System.nanoTime() - t0) / 1e6))
+            runCatching { sftp.close() }
+        }
     }
 
     /** 弹真实对话框；返回用户是否点了“信任”。 */
