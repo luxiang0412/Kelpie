@@ -71,6 +71,7 @@ import dev.herdr.core.herdr.WriteOutcome
 import dev.herdr.feature.board.conversation.ConversationItem
 import dev.herdr.feature.board.conversation.ConversationBranch
 import dev.herdr.feature.board.conversation.IncrementalConversationMapper
+import dev.herdr.feature.board.design.ComposerGutter
 import dev.herdr.feature.board.design.DisclosureIndicator
 import dev.herdr.feature.board.design.TouchTargetIconButton
 import dev.herdr.feature.board.design.LocalHerdrPalette
@@ -631,6 +632,11 @@ private fun ComposerBar(
     onDismissOutcome: () -> Unit,
 ) {
     val palette = LocalHerdrPalette.current
+    // UX-04a（CMP-STYLE-001 暂定）：轻量双层 Surface —— 外层是页面底色，
+    // 输入容器用 surface + 20dp 圆角（窄屏 18dp），Send 是唯一 Accent 操作。
+    val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 360
+    val gutter = if (compact) ComposerGutter.compact else ComposerGutter.normal
+    val radius = if (compact) 18.dp else 20.dp
     var longEditor by remember(pane.paneId) { mutableStateOf(false) }
     var confirmResend by remember { mutableStateOf(false) }
     val hasAgent = pane.agent != null
@@ -641,7 +647,7 @@ private fun ComposerBar(
             .fillMaxWidth()
             .imePadding()
             .navigationBarsPadding()
-            .padding(horizontal = Space.page, vertical = Space.s),
+            .padding(horizontal = gutter, vertical = Space.s),
     ) {
         // 发送结果：Accepted / Rejected / Unknown 三态文案不同，TalkBack 也读得到
         composer.message?.let { msg ->
@@ -679,7 +685,7 @@ private fun ComposerBar(
             }
         }
 
-        Surface(color = palette.surfaceRaised, shape = RoundedCornerShape(Radius.card)) {
+        Surface(color = palette.surface, shape = RoundedCornerShape(radius)) {
             Row(
                 Modifier.padding(start = Space.m, end = Space.xs, top = Space.xs, bottom = Space.xs),
                 verticalAlignment = Alignment.Bottom,

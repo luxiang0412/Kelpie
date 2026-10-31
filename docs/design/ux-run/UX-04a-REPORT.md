@@ -1,0 +1,21 @@
+# UX-04a report — Composer 视觉布局（轻量双层 Surface，CMP-STYLE-001）
+
+- baseline：`22c7a35` / `ux/graphite-editorial`
+- inspected：`ConversationScreen.kt` 的 `ComposerBar`（原：`surfaceRaised` + `Radius.card(18)` + 页面 16dp 边距）
+- goal：只改容器层次/圆角/边距/图标定位，不动 TextField 状态、草稿、发送三态
+- changed：
+  - 输入容器底色 `surfaceRaised` → **`surface`**（与页面底色形成"双层"而非深色块）
+  - 圆角 `Radius.card(18)` → **20dp**，窄屏（`screenWidthDp < 360`）**18dp**
+  - 左右边距改用 `ComposerGutter`（**16dp / 窄屏 12dp**），不再复用页面 16dp
+  - Send 仍是唯一 Accent 操作（≥48dp 触达，圆面可略小）；Expand 仍是矢量图标按钮
+  - **未新增 Mic/附件入口**（尚未接通，按规范禁止假入口）
+- 未改动：`OutlinedTextField` 1–5 行 + 内部滚动、Enter 换行、长 Prompt 全屏编辑、Accepted/Rejected/Unknown 三态、草稿与账本
+- why：Spec「主输入 Surface 使用 surface，约 20dp 圆角（窄屏 18dp），外左右 16dp（窄屏 12dp）；Send 唯一明显 Accent」
+- tests：`assembleDebug` OK；AVD 全量 UI 26/26（ComposerUiTest 7 项无回归）
+- screenshots：`spike/results/ux04a-avd.png`（AVD 393dp / Dark）— 输入区与页面底色分层、20dp 圆角、16dp 边距、Expand + Send
+- 四类结论：
+  - **已实现并验证（AVD）**：surface 双层、圆角/边距响应式、Send 唯一 Accent、无假入口
+  - **已实现但未验证**：真机中文 IME + Gesture Navigation 下的 Insets 双倍留白问题（当前只用 `imePadding + navigationBarsPadding` 一条路径，但未在真机手势导航实测）
+  - **未实现**：Mic（`CMP-VOICE-001`，依赖 UX-07a 结论）、附件
+  - **已知问题**：浅色模式下输入框描边较淡（`outline = #DFE5ED`），在弱光下边界可能不够明确；留待 UX-08b 统一
+- commit：见提交
