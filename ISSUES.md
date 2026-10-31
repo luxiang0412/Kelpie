@@ -217,3 +217,41 @@
 
 - **现象**：`ssh host 'herdr ...'` → `command not found`。
 - **建议**：所有远端命令用绝对路径；App 端也应先 `command -v`/绝对路径探测，而不是假设 PATH。
+
+---
+
+# ONLINE-2 新增问题
+
+## I-29 herdr 在两天内从 0.9.0 变成 0.9.5（非本会话操作）
+
+- **现象**：10-29 只读检查时 `herdr --version` = 0.9.0；10-31 复查为 0.9.5，二进制 `2026-10-30 08:03:28`（30.3 MB）。`remote-api-bridge` 也随之出现。
+- **复现**：`ls -l --time-style=+%F_%T ~/.local/bin/herdr; ~/.local/bin/herdr --version`。
+- **排除**：本会话从未执行 `herdr update`；`~/.config/herdr/herdr-client.log` 最后修改仍是 10-26。
+- **影响**：① 说明主机侧版本不受本项目控制，任何“某方法可用”的结论都必须带版本；② 之前的 0.9.0 结论作废（schema 已存档可回溯）。
+- **建议**：确认是否你手动升级；若为自动更新，客户端必须按 D16 做严格版本探测。**不要再升级**（保持 0.9.5 与文档基线一致即可）。
+
+## I-30 有效并发通道上限是 9，不是 sshd 默认的 10
+
+- **现象**：同一连接上 9 个并发 exec 成功；第 10 个报 `OpenFailException: open failed`；fresh 连接、10 作为首测也复现 2/2。连接本身保持可用。
+- **复现**：`spike/jvm` → `--mode channels --list 10`（见 `spike/results/s1-maxsessions.csv`）。
+- **未知**：`/etc/ssh/sshd_config*` 没有显式 `MaxSessions`，`sshd -T` 需要 root（未用 sudo），所以无法确认是 9 还是“10 减 1 个槽位被占用”。
+- **建议**：按 9 记账（D15），客户端上限 4；若要确认，需要你批准一次 `sudo sshd -T | grep -i maxsessions`。
+
+## I-31 每请求 250 ms 里，200 ms 是 exec channel 本身
+
+- **现象**：复用连接上 `exec true` P50 = 201 ms；同连接上 `ping` P50 = 248 ms → herdr 侧只占约 46 ms。
+- **影响**：优化 JSON/解析没意义；要降延迟只能换 Transport（streamlocal 直连 socket 不启进程）或主机端复用脚本（方案 C）。
+- **建议**：Spike 2 完成后做一次 streamlocal 对照（`--mode bridge` 换成 sshj 的 direct-streamlocal，或先手工用 `ssh -L` 量）。
+
+## I-32 `herdr --session test server` 不会自动创建 pane
+
+- **现象**：新建会话的 `session.snapshot` 是空的（0 workspace / 0 tab / 0 pane），`pane list` 为空。
+- **影响**：所有带 pane 的验证（订阅状态事件、写操作、审批、pi）都需要先显式创建 workspace/pane。
+- **建议**：用 `herdr workspace create --cwd ~/spike-sandbox --label spike --no-focus`（命令已确认存在，待批准执行）。
+
+## I-33 订阅接口的行为已确认（补充 I-19）
+
+- 全局订阅立即返回 `subscription_started`，空闲时**不发送心跳/重放**。
+- 订阅不存在的 pane → `pane_not_found`（整条拒绝）。
+- 缺 `pane_id` 的 `agent_status_changed` → `invalid_request: missing field pane_id`。
+- **建议**：客户端把 `pane_not_found` 当作“pane 已消失”处理（触发一次快照对账），不要当致命错误。

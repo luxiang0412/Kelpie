@@ -36,6 +36,7 @@ fun main(args: Array<String>) {
         "connect" -> connectTiming(a)
         "channels" -> channelConcurrency(a)
         "bridge" -> bridge(a)
+        "pingloop" -> pingLoop(a)
         "keyinfo" -> {
             val ssh = SSHClient()
             val kp = loadKey(ssh, a.s("key")).first()
@@ -180,7 +181,8 @@ private fun channelConcurrency(a: Args) {
     println("RESULT,exec_single,n=${single.size},min=%.1f,p50=%.1f,max=%.1f".format(
         single.min(), pct(single, 50.0), single.max()))
 
-    for (c in listOf(1, 4, 8, 10, 12)) {
+    val levels = a.s("list", "1,4,8,10,12").split(',').map { it.trim().toInt() }
+    for (c in levels) {
         val pool = Executors.newFixedThreadPool(c)
         val tasks = (1..c).map { Callable { runCatching { execOnce(ssh) }.exceptionOrNull() } }
         val t0 = System.nanoTime()
@@ -197,6 +199,43 @@ private fun channelConcurrency(a: Args) {
         println("RESULT,channels,concurrency=$c,connection_alive_after=$alive")
     }
     runCatching { ssh.close() }
+}
+
+/**
+ * 在**同一条 SSH 连接**上顺序发 N 次 ping（每次一个新 exec channel，
+ * 因为 remote-api-bridge 一个连接只处理一个请求）。这是方案 A 的真实每请求成本。
+ */
+private fun pingLoop(a: Args) {
+    val host = a.s("host"); val port = a.i("port", 22); val user = a.s("user"); val key = a.s("key")
+    val count = a.i("count", 20)
+    val herdr = a.s("herdr", "/home/luxiang/.local/bin/herdr")
+    val session = a.s("session", "test")
+    val ssh = buildClient(a) { false }
+    ssh.connect(host, port)
+    ssh.authPublickey(user, loadKey(ssh, key))
+    val ms = ArrayList<Double>()
+    repeat(count) { i ->
+        val t0 = System.nanoTime()
+        val line = execCapture(ssh, "$herdr --session $session remote-api-bridge",
+            """{"id":"p$i","method":"ping","params":{}}""")
+        val d = (System.nanoTime() - t0) / 1_000_000.0
+        ms += d
+        if (i == 0) println("RESULT,pingloop,first_response=${line.take(120)}")
+    }
+    println("RESULT,pingloop,n=${ms.size},min=%.1f,p50=%.1f,p95=%.1f,max=%.1f".format(
+        ms.min(), pct(ms, 50.0), pct(ms, 95.0), ms.max()))
+    runCatching { ssh.close() }
+}
+
+private fun execCapture(ssh: SSHClient, cmdline: String, stdinLine: String): String {
+    ssh.startSession().use { s ->
+        val cmd = s.exec(cmdline)
+        cmd.outputStream.use { it.write((stdinLine + "\n").toByteArray()); it.flush() }
+        val line = cmd.inputStream.bufferedReader().readLine() ?: ""
+        cmd.join(20, TimeUnit.SECONDS)
+        runCatching { IOUtils.readFully(cmd.errorStream).close() }
+        return line
+    }
 }
 
 private fun execOnce(ssh: SSHClient) {

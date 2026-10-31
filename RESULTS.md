@@ -163,3 +163,88 @@
 | `spike/results/s1-sshj-auth-debug.log` | sshj 认证失败的 debug 日志（ON-12） |
 | `spike/results/s1-local-env.txt` | 本机执行环境 |
 | `spike/jvm/` | 可重跑工程（`gradle test` / `gradle installDist` + `--mode hostkey|connect|channels|bridge`） |
+
+---
+
+# 追加：ONLINE-2（2026-10-31 15:16 远端时间 / 同步于本机 MPST）
+
+> 本轮在获批后执行：A-6（创建 `test` 会话）、A-7（ed25519 专用密钥）、A-8（沙箱目录）。
+> **未**创建 workspace/pane、**未**运行 Agent、**未**发送任何输入。
+
+## 9.1 环境变化（重要，非本次操作造成）
+
+| 项目 | 之前（10-29 只读检查） | 现在（10-31） |
+| --- | --- | --- |
+| herdr 版本 | 0.9.0 | **0.9.5**（二进制 `2026-10-30 08:03:28`，30,285,672 B） |
+| `remote-api-bridge` | 无（`unknown command`） | **有**：`--check` → `herdr-api-bridge-v1` |
+| `test` 会话 | 不存在 | **running**（本次创建，见 9.2） |
+| 0.9.5 schema | — | 与 0.9.3 **完全一致**（102 方法、参数、订阅必填字段）；capabilities 6 项（含 `ssh_agent_registration`） |
+
+升级不是本会话所为（本会话没有执行任何 `herdr update`；`herdr-client.log` 最后修改仍是 10-26）。原因待你确认，见 `ISSUES.md` I-29。
+
+## 9.2 A-6：创建 `test` 会话（VERIFIED）
+
+```bash
+[ -e ~/.config/herdr/sessions/test ] && exit 1        # 预检：不存在
+nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
+# socket 200 ms 后就绪
+```
+
+- `herdr session list` → `default`(running)、`ljn`(stopped)、**`test`(running)**
+- `status`：client/server 均 0.9.5，`endpoint_compatible: yes`，`private_protocol: 22`
+- **`session.snapshot` 是空的**（0 workspace / 0 tab / 0 pane）→ 该会话**不会**自动创建默认 pane。`ISSUES.md` I-32
+
+## 9.3 协议行为（VERIFIED）
+
+证据：`spike/results/s2-snapshot-bridge.json`、`s2-snapshot-cli.json`、`s2-subscribe-*.txt`、`s2-ping-latency.csv`。
+
+| ID | 项 | 结果 |
+| --- | --- | --- |
+| ON2-1 | `ping` | `{"type":"pong","version":"0.9.5","protocol":22,"capabilities":{live_handoff:true, detached_server_daemon:false, endpoint_protocol_generation:1, surface_interest:true, health_check:true, ssh_agent_registration:true}}` |
+| ON2-2 | **一个连接只处理一个请求** | 同一连接发 2 个请求：第 1 个正常返回，第 2 个得到 `Error: Os { code: 104, ConnectionReset }` → 待验证 #20 **关闭** |
+| ON2-3 | `session.snapshot` bridge vs CLI | 两者字段与内容完全一致（当前都是空快照，`type=session_snapshot`, version 0.9.5, protocol 22） |
+| ON2-4 | 全局 `events.subscribe` | 立即返回 `{"result":{"type":"subscription_started"}}`；随后空闲 12 s **没有任何事件**（不重放、不心跳） |
+| ON2-5 | 订阅不存在的 pane | `{"error":{"code":"pane_not_found","message":"pane w9:p9 not found"}}` → **整条请求被拒**（不是静默忽略） |
+| ON2-6 | `pane.agent_status_changed` 缺 `pane_id` | `{"error":{"code":"invalid_request","message":"invalid request: missing field \`pane_id\` at line 1 column 107"}}` → **F-2 在真机确认** |
+
+## 9.4 延迟与通道预算（VERIFIED）
+
+| ID | 测量 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| ON2-7 | `ping`（每次新建 SSH 连接） | n=20，avg **1181 ms**，P50 **1185**，P95 **1222**，max 1224 | `s2-ping-latency.csv` |
+| ON2-8 | sshj 连接+认证（Ed25519） | connect P50 ≈ **239 ms**，auth P50 ≈ **265 ms**，合计 P50 ≈ **502 ms**（首次 777 ms 含预热） | `s1-connect-ed25519.csv` |
+| ON2-9 | 复用连接上单个 exec channel（`true`） | n=10，P50 **201.4 ms**（min 197.9，max 280.5） | `s1-channels.csv` |
+| ON2-10 | **复用连接上 `ping`（方案 A 真实成本）** | n=20，P50 **247.7 ms**，P95 **255.1**，max 382.7 | `s1-pingloop.csv` |
+| ON2-11 | 并发 exec channel 上限 | **9 个并发成功**；第 10 个起 `OpenFailException: open failed`；**连接保持可用**（`connection_alive_after=true`），fresh 连接复现 2/2 | `s1-maxsessions.csv` |
+
+推论（写进 `DECISIONS.md`）：
+- 不重用连接 = 1.2 s/请求，**不可接受**；必须长连接复用。
+- 复用后每请求 ≈ 250 ms，其中 **200 ms 是 exec channel 本身**，herdr 只占约 45 ms。
+- 有效通道上限 **9**（不是默认 10）；客户端并发建议限 4，并给订阅/SFTP/终端观察各留 1。
+
+## 9.5 sshj：RSA 失败，Ed25519 成功（VERIFIED）
+
+| 项 | 结果 |
+| --- | --- |
+| RSA（3072/4096，两把现有 key） | **FAILED**（三次 `USERAUTH_FAILURE` → `Exhausted available authentication methods`），原因仍未定位 |
+| Ed25519（`~/.ssh/id_ed25519_spike`，`SHA256:3xa+zIxtftJjvwduu2b3Sq5EERg2LI3EA5rofUGTD5o`） | **VERIFIED**：5/5 认证成功，可正常 exec |
+| 结论 | 产品只用 Ed25519 → 选型风险**降级**，但 RSA 路径仍不可用，且**必须**在 Android 上复测一次 |
+
+授权变更：`~/.ssh/authorized_keys` 从 2 行（RSA×2）变为 **3 行**（+1 ed25519），备份 `authorized_keys.bak.<ts>`。
+回滚：删除 `herdr-spike` 那一行。
+
+## 9.6 A-8：沙箱目录（VERIFIED）
+
+`~/spike-sandbox/{pi-sessions,logs}` 已创建（创建前确认不存在）。
+
+## 9.7 仍然 BLOCKED / NOT TESTED
+
+| 项 | 状态 | 原因 |
+| --- | --- | --- |
+| 带 pane 的订阅（`pane.agent_status_changed` 实事件） | BLOCKED | 会话里 0 pane；需批准创建 workspace/pane |
+| `events_lost` 复现与恢复 | BLOCKED | 需产生事件（创建/关闭 pane） |
+| 写操作（`pane.send_text` / `agent.prompt` / `send_keys`） | BLOCKED | 需 pane + 批准 |
+| 断线注入 / `Unknown` 判定 | BLOCKED | 需先有可观测的写操作 |
+| pane id 移动/关闭/复用 | BLOCKED | 同上 |
+| pi 作为 Agent（Spike 3） | BLOCKED | 需在 pane 里启动 `pi`，会消耗额度，需批准 |
+| MaxSessions 的*真实*配置值 | 部分 | 无 sudo，`sshd -T` 不可用；只能给“有效上限 9”的观测值 |
