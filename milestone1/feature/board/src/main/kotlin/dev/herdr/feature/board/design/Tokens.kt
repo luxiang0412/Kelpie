@@ -149,8 +149,8 @@ object StatusText {
 /** 等宽样式（路径、命令、tool 参数）。 */
 val MonoStyle = TextStyle(
     fontFamily = FontFamily.Monospace,
-    fontSize = 12.sp,
-    lineHeight = 18.sp,
+    fontSize = 13.sp,
+    lineHeight = 20.sp,
 )
 
 private fun typography(): Typography {

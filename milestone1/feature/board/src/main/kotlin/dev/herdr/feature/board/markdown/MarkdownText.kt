@@ -40,6 +40,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -117,7 +118,7 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
 
         is MdBlock.Quote -> Row(Modifier.height(IntrinsicSize.Min)) {
             Box(Modifier.width(3.dp).fillMaxHeight().background(palette.outline))
-            Spacer(Modifier.width(Space.s))
+            Spacer(Modifier.width(12.dp))
             Text(
                 text = inline(block.spans),
                 style = MaterialTheme.typography.bodyMedium,
@@ -125,11 +126,22 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
             )
         }
 
+        // 列表悬挂缩进：标记占固定列宽，正文左缘对齐，换行后不会顶到标记下面
         is MdBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
             block.items.forEach { item ->
                 Row {
-                    Text("•", color = palette.textSecondary, modifier = Modifier.padding(end = Space.s))
-                    Text(inline(item), style = MaterialTheme.typography.bodyLarge, color = textColor)
+                    Text(
+                        "•",
+                        color = palette.textSecondary,
+                        modifier = Modifier.width(20.dp),
+                        textAlign = TextAlign.Start,
+                    )
+                    Text(
+                        inline(item),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = textColor,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }
@@ -140,9 +152,15 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
                     Text(
                         "${block.start + i}.",
                         color = palette.textSecondary,
-                        modifier = Modifier.padding(end = Space.s),
+                        modifier = Modifier.width(28.dp),
+                        textAlign = TextAlign.Start,
                     )
-                    Text(inline(item), style = MaterialTheme.typography.bodyLarge, color = textColor)
+                    Text(
+                        inline(item),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = textColor,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }
@@ -198,7 +216,7 @@ private fun CodeBlock(block: MdBlock.CodeFence) {
             ) {
                 Text(
                     text = if (expanded || !collapsible) block.code else previewLines(block.code),
-                    style = MonoStyle.copy(fontSize = 13.sp, lineHeight = 19.sp),
+                    style = MonoStyle,
                     color = palette.textPrimary,
                     softWrap = false,
                     modifier = Modifier

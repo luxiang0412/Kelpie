@@ -272,22 +272,16 @@ private fun ToolRow(item: ConversationItem.Tool) {
     val palette = LocalHerdrPalette.current
     var expanded by remember(item.index, item.result) { mutableStateOf(false) }
     val hasResult = item.result != null
-    val statusColor = when {
-        item.resultError -> palette.statusFg(AgentStatus.BLOCKED)
-        hasResult -> palette.textSecondary
-        else -> palette.statusFg(AgentStatus.WORKING)
-    }
-    val statusText = when {
-        item.resultError -> "失败"
-        hasResult -> "已返回"
-        else -> "运行中"
-    }
+    // UX-03c：结果"已返回"≠"执行成功"；也不从输出里的 error 字样盲猜失败。
+    // 只如实区分「还没结果 / 已返回」，错误关键字仅作为低强调提示。
+    val statusColor = if (hasResult) palette.textSecondary else palette.statusFg(AgentStatus.WORKING)
+    val statusText = if (hasResult) "已返回" else "运行中"
 
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
+                .heightIn(min = 52.dp)
                 .clickable { expanded = !expanded }
                 .semantics {
                     contentDescription =
@@ -309,6 +303,10 @@ private fun ToolRow(item: ConversationItem.Tool) {
             if (!item.pairedById && hasResult) {
                 Spacer(Modifier.width(Space.s))
                 Text("未配对（无可靠 ID）", style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
+            }
+            if (item.resultError && hasResult) {
+                Spacer(Modifier.width(Space.s))
+                Text("输出含 error 关键字", style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
             }
         }
         if (item.argumentsSummary.isNotBlank()) {
@@ -340,7 +338,7 @@ private fun ToolRow(item: ConversationItem.Tool) {
                         Text(
                             body,
                             style = MonoStyle,
-                            color = if (item.resultError) palette.statusFg(AgentStatus.BLOCKED) else palette.textPrimary,
+                            color = palette.textPrimary,
                         )
                     }
                 }
