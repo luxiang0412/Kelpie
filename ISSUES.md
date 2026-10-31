@@ -407,3 +407,27 @@
 - **数据**：同一主机、同一密钥：JSch exec P50 **108 ms**（min 106 / max 208）；sshj **201 ms**。
 - **影响**：若换成 JSch，单请求 248 ms 有望降到 ~150 ms，直接改善审批窗口与 UI 手感。
 - **注意**：这是 JVM 数据；Android 上需要用 `CryptoSpikeActivity` 复测（BC 依赖更少是 JSch 的优势）。
+
+## I-55 Android 上 `registerSecurityProvider("BCAPP")` 不生效，需直接 `setSecurityProvider`
+
+- **现象**：只调 `registerSecurityProvider("BCAPP")` 时 `getSecurityProvider()` 仍返回 `BC`，连接报 `no such algorithm: X25519 for provider BC`。
+- **修复**：显式 `SecurityUtils.setSecurityProvider("BCAPP")`（并在失败时再尝试 `registerSecurityProvider`），已真机验证。
+- **状态**：已修复（D32）。
+
+## I-56 「多久没刷新」不能判定过期（空闲会话误报）
+
+- **现象**：M1 首版 25 s 没有事件就把看板标成“数据可能过期”，而空闲会话本来就无事件。
+- **修复**：改为 ping 探活（D34）。
+- **状态**：已修复。
+
+## I-57 MIUI 锁屏时 `adb install` 被拒
+
+- **现象**：`INSTALL_FAILED_USER_RESTRICTED: Install canceled by user`，`dumpsys power` 显示 `mWakefulness=Asleep`。
+- **结论**：这是设备/系统限制，不是应用问题；解锁后重试即成功。
+- **建议**：自动化流水线里先 `input keyevent KEYCODE_WAKEUP` 并确认已解锁。
+
+## I-58 Windows 上 Gradle 偶发“classes.jar 被占用”
+
+- **现象**：`core/ssh/build/.../bundleLibCompileToJarDebug/classes.jar: The process cannot access the file`。
+- **规避**：`gradle --stop` + 删除 `**/build` 后重建；或长期使用 `--no-daemon`（本轮采用）。
+- **状态**：已规避，非代码问题。

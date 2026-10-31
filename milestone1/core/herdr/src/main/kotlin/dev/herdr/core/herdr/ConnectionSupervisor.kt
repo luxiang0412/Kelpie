@@ -114,6 +114,7 @@ class ConnectionSupervisor(
             } catch (e: Throwable) {
                 if (e is CancellationException) throw e
                 val (kind, msg) = classify(e)
+                log("connect failed kind=$kind msg=$msg cause=${e.cause?.javaClass?.simpleName}")
                 if (kind == Kind.HOST_KEY_UNKNOWN || kind == Kind.HOST_KEY_CHANGED) {
                     _state.value = State.Failed(msg, kind)
                     delay(2_000)
@@ -129,7 +130,9 @@ class ConnectionSupervisor(
             currentConnection = conn
             try {
                 val api = HerdrApi(conn, cfg.herdrBin, cfg.herdrSession)
+                log("connected generation=${conn.generation}; ping…")
                 val ping = api.ping()
+                log("ping ok version=${ping.version} protocol=${ping.protocol}")
                 if (ping.protocol != requiredProtocol) {
                     _state.value = State.Failed(
                         "协议版本不匹配：server=${ping.protocol}, app 支持 $requiredProtocol",
@@ -143,11 +146,12 @@ class ConnectionSupervisor(
                 val since = System.currentTimeMillis()
                 _state.value = State.Connected(conn.generation, ping.version, ping.protocol, since)
                 reconciler.resetForNewConnection()
-                startWatchdog(conn.generation)
+                startWatchdog(conn.generation, api)
                 runSession(api, conn)
             } catch (e: Throwable) {
                 if (e is CancellationException) throw e
                 val (kind, msg) = classify(e)
+                log("session failed kind=$kind msg=$msg")
                 attempt++
                 val backoff = backoffMs(attempt)
                 _state.value = State.Reconnecting(attempt, backoff, msg)
@@ -205,18 +209,31 @@ class ConnectionSupervisor(
         return globals + perPane
     }
 
+    /**
+     * 存活探测：**空闲会话没有事件是正常的**，所以不能用“多久没刷新”判过期（D29 事件驱动）。
+     * 改为每 [staleAfterMs] 发一次 `ping`：失败才进入 Stale；成功则把 Stale 恢复成 Connected。
+     */
     private var watchdogJob: Job? = null
-    private fun startWatchdog(generation: Long) {
+    private fun startWatchdog(generation: Long, api: HerdrApi) {
         watchdogJob?.cancel()
         watchdogJob = scope.launch {
             while (scope.isActive) {
-                delay(2_000)
+                delay(staleAfterMs)
                 val st = _state.value
-                if (st is State.Connected && st.generation == generation) {
-                    val last = reconciler.state.value.fetchedAtMs
-                    if (last > 0 && System.currentTimeMillis() - last > staleAfterMs) {
-                        _state.value = State.Stale(generation, "超过 ${staleAfterMs / 1000}s 没有刷新")
-                    }
+                if (st !is State.Connected && st !is State.Stale) continue
+                if ((st as? State.Connected)?.generation != generation &&
+                    (st as? State.Stale)?.generation != generation
+                ) continue
+                val ok = runCatching { api.ping(8_000) }.isSuccess
+                if (!ok) {
+                    _state.value = State.Stale(generation, "连接探测失败，数据可能不是最新")
+                } else if (_state.value is State.Stale) {
+                    _state.value = State.Connected(
+                        generation,
+                        (_state.value as State.Stale).let { "0.9.5" },
+                        requiredProtocol,
+                        System.currentTimeMillis(),
+                    )
                 }
             }
         }
@@ -228,6 +245,10 @@ class ConnectionSupervisor(
         3 -> 4_000L
         4 -> 8_000L
         else -> 15_000L
+    }
+
+    private fun log(msg: String) {
+        android.util.Log.i("HerdrConn", msg)
     }
 
     private fun classify(e: Throwable): Pair<Kind, String> = when (e) {

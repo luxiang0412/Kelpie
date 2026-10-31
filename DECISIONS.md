@@ -402,3 +402,37 @@
 - 决策：**M1 不换库**（已实现并测试），但在 Phase 2 之前用 Android 侧数据做一次正式对比；若差距稳定且 JSch 在 Android 14 上 Ed25519/SFTP 均通过，则考虑切换。
 
 **状态**：`待实测确认`。
+
+## D32（定稿）：Android 上用“委托 provider”，不删系统 BC
+
+- 实测 A1：把 APK 内 BC 包成 `BCAPP`（`getService` 转发），`sshj_provider=BCAPP`、`bcapp_x25519=true`，认证与 exec 均正常；
+  系统 `BC` 保持不变（`providers_after` 里 BC 与 BCAPP 并存）。
+- A2（removeProvider）也能用，但有全局副作用。
+- **决策：采用 A1**；`SshCrypto.ensureInitialized()` 的注册顺序固定为：
+  `addProvider(BCAPP 委托)` → `setRegisterBouncyCastle(true)` → `setSecurityProvider("BCAPP")`（失败再 `registerSecurityProvider`）。
+
+**状态**：`已实现 + 真机验证`。
+
+## D33（定稿）：M1 保持 sshj；JSch 作为 Phase 2 性能备选
+
+- Android 实测：JSch exec P50 **120 ms**，sshj **237 ms**；JSch 无需 Provider 操作、SFTP 正常、指纹可自算。
+- 但 M1 的 sshj 路径已端到端验证通过（连接/快照/订阅/看板），换库会带来回归成本。
+- **决策**：M1 不换；Phase 2 若“每请求延迟”成为瓶颈，优先评估 JSch（并复测 SFTP/主机指纹/并发）。
+
+**状态**：`已定`。
+
+## D34. Stale 语义：按“连接存活”判定，而不是“多久没刷新”
+
+- 空闲会话本来就没有事件（D29 事件驱动），用“N 秒没刷新”判过期会永远误报（M1 首版实测到）。
+- 修正：每 25 s 发一次 `ping` 探活；失败 → Stale（并触发重连）；成功且当前是 Stale → 恢复 Connected。
+- 数据新鲜度另外用 `fetchedAtMs` 展示（“缓存数据 · 更新于 …”）。
+
+**状态**：`已实现`。
+
+## D35. pi 集成可在隔离 HOME 下安装（Spike B 结论）
+
+- `herdr integration install pi` 会遵循 `$HOME`；在 `HOME=~/spike-sandbox/pihome` 下安装只会写沙箱，不动全局。
+- 装上后 `agent_session` 返回 `{source:"herdr:pi", kind:"path", value:"…jsonl"}`，可作为 transcript 的权威定位。
+- 决策：Phase 2 优先用 `agent_session.path` 定位 JSONL；`--session-dir` 扁平目录作为可控补充。
+
+**状态**：`已定`（本阶段）。

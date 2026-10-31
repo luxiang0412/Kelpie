@@ -636,3 +636,62 @@ App：`spike/android`（最小 Activity，非 Compose；源码见该目录 READM
 3. sshj 的 RSA 认证失败是**真实存在**的（同一把已授权密钥 JSch 能过），不是“密钥未授权”导致的。
 4. 因此 Spike A 的核心结论仍待 Android 侧数据：需要对比 `BCAPP 委托`（不删系统 BC）与 `removeProvider` 两种方案，以及 JSch 在 Android 14 上的 Ed25519/SFTP 表现。
    → Android 侧探针已写好（`spike/android` 的 `CryptoSpikeActivity`：A1 BCAPP / A2 removeProvider / A3 JSch），等设备解锁后运行。
+
+---
+
+# 11. Milestone 1 验收 + Spike A（Android） + Spike B（2026-10-31 晚）
+
+## 11.1 Milestone 1 真机验收（VERIFIED，有截图）
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 安装 / 启动 | ✅ `dev.herdr.app` 安装成功并启动 | `adb install` |
+| 首次连接：主机指纹对话框 | ✅ 显示 `192.168.5.8:22:ssh-ed25519` + `SHA256:lfFY…`，按钮「取消 / 信任该主机」 | `spike/results/m1-02-connect.png` |
+| 信任后连接 | ✅ 日志 `connected generation=1`、`ping ok version=0.9.5 protocol=22` | logcat `HerdrConn` |
+| 看板 | ✅ 分组（空闲 2 / 未知 3）、计数、pane 卡片（agent/状态/标题/ws·tab·cwd）、页脚 `herdr 0.9.5 · protocol 22 · 5 个 pane` | `m1-05-board-connected.png` |
+| Pane 详情（只读） | ✅ pane_id / terminal_id / workspace / tab / agent_status / revision / cwd / title | `m1-03-detail.png` |
+| 手动重连 | ✅ `manual reconnect` → `generation=2` → `ping ok`（连接代次递增，旧代次回调作废） | logcat |
+| 缓存 / 离线展示 | ✅ Room 落盘；断开时仍能看到最后一次快照并标 stale | 设计 + `m1-04-board-stale.png` |
+
+**过程中修掉的一个语义问题**：最初用“25 s 没刷新 → Stale”，导致空闲会话永久显示过期。
+改为**连接存活探测**（每 25 s 发一次 `ping`，失败才 Stale；成功则恢复 Connected），见 `DECISIONS.md` D34。
+
+## 11.2 Spike A（Android SSH Crypto）—— 完成
+
+| 方案 | 结果 | auth | exec P50 | 系统 BC | SFTP |
+| --- | --- | --- | --- | --- | --- |
+| **A1 sshj + BCAPP 委托 provider（不删系统 BC）** | ✅ 可用 | 909 ms | **237 ms** | **未改动**（BC 仍在，另有 BCAPP） | — |
+| A2 sshj + removeProvider("BC") + 新版 BC | ✅ 可用（对照） | 636 ms | 232 ms | 被替换 | — |
+| **A3 JSch 0.2.20 + Ed25519** | ✅ 可用 | connect 1245 ms | **120 ms** | **未改动** | ✅ 465 ms，指纹校验通过 |
+
+结论：
+
+1. **可以避免全局 `removeProvider("BC")`**：A1 的委托 provider（`BCAPP` = 包一层 `getService` 转发）在 Android 14 上工作正常，
+   系统 `BC` 保持原样 → 采用 A1（D32 定稿）。
+2. **JSch 的 exec 通道约为 sshj 的一半**（120 vs 237 ms），且不需要任何 Provider 操作、SFTP 正常、指纹可自算。
+3. M1 的 sshj 实现在真机端到端可用（连接/快照/订阅/看板都跑通），因此**不立即换库**；JSch 作为 Phase 2 的性能备选（D33 更新）。
+
+## 11.3 Spike B（Pi Session Identity，隔离配置）—— 完成
+
+做法（不碰全局 `~/.pi`）：
+
+```bash
+mkdir -p ~/spike-sandbox/pihome/.pi/agent/extensions
+cp ~/.pi/agent/{auth,models,settings}.json ~/spike-sandbox/pihome/.pi/agent/   # 只拷出
+HOME=~/spike-sandbox/pihome herdr integration install pi
+# → installed pi integration to ~/spike-sandbox/pihome/.pi/agent/extensions/herdr-agent-state.ts
+```
+
+结果：
+
+| 项 | 结果 |
+| --- | --- |
+| 全局 `~/.pi` 是否被改 | ❌ 没有（安装前后条目数都是 77；`~/.pi/agent/extensions` 仍不存在） |
+| 隔离目录 | `~/spike-sandbox/pihome/.pi/agent/extensions/herdr-agent-state.ts` ✅ |
+| 启动时 `agent_session` | `null`（尚未发生会话事件） |
+| 首次对话后 `agent_session` | ✅ `{"source":"herdr:pi","agent":"pi","kind":"path","value":"/home/luxiang/spike-sandbox/pisessions/2026-10-31T09-51-59-580Z_01a1915f-….jsonl"}` |
+| 路径可预测性 | ✅ `--session-dir` 下的扁平文件；`kind=path`，可直接给 SFTP tailer 用 |
+| 清理 | 测试用 pi 进程已 kill；沙箱配置与会话文件保留供复查 |
+
+**结论**：装上官方 pi 集成后，`agent_session` 能给出**精确的 JSONL 路径**，Spike 3 的“定位会话文件”问题基本解决；
+代价是需要一个扩展文件（可在隔离 HOME 下安装，不影响全局），且 `agent_session` 在首次活动后才出现。

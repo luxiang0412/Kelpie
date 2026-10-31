@@ -34,17 +34,28 @@ object SshCrypto {
                 val added = runCatching { Security.addProvider(AppBouncyCastleProvider()) }.getOrNull()
                 report += "app_bc_added=${added != null}"
             }
-            val registered = runCatching {
-                SecurityUtils.setRegisterBouncyCastle(true)
-                SecurityUtils.registerSecurityProvider(APP_PROVIDER)
-            }.getOrElse { false }
-            report += "sshj_provider=${runCatching { SecurityUtils.getSecurityProvider() }.getOrNull()}"
-            report += "registered=$registered"
+            // 先看我们的委托 provider 是否真的能提供 X25519 / SHA-256
+            val appProv = Security.getProvider(APP_PROVIDER)
+            report += "bcapp_present=${appProv != null}"
+            report += "bcapp_x25519=${appProv?.getService("KeyAgreement", "X25519") != null}"
+            report += "bcapp_sha256=${appProv?.getService("MessageDigest", "SHA-256") != null}"
+
+            runCatching { SecurityUtils.setRegisterBouncyCastle(true) }
+            // 关键：直接指定 provider 名（registerSecurityProvider 在某些版本会退回 BC）
+            runCatching { SecurityUtils.setSecurityProvider(APP_PROVIDER) }
+            var prov = runCatching { SecurityUtils.getSecurityProvider() }.getOrNull()
+            if (prov != APP_PROVIDER) {
+                // 兜底：尝试一次显式注册
+                runCatching { SecurityUtils.registerSecurityProvider(APP_PROVIDER) }
+                prov = runCatching { SecurityUtils.getSecurityProvider() }.getOrNull()
+            }
+            report += "sshj_provider=$prov"
 
             val cfg = defaultConfig()
             report += "kex=" + cfg.keyExchangeFactories.map { it.name }
             lastReport = report
             initialized = true
+            android.util.Log.i("HerdrCrypto", report.joinToString(" | "))
             return report
         }
     }
