@@ -186,3 +186,30 @@ spike/results/      # 所有原始证据（schema、CSV、日志、截图）
 3. Spike 7（Compose 基线，需 Macrobenchmark）。
 4. 审批路线拍板（L1 用什么）。
 5. Spike 3 收尾（pi 会话定位的落盘时机/多会话）。
+
+
+---
+
+## 附：M4 之后的状态（2026-10-31）
+
+> 上面第 1–9 节是 Phase 0 的调研与验证结论，仍然有效；本节补充 Milestone 1 + M4 的落地情况。
+
+| 能力 | 状态 | 证据 |
+| --- | --- | --- |
+| 只读看板（多主机、断线恢复、Room 缓存） | ✅ 真机 | `m2-07` / `m1-05` |
+| 发消息（`agent.prompt`，三态账本，不自动重试） | ✅ 真机 | `m5-03` |
+| 看回复：详情页「最近输出」（终端尾部） | ✅ 真机 | `m5-05` |
+| 看回复：对话页（pi JSONL 结构化 + 增量 + 缓存） | ✅ 真机 | `m5-07` |
+| 后台提醒（前台服务 + 本地通知，`completion_seq` 判完成） | ✅ 前台/后台 | `m4-06` |
+| L1 审批客户端（nonce/TTL/一次性/审计） | ✅ 客户端；触发源未定 | `m4-07` |
+| Claude `PermissionRequest` hook | ⛔ 已给变更清单，用户选择暂缓 | — |
+| 长对话滚动性能 | ⚠️ 30–44% jank，测法不可信 → 待 Macrobenchmark | `m3-jank-*` |
+| Compose UI 自动化测试 | ⛔ MIUI 上挂起 | I-59 |
+
+新增的关键事实（供复核）：
+
+1. **`agent_session` 只在 snapshot 的 `agents[]` 里**，`panes[]` 没有（I-62）；
+2. **完成检测必须用 `completion_seq`**，状态 diff 会漏 `done→working→done`（I-66）；
+3. **pi 集成装在跑 agent 的主机 HOME 下，且装完必须重启 pi**（I-71）；
+4. **`pane.read.revision` 恒为 0**，不能当内容版本号（I-35）；
+5. 手机端每请求 300–500 ms；看板 jank 0.9%，长对话 30–44%。

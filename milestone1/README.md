@@ -43,8 +43,22 @@ adb shell run-as dev.herdr.app mkdir -p files/keys
 adb shell run-as dev.herdr.app cp /data/local/tmp/k files/keys/id_ed25519
 ```
 
-## 当前限制（M1 有意为之）
+## 现在能做什么（M4 末）
 
-- 只读：无输入、无审批、无终端接管、无后台服务。
-- 单主机单会话（数据结构已按 hostId+session 设计，UI 暂只用一个）。
-- 缓存不做迁移（`fallbackToDestructiveMigration`）。
+- 多主机看板（状态分组/计数），断线自动恢复；
+- **Pane 详情**：字段 + 最近输出（`pane.read`，2 s 刷新）+ **发送消息**（`agent.prompt`，三态账本）；
+- **对话页（只读）**：pi JSONL → 结构化消息，增量读取 + Room 缓存 + 2 s 自动刷新；底部也能发消息；
+- **后台提醒**：`dataSync` 前台服务 + 本地通知（完成/需要处理），`completionMode` 用 `completion_seq` 判完成；
+- **L1 审批客户端**：沙箱文件 IPC（`.req`/`.answer`，nonce + TTL + 一次性），看板弹出审批卡片。
+
+## 依赖与前提
+
+- 对话页需要 pane 上报 `agent_session`：在**跑 agent 的主机**上 `herdr integration install pi`，**然后重启 pi**（扩展不会热加载）；
+- 本机 Windows 的 `herdr integration status` 显示“未安装”是正常的（不同 HOME）。
+
+## 仍未做
+
+- 真实审批触发（Claude `PermissionRequest` hook / pi 扩展）——需批准；
+- 终端接管、Markdown 渲染、CodeMirror 高亮、多主机聚合、后台推送；
+- 长对话性能（30–44% jank，待 Macrobenchmark 基线）；
+- Room 不做迁移（`fallbackToDestructiveMigration`，开发期可接受）。

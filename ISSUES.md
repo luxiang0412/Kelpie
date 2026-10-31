@@ -506,3 +506,22 @@
 - **影响**：验证时体验混乱；真实产品里必须由**扩展/工具**保证“一次审批一次请求”。
 - **建议**：改用 pi 扩展注册工具，或在 Claude 侧用 `PermissionRequest` hook（一次调用一次请求）。
 - **状态**：客户端已验证，触发源待替换。
+
+## I-70 “herdr integration status 显示未安装”其实是查了本机
+
+- **现象**：用户在 Windows 本机执行 `herdr integration status`，看到 `pi: not installed (C:\Users\luxia\.pi\...)`，误以为远端没装。
+- **事实**：远端两台都是 `pi: current (v9)`（`/home/luxiang/.pi/agent/extensions/...`）。
+- **根因**：集成装在“跑 agent 的那台机器”的 HOME 下，每台主机独立；Windows 与 Linux 的 pi 配置互不相干。
+- **建议**：排查时先看路径前缀（`/home/...` vs `C:\Users\...`）；文档里引用命令时标注在哪台机器执行。
+
+## I-71 集成装完不会热加载，必须重启 pi
+
+- **现象**：21:28 装好集成后，已在运行的 pi（w1:p1 等）`agent_session` 仍然是 `null`。
+- **事实**：扩展在 pi 启动时加载；重启后的新 pane（w7:p1/w8:p1）立刻上报路径。
+- **建议**：App 里 `agent_session=null` 的提示要写“pi 可能启动早于集成安装，重启 pi 再试”（D47）；文档把“安装后需重启 pi”写成步骤。
+
+## I-72 App 的 `agent_session: null（未安装/未上报集成）` 文案有歧义
+
+- **现象**：容易让人以为“集成没装”，实际可能只是“这个 pane 启动早于安装/未上报”。
+- **建议**：改成“这个 pane 没有上报会话路径（重启 pi 或检查集成）”。
+- **状态**：待改（D47）。

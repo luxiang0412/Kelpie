@@ -1058,3 +1058,56 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 | 无 agent / 未连接 | ✅ 显示“（还没有输出，或主机未连接）” | 代码 |
 
 说明：这是**终端尾部**（去掉 ANSI 的文本），不是结构化对话；结构化对话仍需 `agent_session`（装 herdr pi 集成后可看）。
+
+---
+
+# 21. M4 阶段总结：基本闭环走通（2026-10-31 夜）
+
+## 21.1 现在能做什么（真机已验证）
+
+| 能力 | 状态 | 证据 |
+| --- | --- | --- |
+| SSH + 主机指纹 fail-closed | ✅ | `s1-android-dialog.png` 等 |
+| 多主机（两台真实机器 .5.8 / .5.31） | ✅ | `m2-07-two-real-hosts.png`、`m2-08-host31-board.png` |
+| 看板（状态分组/计数/详情） | ✅ | `m1-05-board-connected.png` |
+| 断线自动恢复 | ✅ 1.67 s | logcat（generation 递增） |
+| **发消息给 agent**（`agent.prompt` + 三态账本） | ✅ | `m5-03-reply-detail.png`（DETAIL） |
+| **详情页“最近输出”**（终端尾部，2 s 刷新） | ✅ | `m5-05-detail-with-output.png` |
+| **对话页（结构化，pi JSONL）** | ✅ | `m5-07-conversation.png`（真实 pi 会话：你/assistant） |
+| 对话增量 + Room 缓存 | ✅ | `m3-01-transcript-incremental.png` |
+| 后台提醒（前台服务 + 本地通知） | ✅ 前台/后台均验证 | `m4-06-notification.png` |
+| L1 审批**客户端**（nonce/过期/一次性/审计） | ✅（PARTIAL：触发源待定） | `m4-07-approval-card.png` |
+
+## 21.2 关键结论修正（本轮新增）
+
+| 结论 | 说明 |
+| --- | --- |
+| **pi 集成装在“跑 agent 的那台机器”** | 远端 `.5.8`/`.5.31` 均 `pi: current (v9)`；Windows 本机显示未安装是正常的（不同 HOME） |
+| **集成不会热加载** | 装完必须**重启 pi** 才会上报 `agent_session`；否则 pane 永远是 `null`，对话页入口不出现 |
+| **回复入口** | 详情页底部（不依赖 transcript）+ 对话页底部；两者共用同一个 `WriteLedger` |
+| **完成通知不能用状态 diff** | 必须用 `completion_seq`（单调）否则会漏 `done→working→done`（I-66） |
+| **审批触发源不能用自然语言** | pi 会重试，产生多次请求（I-69）；必须用 hook/扩展 |
+
+## 21.3 测试与基线
+
+| 项 | 值 |
+| --- | --- |
+| JVM 单测 | **23/23**（分组 5 + 编解码 9 + JsonlChunker 6 + pi 解析 3） |
+| Android 仪器测试 | Room **4/4**；Compose UI 测试在 MIUI 挂起（I-59，BLOCKED） |
+| 冷启动（debug） | 中位 **555 ms** |
+| 看板滚动 | jank **0.90%**（667 帧，120 Hz） |
+| 长对话滚动 | 30–44%（**瓶颈**，测法不可控 → M5 用 Macrobenchmark，I-63/I-64） |
+| 单请求延迟（PC） | 248 ms；手机约 300–500 ms（含 exec channel 开销） |
+
+## 21.4 证据索引（截至本轮）
+
+| 文件 | 内容 |
+| --- | --- |
+| `m5-07-conversation.png` | 真实 pi 会话的结构化对话页（本轮核心交付） |
+| `m5-06-detail-with-session.png` | 详情页：agent_session 路径 + 查看对话入口 |
+| `m5-05-detail-with-output.png` | 详情页：最近输出 + 输入框 |
+| `m4-06-notification.png` | 通知栏：已完成提醒 + 常驻监控 |
+| `m4-07-approval-card.png` | L1 审批卡片 |
+| `m3-01-transcript-incremental.png` | 对话增量刷新 |
+| `m2-07/08` | 两台真实主机 + 切换 |
+| `m1-05`、`m1-02` | 看板、指纹对话框 |
