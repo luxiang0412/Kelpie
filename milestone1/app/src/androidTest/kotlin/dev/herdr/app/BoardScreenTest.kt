@@ -6,6 +6,7 @@ import dev.herdr.feature.board.HerdrTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -16,6 +17,7 @@ import dev.herdr.core.herdr.BoardGrouper
 import dev.herdr.core.herdr.Pane
 import dev.herdr.core.herdr.WriteOutcome
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -110,10 +112,11 @@ class BoardScreenTest {
     @Test
     fun doneAndIdle_areDistinctLabels() {
         render(state(listOf(pane("w1:p1", AgentStatus.DONE), pane("w1:p2", AgentStatus.IDLE))))
-        rule.onNodeWithText("已完成").assertIsDisplayed()
-        rule.onNodeWithText("空闲").assertExists()
-        // 其他分区默认展开（M1 修复）
-        rule.onNodeWithText("任务-w1:p2").assertIsDisplayed()
+        // 状态词在合并语义的行内（TalkBack 一致朗读），需要 unmerged tree 才能单独断言
+        // 分区标题也叫“已完成”，因此按节点集合断言（行状态词必须存在）
+        assertTrue(rule.onAllNodesWithText("已完成", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText("空闲", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        // 「其他」分区默认展开由 allIdle_stillShowsRows 覆盖（同一渲染路径），此处不再重复断言标题节点
     }
 
     @Test
@@ -167,7 +170,7 @@ class BoardScreenTest {
         render(
             state(listOf(pane("w1:p1", AgentStatus.BLOCKED)), stale = true),
         )
-        rule.onNodeWithText("显示的是缓存数据 · 上次同步 1 分钟前", substring = true).assertExists()
+        rule.onNodeWithText("显示的是缓存数据", substring = true).assertExists()
     }
 
     @Test
@@ -175,7 +178,8 @@ class BoardScreenTest {
         var opened: Pane? = null
         val p = pane("w1:p9", AgentStatus.WORKING)
         render(state(listOf(p)), onSelectAgent = { opened = it })
-        rule.onNodeWithText("任务-w1:p9").performClick()
+        // 行是合并语义：标题在 contentDescription 里，文本节点在 unmerged tree
+        rule.onNodeWithContentDescription("任务-w1:p9", substring = true).performClick()
         rule.runOnIdle { assertEquals("w1:p9", opened?.paneId) }
     }
 

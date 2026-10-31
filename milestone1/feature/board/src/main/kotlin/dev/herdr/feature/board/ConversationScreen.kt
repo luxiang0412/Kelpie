@@ -55,7 +55,8 @@ import dev.herdr.core.herdr.ChatMessage
 import dev.herdr.core.herdr.Pane
 import dev.herdr.core.herdr.WriteOutcome
 import dev.herdr.feature.board.conversation.ConversationItem
-import dev.herdr.feature.board.conversation.ConversationItemMapper
+import dev.herdr.feature.board.conversation.ConversationBranch
+import dev.herdr.feature.board.conversation.IncrementalConversationMapper
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.MonoStyle
 import dev.herdr.feature.board.markdown.MarkdownText
@@ -160,7 +161,11 @@ private fun BlockedNotice() {
 @Composable
 private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
     val palette = LocalHerdrPalette.current
-    val items = remember(messages) { ConversationItemMapper.map(messages) }
+    // 增量映射：分支解析 → 增量映射（历史条目复用；会话 key 变化时清空派生状态）
+    val effective = remember(messages) { ConversationBranch.effective(messages) }
+    val mapper = remember(pane.paneId) { IncrementalConversationMapper() }
+    val sessionKey = "${pane.terminalId}|${pane.agentSessionPath}"
+    val items = remember(effective, sessionKey) { mapper.update(effective, sessionKey) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var pendingNew by remember(pane.paneId) { mutableStateOf(false) }

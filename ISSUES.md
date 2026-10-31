@@ -576,3 +576,29 @@
 - **变更**：`i % 8` → `i % 10`，并加入 Markdown/不安全链接/未知内容。
 - **影响**：M2-A 的 debug 首帧（787/786/834ms）与本轮 benchmark 首帧（375/344/298ms）同时包含构建模式与数据集两处变化，不可归因。
 - **建议**：对比时必须固定数据集版本（本报告为 fixture-v2）。
+
+
+## I-79 ✅ 已修复 — 全量映射 O(n)
+
+- 修复：`IncrementalConversationMapper`（APPEND/PATCH/FULL），追加 1 条只映射 1 条，
+  工具结果追加只原位替换单条目（`mapped == 0`）。
+- 验证：`IncrementalMapperEquivalenceTest`（随机种子一致性）+ `MapperCostTest`（21.9×）。
+
+## I-81 分支解析与条目映射仍是每次 O(n)
+
+- **现状**：`ConversationBranch.effective()` 与 `ConversationItemMapper.map()` 每次消息变化都跑一遍，
+  但只做线性扫描，不解析 Markdown（2000 条约 0.9 ms）。
+- **风险**：真实流式高频增量下仍可能累积；需真机帧数据判断。
+- **建议**：M2-C2 视真机数据决定是否做增量分支。
+
+## I-82 UI 测试首轮 3 个失败均为测试代码问题（已修）
+
+- `doneAndIdle_areDistinctLabels`：合并语义需 `useUnmergedTree`；「已完成」同时是分区标题 → 用节点集合断言。
+- `staleData_isLabelledAsCache`：文案已改为动态 `timeAgo()`。
+- `tappingAgent_opensConversation`：应点击行的合并 `contentDescription`。
+- **结论**：产品代码未改动来迎合测试（语义合并与文案保持原样）。
+
+## I-83 模拟器只有“流程可运行”结论，不能代表真机性能
+
+- `startup_500` 在模拟器 median 2869.6 ms（debuggable + emulator，已显式 suppress）。
+- 禁止据此宣称性能改善；真机 FrameTimingMetric 仍缺（I-74 / I-78）。

@@ -1120,3 +1120,16 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - **单元测试**：新增 19 个（Markdown 12 + Tool 配对 7），`:feature:board:testDebugUnitTest` 全绿；`:core:herdr:test` 全绿。
 - **未获得**：FrameTimingMetric / StartupTimingMetric / Perfetto（MIUI BAL 阻断 instrumentation 启动 Activity，I-74；`dropShaderCache` 失败 I-78）。
 - **不可宣称**：任何滚动/追加/IME 的性能改善——本轮无同条件前后对比数据。
+
+
+## M2-C1（2026-10-31）
+
+- **增量映射**：`IncrementalConversationMapper`（APPEND/PATCH/FULL）；追加 1 条 → mapped=1；
+  2000 条历史 + 100 次追加：全量 55.1 ms vs 增量 2.5 ms（**21.9×**，JVM 微基准）。
+- **Tool 关联**：移除位置猜测；仅 `toolCallId` 相等算配对；无 id/不匹配的结果独立渲染。
+- **分支**：`ChatMessageId/parentId` + `ConversationBranch.effective()`；分支切换不串结果。
+- **缓存**：`MarkdownAstCache` 内容寻址 + LRU 256 + `PARSER_VERSION`。
+- **测试基础设施**：新建隔离 AVD `herdr_m2c1`（Android 34），`pm` 正常；
+  **Compose UI 测试 9/9 通过**；Macrobenchmark `startup_500` 在模拟器跑通（median 2869.6 ms，仅验证流程）。
+- **未获得**：真机 FrameTimingMetric（MIUI BAL + dropShaderCache）。
+- **单元测试**：新增 38 个（配对 9 / 分支 5 / 增量一致性 7 / Mapper 成本 2 / 缓存 5 / Markdown 12 既有）全绿。

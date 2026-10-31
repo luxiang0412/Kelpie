@@ -16,6 +16,10 @@ data class ChatMessage(
     val timestamp: Long? = null,
     /** toolCall 的稳定 id（用于 ToolCall↔ToolResult 配对；拿不到时为 null）。 */
     val toolCallId: String? = null,
+    /** JSONL 事件行的稳定 id（pi 的 id 字段；拿不到时为 null）。 */
+    val id: String? = null,
+    /** 父事件 id（pi 的 parentId；用于分支重建）。 */
+    val parentId: String? = null,
 ) {
     enum class Kind { USER, ASSISTANT, THINKING, TOOL_CALL, TOOL_RESULT, SYSTEM }
 }
@@ -46,11 +50,13 @@ object PiTranscriptParser {
             val msg = obj["message"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: return@forEach
             val role = msg.str("role") ?: return@forEach
             val ts = obj.str("timestamp")?.toLongOrNull()
+            val eventId = obj.str("id")
+            val parentEventId = obj.str("parentId")
             when (role) {
                 "system" -> Unit // 系统提示不展示
                 "user" -> {
                     val text = textOf(msg)
-                    if (text.isNotBlank()) out += ChatMessage(ChatMessage.Kind.USER, text, timestamp = ts)
+                    if (text.isNotBlank()) out += ChatMessage(ChatMessage.Kind.USER, text, timestamp = ts, id = eventId, parentId = parentEventId)
                 }
                 "assistant" -> {
                     val parts = partsOf(msg)
@@ -61,10 +67,10 @@ object PiTranscriptParser {
                     parts.forEach { part ->
                         when (part.str("type")) {
                             "text" -> part.str("text")?.takeIf { it.isNotBlank() }?.let {
-                                out += ChatMessage(ChatMessage.Kind.ASSISTANT, it, timestamp = ts)
+                                out += ChatMessage(ChatMessage.Kind.ASSISTANT, it, timestamp = ts, id = eventId, parentId = parentEventId)
                             }
                             "thinking" -> (part.str("thinking") ?: part.str("text"))?.takeIf { it.isNotBlank() }?.let {
-                                out += ChatMessage(ChatMessage.Kind.THINKING, it, timestamp = ts)
+                                out += ChatMessage(ChatMessage.Kind.THINKING, it, timestamp = ts, id = eventId, parentId = parentEventId)
                             }
                             "toolCall", "tool_use", "tool_call" -> {
                                 val name = part.str("name") ?: part.str("toolName") ?: "tool"
@@ -75,6 +81,8 @@ object PiTranscriptParser {
                                     toolName = name,
                                     timestamp = ts,
                                     toolCallId = part.str("id") ?: part.str("toolCallId") ?: part.str("tool_use_id"),
+                                    id = eventId,
+                                    parentId = parentEventId,
                                 )
                             }
                             else -> Unit
@@ -93,6 +101,8 @@ object PiTranscriptParser {
                             timestamp = ts,
                             toolCallId = id,
                             toolName = msg.str("toolName"),
+                            id = eventId,
+                            parentId = parentEventId,
                         )
                     }
                 }

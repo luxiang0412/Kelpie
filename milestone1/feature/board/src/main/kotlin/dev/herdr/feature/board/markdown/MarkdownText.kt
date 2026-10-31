@@ -68,7 +68,7 @@ fun MarkdownText(
     color: androidx.compose.ui.graphics.Color? = null,
 ) {
     val blocks by produceState<List<MdBlock>?>(initialValue = null, source) {
-        value = withContext(Dispatchers.Default) { MarkdownParser.parse(source) }
+        value = withContext(Dispatchers.Default) { MarkdownAstCache.getOrParse(source) }
     }
     val palette = LocalHerdrPalette.current
 

@@ -213,3 +213,12 @@ P-4  → 只在你想把“9”变成确定值时做                            
 3. 测试环境：新建隔离 AVD（I-75）+ 非 MIUI 设备或 CI 跑 FrameTimingMetric（I-74/I-78）。
 4. Markdown 扩展（表格/嵌套列表）需重新评估是否引入库。
 5. 仍未做：Composer 全面重构、跨主机聚合、正式图标、Diff Viewer。
+
+
+## M2-C1 完成后（M2-C2）
+
+1. Benchmark 补齐确定性增量场景：追加 100 条 / 更新 100 次 / 100 次 ToolResult 更新 / 分支切换 / 展开折叠 / 滚动+新消息；
+2. 真机（非 MIUI）或 CI emulator 取 FrameTimingMetric，与 JVM 微基准分开记录；
+3. 真实 pi 会话验收：流式增量、新消息提示、分支切换、缓存失效；
+4. 视真机数据决定是否把分支解析/映射也做成增量（I-81）；
+5. 仍未做：Composer 重构、跨主机聚合、Markdown 表格/图片。

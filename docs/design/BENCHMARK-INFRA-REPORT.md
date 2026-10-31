@@ -61,3 +61,33 @@
 | Perfetto trace | ❌ 未获得（同上） |
 
 **因此本轮不宣称任何滚动/追加/IME 性能结论。** M2-B 的渲染改动只按「正确性与可读性」验收，性能影响未知。
+
+
+---
+
+# 附录（M2-C1 更新，2026-10-31）
+
+## A3'. 隔离 AVD（已解决 I-75 的可用性）
+
+| 项 | 结果 |
+| --- | --- |
+| AVD 名称 | `herdr_m2c1`（新建；用户已有 `touchlab_api34` 未改动） |
+| 镜像 | `system-images;android-34;google_apis;x86_64`（本地已有，无需下载） |
+| 启动 | headless、`-no-snapshot -gpu swiftshader_indirect`，50 s 到 `sys.boot_completed=1` |
+| `pm` 服务 | ✅ 正常（`pm list packages` 返回完整列表） |
+| 安装 | ✅ `app-debug.apk` / `app-debug-androidTest.apk` 安装成功 |
+| Instrumentation | ✅ Runner 正常，Compose UI 测试 **9/9 通过**（26 s） |
+| Macrobenchmark | ✅ `startup_500` 通过，`timeToInitialDisplayMs` median 2869.6 ms，产出 5 份 Perfetto trace |
+
+> 旧的 `emulator-5554`（package 服务损坏）保留未删除，仅不再使用。
+
+## 测量口径（重要）
+
+| 数据 | 来源 | 可用于 |
+| --- | --- | --- |
+| Mapper 算法耗时 | JVM 单测 `MapperCostTest` | 算法回归、增量收益（相对值） |
+| Markdown 解析耗时 | JVM 单测 `MarkdownParserTest.largeInput` | 解析性能上限 |
+| Compose UI 帧时 | `FrameTimingMetric` | **尚未获得**（真机 MIUI 阻断；模拟器仅验证流程） |
+| Activity 启动 | `am start -W` / `StartupTimingMetric` | 真机 fixture 首帧；模拟器 startup_500 |
+
+模拟器 `startup_500`（2869.6 ms）**只能**说明流程可运行：模拟器无真实 GPU、且目标 App 是 debuggable。
