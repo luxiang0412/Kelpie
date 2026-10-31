@@ -814,3 +814,16 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - 只支持 **pi** 的 JSONL 结构；Claude/Codex 需要各自的 parser（D19 的 Provider 化留到 M3）。
 - 没有 Markdown 渲染、代码高亮、折叠；纯文本块（避免在没做性能基线前引入重渲染）。
 - 依赖主机侧 `agent_session`（真实环境需装 herdr pi 集成，D35）。
+
+### 14.5 两台真实主机的多主机验证（VERIFIED，2026-10-31 19:16）
+
+给 `192.168.5.31` 追加专用 ed25519 公钥（`SHA256:3xa+zIx…`，先备份 `authorized_keys`）后：
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| `.5.8` | `connected generation=1` → `ping ok 0.9.5/22`，5 个 pane | `m2-07-two-real-hosts.png` |
+| `.5.31` | 同时 `connected generation=1` → `ping ok 0.9.5/22`，**2 个 pane** | 同上 |
+| 切换 | 点 `.5.31` chip → 显示它自己的 pane（`pi/idle w2:p1`，标题 `π - light-ontology`，cwd `/home/luxiang/project/work/light-ontology`） | `m2-08-host31-board.png` |
+| 隔离 | 两台主机各自独立 Supervisor / 信任库 / Room 分区 | logcat + 代码 |
+
+至此“多主机”在**两台真实机器**上验证通过（不是合成数据）。
