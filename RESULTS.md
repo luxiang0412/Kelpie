@@ -1111,3 +1111,12 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 | `m3-01-transcript-incremental.png` | 对话增量刷新 |
 | `m2-07/08` | 两台真实主机 + 切换 |
 | `m1-05`、`m1-02` | 看板、指纹对话框 |
+
+## M2-B（2026-10-31，提交 b0ece0a）
+
+- **benchmark 变体**：`:app:assembleBenchmark` 成功；设备 `run-as` 报 `package not debuggable` → R8/非调试生效。
+- **Fixture 首帧**（benchmark 变体，真机）：100 → 375 ms、500 → 344 ms、2000 → 298 ms（`spike/results/m2b-fixture-start-benchmark.txt`）。
+- **Markdown 渲染**：标题/列表/引用/行内样式/代码块/链接，深色截图 `m2b-markdown-dark.png`、浅色 `m2b-markdown-light.png`。
+- **单元测试**：新增 19 个（Markdown 12 + Tool 配对 7），`:feature:board:testDebugUnitTest` 全绿；`:core:herdr:test` 全绿。
+- **未获得**：FrameTimingMetric / StartupTimingMetric / Perfetto（MIUI BAL 阻断 instrumentation 启动 Activity，I-74；`dropShaderCache` 失败 I-78）。
+- **不可宣称**：任何滚动/追加/IME 的性能改善——本轮无同条件前后对比数据。
