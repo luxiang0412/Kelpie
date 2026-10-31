@@ -221,6 +221,26 @@ class HostsViewModel(
 
     fun clearComposerOutcome() = manager.clearComposerOutcome()
 
+    /**
+     * UX-04c：把某条 Agent 回复引用进当前草稿。
+     * - **不覆盖**已有草稿：只在末尾追加，用空行+引用边界分隔；
+     * - 超过 8000 字符上限时**拒绝**（不静默截断），由 UI 提示；
+     * - 只写本地草稿，绝不触发发送。
+     */
+    fun quoteIntoDraft(text: String): Boolean {
+        val current = manager.composer.value.text
+        val nl = System.lineSeparator()
+        fun asQuote(t: String) = t.trimEnd().lineSequence().joinToString(nl) { "> $it" }
+        val merged = if (current.isBlank()) {
+            asQuote(text)
+        } else {
+            current.trimEnd() + nl + nl + asQuote(text) + nl + nl
+        }
+        if (merged.length > dev.herdr.core.data.drafts.DraftStore.MAX_CHARS) return false
+        updateComposerText(merged)
+        return true
+    }
+
     fun sendPrompt(pane: Pane) {
         val hostId = _state.value.activeId ?: return
         val writable = _state.value.hosts.firstOrNull { it.cfg.id == hostId }

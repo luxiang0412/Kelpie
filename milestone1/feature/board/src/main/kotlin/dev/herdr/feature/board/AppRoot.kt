@@ -67,6 +67,7 @@ private fun AppContent(vm: HostsViewModel) {
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
     var techSheet by rememberSaveable { mutableStateOf(false) }
     var pendingSheet by rememberSaveable { mutableStateOf(false) }
+    var quoteTooLong by rememberSaveable { mutableStateOf(false) }
     val pane = state.board.selectedPane
     val activeHost = state.hosts.firstOrNull { it.cfg.id == state.activeId }
 
@@ -123,6 +124,9 @@ private fun AppContent(vm: HostsViewModel) {
                     onDismissOutcome = vm::clearComposerOutcome,
                     onReload = vm::reloadConversation,
                     onOpenTechSheet = { techSheet = true },
+                    onQuote = { quoted ->
+                        if (!vm.quoteIntoDraft(quoted)) quoteTooLong = true
+                    },
                     onBack = {
                         vm.closeConversation()
                         screen = SCREEN_BOARD
@@ -146,6 +150,16 @@ private fun AppContent(vm: HostsViewModel) {
                 )
             }
         }
+    }
+
+    // UX-04c：引用超出 8000 字符上限时明确拒绝，不静默截断
+    if (quoteTooLong) {
+        AlertDialog(
+            onDismissRequest = { quoteTooLong = false },
+            title = { Text("内容太长") },
+            text = { Text("当前草稿加上这段引用会超过 8000 字符上限，未写入。请先精简草稿，或单独复制引用内容。") },
+            confirmButton = { TextButton(onClick = { quoteTooLong = false }) { Text("知道了") } },
+        )
     }
 
     // UX-02c：Unknown 写操作详情（可从工作台 Banner 直接进入，不必先进对话/技术信息）

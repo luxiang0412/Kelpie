@@ -99,6 +99,7 @@ fun ConversationScreen(
     onReload: () -> Unit,
     onOpenTechSheet: () -> Unit,
     onBack: () -> Unit,
+    onQuote: (String) -> Unit = {},
 ) {
     val palette = LocalHerdrPalette.current
     if (pane == null) {
@@ -167,7 +168,7 @@ fun ConversationScreen(
                 transcript.loading -> LoadingBlock("读取会话…")
                 transcript.error != null -> ErrorBlock(transcript.error, onReload)
                 transcript.messages.isEmpty() -> EmptyBlock("还没有消息。发一句话开始。")
-                else -> MessageList(transcript.messages, pane)
+                else -> MessageList(transcript.messages, pane, onQuote)
             }
         }
     }
@@ -197,7 +198,7 @@ private fun BlockedNotice() {
 private enum class ReadMode { FollowingLatest, BrowsingHistory, RestoringAnchor, Empty }
 
 @Composable
-private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
+private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (String) -> Unit) {
     val palette = LocalHerdrPalette.current
     // 增量映射：分支解析 → 增量映射（历史条目复用；会话 key 变化时清空派生状态）
     val effective = remember(messages) { ConversationBranch.effective(messages) }
@@ -294,7 +295,7 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
                         // UX-03a：一组连续 Agent 回复只出现一次中性 Agent 标识（不再每条重复 11sp 绿色 "Pi"）
                         val startsGroup = prev !is ConversationItem.Assistant
                         if (startsGroup) AgentGroupHeader(pane)
-                        AssistantMessage(item.text)
+                        AssistantMessage(item.text, onQuote)
                     }
                     is ConversationItem.Thinking -> CollapsibleRow("思考过程", item.text, muted = true)
                     is ConversationItem.Tool -> ToolRow(item)
@@ -432,7 +433,7 @@ private fun UserMessage(text: String) {
  * 超长消息折叠预览；解析在 [MarkdownText] 内部的后台线程完成。
  */
 @Composable
-private fun AssistantMessage(text: String) {
+private fun AssistantMessage(text: String, onQuote: (String) -> Unit) {
     val palette = LocalHerdrPalette.current
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
     val collapsible = text.length > 2500 || lineCount > 40
@@ -457,7 +458,7 @@ private fun AssistantMessage(text: String) {
                     .semantics { contentDescription = "展开这条消息的全文" },
             )
         }
-        MessageActions(text)
+        MessageActions(text, onQuote)
     }
 }
 
@@ -467,7 +468,7 @@ private fun AssistantMessage(text: String) {
  * - 更多菜单只放**真正实现**的动作，不放 Quote/Share 占位。
  */
 @Composable
-private fun MessageActions(text: String) {
+private fun MessageActions(text: String, onQuote: (String) -> Unit) {
     val palette = LocalHerdrPalette.current
     val clipboard = LocalClipboardManager.current
     var menu by remember { mutableStateOf(false) }
@@ -504,6 +505,13 @@ private fun MessageActions(text: String) {
                     onClick = {
                         clipboard.setText(AnnotatedString(text))
                         menu = false
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("引用到输入框", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
+                        menu = false
+                        onQuote(text)
                     },
                 )
             }
@@ -755,10 +763,16 @@ private fun ComposerBar(
     }
 
     if (longEditor) {
+        var snapshot by remember { mutableStateOf(composer.text) }
         LongPromptEditor(
             text = composer.text,
             onChange = onTextChange,
-            onDismiss = { longEditor = false },
+            onCancel = {
+                // UX-04b：取消回退到打开编辑前的草稿内容（不发送、不保留半成品）
+                onTextChange(snapshot)
+                longEditor = false
+            },
+            onDismiss = { longEditor = false },   // 「完成」只写回本地草稿，绝不触发发送
         )
     }
 
@@ -786,7 +800,12 @@ private fun ComposerBar(
 
 /** 长 Prompt 编辑：全屏纯文本编辑，粘贴代码/堆栈不挤压列表。 */
 @Composable
-private fun LongPromptEditor(text: String, onChange: (String) -> Unit, onDismiss: () -> Unit) {
+private fun LongPromptEditor(
+    text: String,
+    onChange: (String) -> Unit,
+    onCancel: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     val palette = LocalHerdrPalette.current
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(color = palette.background, modifier = Modifier.fillMaxSize()) {
@@ -795,6 +814,7 @@ private fun LongPromptEditor(text: String, onChange: (String) -> Unit, onDismiss
                     Modifier.fillMaxWidth().padding(horizontal = Space.page, vertical = Space.s),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("取消") }
                     Text("长 Prompt", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("完成") }
