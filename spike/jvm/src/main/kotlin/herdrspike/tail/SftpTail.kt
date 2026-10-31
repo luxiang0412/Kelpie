@@ -142,8 +142,8 @@ class SftpTail(
             }
         }
 
+        // 首次 poll 不额外读前缀：等真正读到从 0 开始的数据时顺手填（省 1 个往返）
         identity = FileIdentity(st.size, st.mtimeMs, st.inode, cachedPrefix ?: ByteArray(0))
-            .also { if (cachedPrefix == null) cachedPrefix = fs.headBytes(path, cfg.headBytes) }
 
         if (st.size == offset) return TailResult.Empty
 
@@ -175,6 +175,10 @@ class SftpTail(
                 off = n
             }
             if (read - off > 0) {
+                if ((cachedPrefix == null || cachedPrefix!!.isEmpty()) && pos - read == 0L) {
+                    val n = minOf(cfg.headBytes, read)
+                    cachedPrefix = buf.copyOfRange(0, n)
+                }
                 pending.write(buf, off, read - off)
                 rememberTail(buf, off, read - off)
             }

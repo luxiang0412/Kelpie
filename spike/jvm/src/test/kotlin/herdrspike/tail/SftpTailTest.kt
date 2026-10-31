@@ -87,12 +87,12 @@ class SftpTailTest {
         }
         val tail = SftpTail(counting, f.toString(), TailConfig(prefixRecheckPolls = 100))
         tail.poll()
-        assertEquals(1, headCalls)
+        assertEquals(0, headCalls, "首次 poll 也不应额外读前缀（应从首次读取里顺手取）")
         for (i in 2..5) {
             writeFile(f, "l$i\n".toByteArray(), append = true)
             tail.poll()
         }
-        assertEquals(1, headCalls, "稳态 poll 不应重复读前缀，实际 $headCalls 次")
+        assertEquals(0, headCalls, "稳态 poll 不应读前缀，实际 $headCalls 次")
     }
 
     @Test
