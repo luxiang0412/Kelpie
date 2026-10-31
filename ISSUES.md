@@ -282,3 +282,25 @@
 - **现象**：`pane_created` / `pane_updated` / `pane_closed` / `layout_updated` 的载荷里都没有时间戳。
 - **影响**：端到端延迟只能靠“主机侧先记时间、客户端收到再回传”或时钟偏差估计；无法直接用事件自带时间。
 - **建议**：延迟测量脚本按“主机侧写入标记 + 客户端记录接收时刻 + 估算偏差”三段式；别假设事件带 ts。
+
+## I-38 streamlocal 在客户端栈不可用（服务端 OK）
+
+- **现象 1**：Windows OpenSSH `-L <unix socket>:<remote socket>` 直接拒绝（`Bad local forwarding specification`）。
+- **现象 2**：sshj 0.41.2 无 `direct-streamlocal@openssh.com` 实现（jar 内只有 `DirectTCPIPChannel`）。
+- **现象 3**：服务端允许（主机本机自连 `ssh -L` 成功 ping）。
+- **影响**：方案 B 在当前客户端栈上不可行；每请求 200 ms 的 exec 开销暂时无法绕过。
+- **建议**：① 短期靠“减少请求数 + 连接复用”；② 若必须优化，给 sshj 写自定义 channel 或采用方案 C（主机端脚本，需批准）。
+- **状态**：BLOCKED（客户端侧）。
+
+## I-39 `agent.wait` 超时经 `remote-api-bridge` 时没有响应
+
+- **现象**：`agent.wait` 条件不满足 + `timeout_ms=1500/2000/3000` 经 bridge 发出 → **stdout/stderr 都为空**、连接关闭；同一请求直连 socket → 收到 `{"error":{"code":"timeout",…}}`。
+- **复现**：`printf '%s\n' '{...agent.wait until blocked timeout 3000...}' | ssh host 'herdr --session test remote-api-bridge'`（无输出）。
+- **影响**：客户端会把它判成 `Unknown`（可接受但语义变差）；也说明“bridge ≠ 直连”的行为并不完全等价。
+- **建议**：客户端把“无响应 + 连接关闭”统一映射为 `timeout/Unknown`；**不要**因为 bridge 有响应差异就假设请求没送达。
+
+## I-40 capabilities 随连接方式变化
+
+- **现象**：`ping` 的 `capabilities.detached_server_daemon`：直连 socket = `true`，经 `remote-api-bridge` = `false`。
+- **影响**：能力协商必须在**实际使用的传输**上做，不能一次探测到处复用。
+- **建议**：写进 D8 的实现细则：每个 Transport 建立后各做一次 `ping`，结果按 Transport 缓存。

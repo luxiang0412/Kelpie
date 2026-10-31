@@ -273,3 +273,20 @@
 **依据**：`RESULTS.md` ON2-25…ON2-28。
 
 **状态**：`已定`（本阶段）。
+
+## D20. 方案 B（streamlocal）暂不投入；先做“减少请求数”
+
+- 服务端支持 streamlocal，但 Windows OpenSSH 客户端与 sshj 0.41.2 都不支持 unix-socket 直连。
+- 要落地需要给 sshj 写自定义 channel（估 1–2 天）或主机端复用脚本（方案 C，需装脚本/批准）。
+- 决策：**Phase 1 不做方案 B**；先把“每请求 248 ms”压下去的手段放在：① 事件驱动（少轮询）② SFTP 复用 ③ 批量读取（一次 `snapshot` 覆盖多个 pane）。
+- 若 Phase 2 仍有 >200 ms 的体感问题，再评估方案 B/C。
+
+**状态**：`已定`。
+
+## D21. `agent.wait` 只当“带超时的阻塞查询”，不当锁、也不当完成通知的唯一来源
+
+- 实测：条件满足时 2 ms 返回 `agent_info`；不满足时精确阻塞 `timeout_ms` 后返回 `error.code=timeout`（直连）；**条件不满足时不会排斥其他写者**（working 期间另写被 1 ms 接受）。
+- 用法约束：① `until` 必须包含 `done`（pi 完成后是 `done`，不是 `idle`）；② 超时一律视为“没等到”，不得推断成败；③ 完成检测以 `done`/`idle` 事件 + `agent.get` 为准，`agent.wait` 只做辅助。
+- 经 `remote-api-bridge` 时超时无响应（I-39），客户端要按 `Unknown` 处理。
+
+**状态**：`已定`。

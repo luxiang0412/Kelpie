@@ -298,3 +298,46 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 
 - 审批 L2 里“`revision` 变了但问题哈希没变就继续”的规则**不成立**：`revision` 不反映屏幕内容（ON2-20）。L2 的判据只能是 `promptHash`（对 `pane.read` 文本归一化）+ `agent_status`。
 - pi 的会话定位：`--session-dir` 时是**扁平目录**，`<ISO8601>_<uuid>.jsonl`；默认（不加 `--session-dir`）是否走 `--<cwd>--` 子目录 **未测**（不想往你的 `~/.pi` 里写样本）。
+
+## 9.10 Q-4 / Q-2 / Q-1（2026-10-31 15:40–16:05）
+
+### Q-4 streamlocal 对照（BLOCKED，两个独立原因）
+
+| 项 | 结果 |
+| --- | --- |
+| Windows OpenSSH 客户端做 unix-socket `-L` | **不支持**：`Bad local forwarding specification 'C:/…/herdr-test.sock:/home/…/herdr.sock'` |
+| sshj 0.41.2 的 `direct-streamlocal@openssh.com` | **没有实现**（jar 里只有 `DirectTCPIPChannel`，没有 streamlocal 相关类） |
+| 服务端是否允许 streamlocal | **允许**：在主机本机 `ssh -N -L /tmp/herdr-loop.sock:<herdr.sock> localhost` + `socat` → `ping` 正常返回 |
+| 顺带发现 | **同一个服务端的 capabilities 随连接方式变化**：直连 socket 时 `detached_server_daemon: true`，经 `remote-api-bridge` 时是 `false` |
+
+结论：方案 B 在“我们的客户端栈”里 **BLOCKED**，不是服务端限制。要做只有两条路：给 sshj 写自定义 channel（估 1–2 天），或走方案 C（主机端复用脚本，需装脚本，需批准）。
+
+### Q-2 events_lost（小规模尝试 → NOT TESTED，附量化估算）
+
+做法：订阅后本地 25 s 不读取，同时在 `w4` 里做 6 次 split+close（30 个事件）。
+
+| 结果 | 值 |
+| --- | --- |
+| 事件数 / 字节 | 30 个事件 / 10,477 B（≈1.7 KB/pane） |
+| `events_lost` | **未出现**；恢复读取后 30 个事件**全部送达**（无丢失、无重放） |
+| 结论 | 订阅能承受 25 s 级卡顿。要触发 `events_lost` 需要 >100 个 pane 量级（填满 socket 缓冲），属于压力测试，按你的约束**不做** → 恢复路径本轮 `NOT TESTED` |
+
+证据：`spike/results/s2-events-lost-attempt.ndjson`。
+
+### Q-1 交互式 pi：agent.prompt / agent.wait / 无锁（VERIFIED）
+
+在 `w4:p1` 里启动 `pi --session-dir ~/spike-sandbox/pi-sessions`；用**直连 unix socket**（本地 loopback）测量，去掉 SSH 连接开销。
+
+| ID | 项 | 结果 |
+| --- | --- | --- |
+| ON2-29 | herdr 对 pi 的识别 | `agent=pi`，`agent_session=null`（未装集成） |
+| ON2-30 | `agent.prompt` | 返回 `{"type":"agent_prompted","agent":{…}}`，**301 ms** |
+| ON2-31 | 状态轨迹 | `done`(残留) → **`working` @405 ms → `done` @4836 ms** |
+| ON2-32 | `agent.wait` 条件已满足 | **2 ms** 返回 `agent_info` |
+| ON2-33 | `agent.wait` 条件不满足 | **精确阻塞 3007 ms**（timeout_ms=3000）后返回 `{"error":{"code":"timeout","message":"timed out waiting for agent status"}}` |
+| ON2-34 | **`agent.wait` 不提供互斥（P0-2 实证）** | pi 处于 `working` 时，另一个客户端的 `pane.send_text` + `send_keys(enter)` 在 **1 ms** 内被接受；同时第三个客户端的 `agent.wait` 持续 **13.3 s** 后才返回 `done`。→ 等待期间别人可以写，**没有锁** |
+| ON2-35 | 经 `remote-api-bridge` 的 `agent.wait` 超时 | 3/3 次**没有任何输出**、连接被关；同一请求直连 socket 则明确返回 `timeout` 错误 → 传输层差异（`ISSUES.md` I-39） |
+| ON2-36 | `agent_blocked` | **NOT TESTED**：需要诱导 pi 弹权限确认，未做（避免在共享机上产生需要审批的操作） |
+| ON2-37 | 收尾 | `ctrl+c`×3 与 `/exit` 都没退出 TUI；最终 `kill` 掉自己的测试进程（pid 1012435），pane 回到 shell（`agent=None`） |
+
+上一条的“状态轨迹”说明：**pi 完成后是 `done` 而不是 `idle`**；`agent.wait` 的 `until` 必须包含 `done`，否则会白等到超时。
