@@ -85,7 +85,14 @@ fun HostsScreen(
                 Button(onClick = { isNew = true; editing = null }) { Text("添加主机") }
             }
         } else {
-            Column(Modifier.padding(padding).fillMaxSize()) {
+            // UX-08a：整页可滚动，否则空态会占满视口，设置项（语言/后台监控）在无主机时不可达
+            Column(
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 24.dp),
+            ) {
                 // UX-05b：App 语言（跟随系统 / 简体中文 / English）。
                 // 仅 Android 13+ 用系统级 per-app locale；旧版本不引入 AppCompat 架构迁移，明确说明不可用。
                 LanguageSection(context)
