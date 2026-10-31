@@ -1,0 +1,22 @@
+# UX-00a report — 基础 Tokens / Theme / 对比度（PARTIAL）
+
+- baseline commit / branch：`128632a` / `ux/graphite-editorial`
+- inspected real files：`feature/board/.../design/Tokens.kt`（`HerdrPalette`、`LightPalette`、`DarkPalette`、`Space`、`Radius`、`Motion`、`StatusText`、`MonoStyle`、`typography()`）、`Theme.kt`、所有使用 `LocalHerdrPalette` 的页面
+- exact goal：把 Graphite × Editorial §2.2 的颜色/对比度落到**唯一** Token 实现上；不重构页面布局，避免截图差异无法归因
+- changed files：
+  - `design/Tokens.kt`：`HerdrPalette` 新增 `borderSubtle`；Light/Dark 色值对齐 §2.2（canvas/surface/raised/textPrimary/textSecondary/accent/onAccent/borderSubtle）；`LightPalette`/`DarkPalette` 由 `private` 改 `internal` 以便 JVM 对比度测试读取
+  - 新增 `feature/board/src/test/.../design/ContrastTest.kt`（纯 JVM，WCAG 2.1 相对亮度）
+- why matches UX-D0：§2.2 明确「业务页面禁止散落色值」「borderSubtle 不是焦点线」；本轮只改 token 值 + 可见性，未改任何页面结构
+- tests：`:feature:board:testDebugUnitTest` **BUILD SUCCESSFUL**，`ContrastTest` 34 项断言全通过，实测最小值：
+  - 文本：light `textSecondary/raised` **5.97**、dark `textSecondary/raised` **7.18**（阈值 4.5）
+  - 状态色：light 最低 `IDLE/statusBg` **5.41**、dark 最低 `IDLE/statusBg` **6.16**（阈值 3.0）
+  - accent/onAccent：light **6.22**、dark **8.76**
+- screenshots：`spike/results/ux00a-board-dark.png`（看板，深色，fontScale 1.0，zh-CN，真机）、`spike/results/ux00a-conv-dark.png`（对话，同条件）
+- safety regressions checked：未改发送/草稿/账本/配对/连接/草稿库；无 Room 结构变化；`borderSubtle` 仅新增字段
+- 四类结论：
+  - **已实现并验证**：色值对齐 §2.2；`borderSubtle` 语义 token；34 项对比度断言（JVM）通过；深色看板/对话真机截图
+  - **已实现但未验证**：321dp/320dp 极窄（P5/P6）与 en 语言（P3/P4）截图未拍
+  - **未实现**：图标契约（`›`/`▸`/`⤢` 字形仍是主要点击/指示符号）、`AppTextStyles` 语义字阶命名（目前直接引用 Material typography）、`TouchTargetIconButton`/`PageGutter` 共享组件
+  - **已知问题**：深色色值改动属**默认值变更**，标 `PROVISIONAL / 待用户视觉终审`；字阶仍是 8 档但页面只用 3 档，属 UX-02 系列任务范围
+- commit：见本条提交
+- rollback：`git revert <commit>`

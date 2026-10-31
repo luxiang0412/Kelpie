@@ -32,19 +32,22 @@ data class HerdrPalette(
     val accent: Color,
     val accentOn: Color,
     val outline: Color,
+    /** 轻分隔线（不可当作可点击边界）。 */
+    val borderSubtle: Color,
     val statusFg: (AgentStatus) -> Color,
     val statusBg: (AgentStatus) -> Color,
 )
 
-private val LightPalette = HerdrPalette(
+internal val LightPalette = HerdrPalette(
     background = Color(0xFFF7F8FA),
     surface = Color(0xFFFFFFFF),
-    surfaceRaised = Color(0xFFF1F3F8),
+    surfaceRaised = Color(0xFFEFF2F6),
     textPrimary = Color(0xFF172033),
-    textSecondary = Color(0xFF526074),
+    textSecondary = Color(0xFF4F5D70),
     accent = Color(0xFF3556CE),
     accentOn = Color(0xFFFFFFFF),
-    outline = Color(0xFFD6DDE7),
+    outline = Color(0xFFDFE5ED),
+    borderSubtle = Color(0xFFDFE5ED),
     statusFg = { st ->
         when (st) {
             AgentStatus.BLOCKED -> Color(0xFF98470B)
@@ -65,31 +68,32 @@ private val LightPalette = HerdrPalette(
     },
 )
 
-private val DarkPalette = HerdrPalette(
-    background = Color(0xFF0B111C),
-    surface = Color(0xFF141B29),
-    surfaceRaised = Color(0xFF1C2636),
-    textPrimary = Color(0xFFF1F5FA),
-    textSecondary = Color(0xFFB4C0D0),
-    accent = Color(0xFF9DB2FF),
-    accentOn = Color(0xFF0B111C),
-    outline = Color(0xFF344356),
+internal val DarkPalette = HerdrPalette(
+    background = Color(0xFF10151D),
+    surface = Color(0xFF181F2A),
+    surfaceRaised = Color(0xFF222B39),
+    textPrimary = Color(0xFFEEF2F8),
+    textSecondary = Color(0xFFAEB9C8),
+    accent = Color(0xFF9BB0FF),
+    accentOn = Color(0xFF10151D),
+    outline = Color(0xFF344052),
+    borderSubtle = Color(0xFF344052),
     statusFg = { st ->
         when (st) {
-            AgentStatus.BLOCKED -> Color(0xFFFFB386)
-            AgentStatus.WORKING -> Color(0xFF8BC5F9)
-            AgentStatus.DONE -> Color(0xFF8CD8AE)
-            AgentStatus.IDLE -> Color(0xFFC1CCD8)
-            AgentStatus.UNKNOWN -> Color(0xFFEBD28D)
+            AgentStatus.BLOCKED -> Color(0xFFFFB86B)
+            AgentStatus.WORKING -> Color(0xFF8FC7FF)
+            AgentStatus.DONE -> Color(0xFF7FD1A0)
+            AgentStatus.IDLE -> Color(0xFFA0AAB8)
+            AgentStatus.UNKNOWN -> Color(0xFFE0C070)
         }
     },
     statusBg = { st ->
         when (st) {
-            AgentStatus.BLOCKED -> Color(0xFF3B241A)
-            AgentStatus.WORKING -> Color(0xFF142C43)
-            AgentStatus.DONE -> Color(0xFF153326)
-            AgentStatus.IDLE -> Color(0xFF28313D)
-            AgentStatus.UNKNOWN -> Color(0xFF3B3119)
+            AgentStatus.BLOCKED -> Color(0xFF3A2A18)
+            AgentStatus.WORKING -> Color(0xFF152A3E)
+            AgentStatus.DONE -> Color(0xFF15301F)
+            AgentStatus.IDLE -> Color(0xFF232A33)
+            AgentStatus.UNKNOWN -> Color(0xFF332C17)
         }
     },
 )
