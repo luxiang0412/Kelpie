@@ -8,7 +8,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.herdr.feature.board.AppRoot
 import dev.herdr.feature.board.HostsViewModel
-import dev.herdr.feature.board.HerdrTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -22,7 +21,6 @@ class MainActivity : ComponentActivity() {
                 HostsViewModel(container.manager, container.hosts) as T
         }
         setContent {
-            HerdrTheme {
                 val vm: HostsViewModel = viewModel(factory = factory)
                 androidx.compose.runtime.LaunchedEffect(Unit) {
                     // API 33+ 需要显式申请通知权限，否则“出门被提醒”不会显示
@@ -42,7 +40,6 @@ class MainActivity : ComponentActivity() {
                 ) {
                     AppRoot(vm)
                 }
-            }
         }
     }
 }

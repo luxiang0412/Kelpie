@@ -1,11 +1,14 @@
 package dev.herdr.feature.board
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -13,84 +16,124 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.herdr.feature.board.design.HerdrThemeCompat
+import dev.herdr.feature.board.design.LocalHerdrPalette
 
 private const val SCREEN_BOARD = "board"
+private const val SCREEN_CONVERSATION = "conversation"
 private const val SCREEN_HOSTS = "hosts"
-private const val SCREEN_DETAIL = "detail"
-private const val SCREEN_TRANSCRIPT = "transcript"
 
+/**
+ * 导航（M1）：看板 ⇄ 对话；主机是第二个一级目的地；技术信息走 Bottom Sheet。
+ * 会话途中不再经过“Pane 详情”整页。
+ */
 @Composable
 fun AppRoot(vm: HostsViewModel) {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    HerdrThemeCompat(dark) { AppContent(vm) }
+}
+
+@Composable
+private fun AppContent(vm: HostsViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val transcript by vm.transcript.collectAsStateWithLifecycle()
     val composer by vm.composer.collectAsStateWithLifecycle()
     val approvals by vm.approvals.collectAsStateWithLifecycle()
     val paneOutput by vm.paneOutput.collectAsStateWithLifecycle()
+    val palette = LocalHerdrPalette.current
+
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
+    var techSheet by rememberSaveable { mutableStateOf(false) }
+    val pane = state.board.selectedPane
+    val activeHost = state.hosts.firstOrNull { it.cfg.id == state.activeId }
 
     BackHandler(enabled = screen != SCREEN_BOARD) {
-        if (screen == SCREEN_DETAIL) vm.selectPane(null)
-        if (screen == SCREEN_TRANSCRIPT) vm.closeTranscript()
-        screen = SCREEN_BOARD
+        if (screen == SCREEN_CONVERSATION) {
+            vm.closeConversation()
+            screen = SCREEN_BOARD
+        } else {
+            screen = SCREEN_BOARD
+        }
     }
 
-    when (screen) {
-        SCREEN_HOSTS -> HostsScreen(
-            state = state,
-            onSave = { cfg -> vm.addHost(cfg) },
-            onDelete = vm::removeHost,
-            onImportKey = vm::importKey,
-            onDeleteKey = vm::deleteKey,
-            onConnect = { id -> vm.selectHost(id); vm.connect(id) },
-            onDisconnect = vm::disconnect,
-            onBack = { screen = SCREEN_BOARD },
-        )
-
-        SCREEN_DETAIL -> PaneDetailScreen(
-            pane = state.board.selectedPane,
-            onBack = {
-                vm.selectPane(null)
-                screen = SCREEN_BOARD
-            },
-            composer = composer,
-            output = paneOutput,
-            onTextChange = vm::updateComposerText,
-            onSend = { state.board.selectedPane?.let { vm.sendPrompt(it) } },
-            onDismissOutcome = vm::clearComposerOutcome,
-            onOpenTranscript = state.board.selectedPane?.agentSessionPath?.let {
-                {
-                    state.board.selectedPane?.let { p -> vm.openTranscript(p) }
-                    screen = SCREEN_TRANSCRIPT
+    Scaffold(
+        containerColor = palette.background,
+        bottomBar = {
+            if (screen != SCREEN_CONVERSATION) {
+                NavigationBar(containerColor = palette.surface) {
+                    NavigationBarItem(
+                        selected = screen == SCREEN_BOARD,
+                        onClick = { screen = SCREEN_BOARD },
+                        icon = { Text("▤", style = MaterialTheme.typography.titleMedium) },
+                        label = { Text("看板") },
+                    )
+                    NavigationBarItem(
+                        selected = screen == SCREEN_HOSTS,
+                        onClick = { screen = SCREEN_HOSTS },
+                        icon = { Text("⚙", style = MaterialTheme.typography.titleMedium) },
+                        label = { Text("主机") },
+                    )
                 }
-            },
-        )
+            }
+        },
+    ) { padding ->
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            when (screen) {
+                SCREEN_HOSTS -> HostsScreen(
+                    state = state,
+                    onSave = vm::addHost,
+                    onDelete = vm::removeHost,
+                    onImportKey = vm::importKey,
+                    onDeleteKey = vm::deleteKey,
+                    onConnect = { id -> vm.selectHost(id); vm.connect(id) },
+                    onDisconnect = vm::disconnect,
+                    onBack = { screen = SCREEN_BOARD },
+                )
 
-        SCREEN_TRANSCRIPT -> TranscriptScreen(
-            state = transcript,
-            composer = composer,
-            onTextChange = vm::updateComposerText,
-            onSend = { state.board.selectedPane?.let { vm.sendPrompt(it) } },
-            onDismissOutcome = vm::clearComposerOutcome,
-            onRefresh = vm::reloadTranscript,
-            onBack = { screen = SCREEN_DETAIL },
-        )
+                SCREEN_CONVERSATION -> ConversationScreen(
+                    pane = pane,
+                    transcript = transcript,
+                    output = paneOutput,
+                    composer = composer,
+                    onTextChange = vm::updateComposerText,
+                    onSend = { pane?.let { vm.sendPrompt(it) } },
+                    onDismissOutcome = vm::clearComposerOutcome,
+                    onReload = vm::reloadConversation,
+                    onOpenTechSheet = { techSheet = true },
+                    onBack = {
+                        vm.closeConversation()
+                        screen = SCREEN_BOARD
+                    },
+                )
 
-        else -> BoardScreen(
-            state = state,
-            approvals = approvals,
-            onApproval = { item, allow -> vm.answerApproval(item, allow) },
-            onSelectHost = vm::selectHost,
-            onRefresh = vm::refreshActive,
-            onReconnect = { vm.reconnect(state.activeId ?: return@BoardScreen) },
-            onOpenHosts = { screen = SCREEN_HOSTS },
-            onSelectPane = { pane ->
-                vm.selectPane(pane)
-                screen = SCREEN_DETAIL
-            },
+                else -> BoardScreen(
+                    state = state,
+                    approvals = approvals,
+                    onApproval = { item, allow -> vm.answerApproval(item, allow) },
+                    onSelectHost = vm::selectHost,
+                    onRefresh = vm::refreshActive,
+                    onReconnect = { vm.reconnect(state.activeId ?: return@BoardScreen) },
+                    onOpenHosts = { screen = SCREEN_HOSTS },
+                    onSelectAgent = { p ->
+                        vm.openConversation(p)
+                        screen = SCREEN_CONVERSATION
+                    },
+                )
+            }
+        }
+    }
+
+    if (techSheet && pane != null) {
+        TechnicalInfoSheet(
+            pane = pane,
+            hostLabel = activeHost?.cfg?.label?.ifBlank { activeHost.cfg.host } ?: "-",
+            lastSyncMs = state.board.updatedAtMs,
+            onDismiss = { techSheet = false },
         )
     }
 
@@ -99,13 +142,13 @@ fun AppRoot(vm: HostsViewModel) {
             onDismissRequest = { /* 必须显式选择 */ },
             title = { Text("确认主机指纹（请带外核对）") },
             text = {
-                Column {
+                androidx.compose.foundation.layout.Column {
                     Text("${prompt.label} · ${prompt.hostId}", style = MaterialTheme.typography.labelMedium)
                     Text(
                         prompt.fingerprint,
                         style = MaterialTheme.typography.bodyMedium,
                         fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        modifier = Modifier.padding(vertical = 8.dp),
                     )
                     Text(
                         "请与主机上 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` 的结果逐字核对。\n" +

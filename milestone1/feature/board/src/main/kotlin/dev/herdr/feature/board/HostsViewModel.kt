@@ -211,6 +211,24 @@ class HostsViewModel(
 
     // ---------------- 对话（只读） ----------------
 
+    /** W2：进入对话（有 agent_session 走结构化；否则降级终端输出）。 */
+    fun openConversation(pane: Pane) {
+        selectPane(pane)   // 启动终端尾部轮询，作为兜底
+        if (pane.agentSessionPath != null) openTranscript(pane) else _transcript.value = TranscriptState()
+    }
+
+    fun closeConversation() {
+        closeTranscript()
+        selectPane(null)
+    }
+
+    fun reloadConversation() {
+        if (_transcript.value.path != null) reloadTranscript()
+        val hostId = _state.value.activeId ?: return
+        val p = _state.value.board.selectedPane ?: return
+        viewModelScope.launch { manager.readPane(hostId, p.paneId)?.let { _paneOutput.value = it } }
+    }
+
     fun openTranscript(pane: Pane) {
         val path = pane.agentSessionPath
         val hostId = _state.value.activeId

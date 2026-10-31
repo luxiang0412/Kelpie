@@ -48,6 +48,7 @@ class HerdrApplication : Application() {
         container = AppContainer(this)
         container.manager.startAll()
         if (container.prefs.monitoringEnabled) {
+            container.manager.setMonitoring(true)
             runCatching { MonitorService.start(this) }
         }
     }

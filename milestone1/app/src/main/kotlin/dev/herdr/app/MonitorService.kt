@@ -66,6 +66,7 @@ class MonitorService : Service() {
         startForeground(NOTIF_ONGOING, ongoingNotification("正在监控 agent 状态"))
         val container = (application as HerdrApplication).container
         container.manager.startAll()
+        container.manager.setMonitoring(true)
         observeStatus(container)
         return START_STICKY
     }
@@ -147,6 +148,9 @@ class MonitorService : Service() {
     }
 
     override fun onDestroy() {
+        runCatching {
+            (application as HerdrApplication).container.manager.setMonitoring(false)
+        }
         collectJob?.cancel()
         scope.cancel()
         super.onDestroy()

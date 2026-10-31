@@ -44,10 +44,15 @@ class HostConnectionManager(
     data class HostState(
         val cfg: HostRepository.HostConfig,
         val hasKey: Boolean,
+        /** 传输状态（SSH 连接本身） */
         val connKind: ConnKind = ConnKind.IDLE,
         val connText: String = "未连接",
         val lastError: String? = null,
         val paneCount: Int = 0,
+        /** 数据有效性（最近一次权威快照）：与传输状态分开，避免“空闲=过期”的误判（D34/D8） */
+        val dataStale: Boolean = true,
+        val dataAtMs: Long = 0,
+        val dataVersion: String = "",
     )
 
     data class HostKeyPrompt(val hostId: String, val label: String, val fingerprint: String)
@@ -107,10 +112,24 @@ class HostConnectionManager(
     private var started = false
     private var ticker: Job? = null
 
-    /** 由 Application 启动时调用：按配置连接所有主机。 */
+    /**
+     * 进程启动 / 服务启动时调用：**幂等**。
+     * 已在运行的主机不做任何事（尤其不能再触发 reconnectNow，见 I-73）。
+     */
     fun startAll() {
         reload(startConnections = true)
+        started = true
+        startTickerIfNeeded()
     }
+
+    /** 后台监控开关（决定是否跑低频对账与审批轮询）。 */
+    fun setMonitoring(on: Boolean) {
+        monitoring = on
+        if (on) startTickerIfNeeded() else stopTicker()
+    }
+
+    var monitoring: Boolean = false
+        private set
 
     fun reload(startConnections: Boolean = false) {
         val list = hosts.list()
@@ -146,7 +165,7 @@ class HostConnectionManager(
      */
     private fun startTickerIfNeeded() {
         if (ticker?.isActive == true) return
-        if (!started) return
+        if (!started || !monitoring) return
         var tick = 0
         ticker = scope.launch {
             while (true) {
@@ -190,7 +209,11 @@ class HostConnectionManager(
         ticker?.cancel(); ticker = null
     }
 
-    fun connect(id: String) = runtimes[id]?.let { ensureStarted(it) } ?: Unit
+    /** 用户主动连接：未连接则建立；已连接则强制重连（唯一允许触发新 generation 的入口）。 */
+    fun connect(id: String) = runtimes[id]?.let {
+        val sup = it.supervisor
+        if (sup == null) ensureStarted(it) else sup.reconnectNow()
+    } ?: Unit
 
     fun disconnect(id: String) = runtimes[id]?.let {
         stopRuntime(it)
@@ -299,10 +322,8 @@ class HostConnectionManager(
     // ---------------- 内部 ----------------
 
     private fun ensureStarted(rt: Runtime) {
-        if (rt.supervisor != null) {
-            rt.supervisor?.reconnectNow()
-            return
-        }
+        // 幂等：已经在运行（或正在重连）的主机不再触碰，避免启动时白连一次（I-73）
+        if (rt.supervisor != null) return
         if (!hosts.hasKey(rt.cfg.id)) {
             update(rt.cfg.id, ConnKind.IDLE, "未导入私钥", null)
             return
@@ -394,7 +415,13 @@ class HostConnectionManager(
             }
             rt.lastStatuses = now
             rt.lastCompletion = rs.panes.mapNotNull { p -> p.completionSeq?.let { p.paneId to it } }.toMap()
-            update(rt.cfg.id, panes = rs.panes.size)
+            update(
+                rt.cfg.id,
+                panes = rs.panes.size,
+                dataStale = rs.stale,
+                dataAtMs = rs.fetchedAtMs,
+                dataVersion = rs.version,
+            )
         }
     }
 
@@ -404,6 +431,9 @@ class HostConnectionManager(
         text: String? = null,
         error: String? = null,
         panes: Int? = null,
+        dataStale: Boolean? = null,
+        dataAtMs: Long? = null,
+        dataVersion: String? = null,
     ) {
         _hosts.value = _hosts.value.map { hs ->
             if (hs.cfg.id != id) hs else hs.copy(
@@ -411,6 +441,9 @@ class HostConnectionManager(
                 connText = text ?: hs.connText,
                 lastError = if (error != null) error else hs.lastError,
                 paneCount = panes ?: hs.paneCount,
+                dataStale = dataStale ?: hs.dataStale,
+                dataAtMs = dataAtMs ?: hs.dataAtMs,
+                dataVersion = dataVersion ?: hs.dataVersion,
             )
         }
     }
