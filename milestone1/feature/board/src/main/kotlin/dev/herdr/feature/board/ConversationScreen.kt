@@ -40,6 +40,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -189,6 +192,9 @@ private fun BlockedNotice() {
     }
 }
 
+/** UX-03e：阅读位置状态（真实手势驱动，不用 index 猜测）。 */
+private enum class ReadMode { FollowingLatest, BrowsingHistory, RestoringAnchor, Empty }
+
 @Composable
 private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
     val palette = LocalHerdrPalette.current
@@ -199,23 +205,72 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
     val items = remember(effective, sessionKey) { mapper.update(effective, sessionKey) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    var pendingNew by remember(pane.paneId) { mutableStateOf(false) }
-    var initialised by remember(pane.paneId) { mutableStateOf(false) }
 
-    // 首次进入定位到最新；之后仅在用户处于底部附近时跟随，
-    // 否则提示「新消息」——阅读历史时不被拉回底部（B5）。
-    LaunchedEffect(items.size) {
-        if (items.isEmpty()) return@LaunchedEffect
-        if (!initialised) {
-            listState.scrollToItem(items.lastIndex)
-            initialised = true
-            return@LaunchedEffect
+    // UX-03e：显式阅读状态机（不再只靠 firstVisibleItemIndex 猜测）
+    // FollowingLatest → 贴底跟随；BrowsingHistory → 停在原处并累计未读；
+    // RestoringAnchor → 刚恢复锚点，暂不自动滚动；Empty → 无消息。
+    var mode by remember(sessionKey) { mutableStateOf(if (items.isEmpty()) ReadMode.Empty else ReadMode.RestoringAnchor) }
+    var unread by remember(sessionKey) { mutableStateOf(0) }
+    var lastSeenIndex by remember(sessionKey) { mutableStateOf(items.lastIndex) }
+
+    // 锚点：会话 + 条目稳定 key（paneId-index）+ 像素偏移，不只用 index
+    var anchorKey by rememberSaveable(sessionKey) { mutableStateOf<String?>(null) }
+    var anchorOffset by rememberSaveable(sessionKey) { mutableStateOf(0) }
+
+    val atBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
+            last.index >= info.totalItemsCount - 1 &&
+                last.offset + last.size <= info.viewportEndOffset + 8
         }
-        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-        if (items.lastIndex - lastVisible <= 2) {
-            listState.animateScrollToItem(items.lastIndex)
-        } else {
-            pendingNew = true
+    }
+
+    // 用户手势决定状态：贴近底部 → 跟随；否则 → 浏览历史
+    LaunchedEffect(atBottom) {
+        if (items.isEmpty()) return@LaunchedEffect
+        mode = if (atBottom) ReadMode.FollowingLatest else ReadMode.BrowsingHistory
+        if (atBottom) unread = 0
+    }
+
+    // 首次进入：优先恢复锚点，否则定位最新
+    LaunchedEffect(sessionKey, items.isNotEmpty()) {
+        if (items.isEmpty()) { mode = ReadMode.Empty; return@LaunchedEffect }
+        val key = anchorKey
+        val idx = if (key != null) items.indexOfFirst { "${pane.paneId}-${it.index}" == key } else -1
+        when {
+            idx >= 0 -> {
+                listState.scrollToItem(idx, anchorOffset)
+                mode = ReadMode.RestoringAnchor
+            }
+            else -> listState.scrollToItem(items.lastIndex)
+        }
+        lastSeenIndex = items.lastIndex
+    }
+
+    // 新内容到达：仅在跟随态自动滚到底；否则累计未读并保留位置
+    LaunchedEffect(items.lastIndex) {
+        if (items.isEmpty()) return@LaunchedEffect
+        when (mode) {
+            ReadMode.FollowingLatest -> {
+                listState.animateScrollToItem(items.lastIndex)
+                lastSeenIndex = items.lastIndex
+                unread = 0
+            }
+            ReadMode.BrowsingHistory, ReadMode.RestoringAnchor -> {
+                if (items.lastIndex > lastSeenIndex) unread = items.lastIndex - lastSeenIndex
+            }
+            ReadMode.Empty -> Unit
+        }
+    }
+
+    // 离开时记录锚点（切会话/返回看板后可回到原处；身份不匹配则保守回退到最新）
+    DisposableEffect(sessionKey) {
+        onDispose {
+            val first = listState.layoutInfo.visibleItemsInfo.firstOrNull() ?: return@onDispose
+            val key = items.getOrNull(first.index)?.let { "${pane.paneId}-${it.index}" }
+            anchorKey = key
+            anchorOffset = first.offset
         }
     }
 
@@ -246,7 +301,7 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
                 }
             }
         }
-        if (pendingNew) {
+        if (unread > 0) {
             Surface(
                 color = palette.accent,
                 shape = RoundedCornerShape(Radius.chip),
@@ -254,13 +309,14 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
                     .align(Alignment.BottomCenter)
                     .padding(bottom = Space.l)
                     .clickable {
-                        pendingNew = false
+                        unread = 0
+                        mode = ReadMode.FollowingLatest
                         scope.launch { listState.animateScrollToItem(items.lastIndex.coerceAtLeast(0)) }
                     }
                     .semantics { contentDescription = "跳到最新消息" },
             ) {
                 Text(
-                    "↓ 新消息",
+                    if (unread > 0) "↓ $unread 条新消息" else "↓ 回到最新",
                     style = MaterialTheme.typography.labelLarge,
                     color = palette.accentOn,
                     modifier = Modifier.padding(horizontal = Space.l, vertical = Space.s),
