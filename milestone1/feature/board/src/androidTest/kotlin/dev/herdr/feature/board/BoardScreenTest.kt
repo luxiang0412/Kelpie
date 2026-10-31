@@ -7,7 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import dev.herdr.core.data.SettingsStore
+import dev.herdr.core.data.HostRepository
 import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.BoardGrouper
 import dev.herdr.core.herdr.Pane
@@ -16,6 +16,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * Compose UI 测试（M2 版，多主机）。
+ *
+ * 注意：在 MIUI 设备上 instrumentation 会挂起（ISSUES I-59），目前只在非 MIUI 设备/CI 上有效。
+ */
 @RunWith(AndroidJUnit4::class)
 class BoardScreenTest {
 
@@ -25,24 +30,38 @@ class BoardScreenTest {
     private fun pane(id: String, st: AgentStatus, agent: String? = "pi") =
         Pane(id, "term-$id", "w1", "w1:t1", agent, st, "title-$id", "/repo", 0)
 
-    private fun state(panes: List<Pane>, conn: BoardViewModel.ConnKind, stale: Boolean) =
-        BoardViewModel.UiState(
-            host = SettingsStore.Host(host = "h", user = "u", session = "test"),
-            hasKey = true,
-            connKind = conn,
-            connText = when (conn) {
-                BoardViewModel.ConnKind.CONNECTED -> "已连接 · herdr 0.9.5 · protocol 22"
-                BoardViewModel.ConnKind.STALE -> "数据可能过期"
-                else -> "未连接"
-            },
+    private fun hostState(kind: HostsViewModel.ConnKind) = HostsViewModel.HostState(
+        cfg = HostRepository.HostConfig(
+            id = "default", label = "开发机", host = "192.168.5.8", user = "luxiang", session = "test",
+        ),
+        hasKey = true,
+        connKind = kind,
+        connText = when (kind) {
+            HostsViewModel.ConnKind.CONNECTED -> "已连接 · herdr 0.9.5 · protocol 22"
+            HostsViewModel.ConnKind.STALE -> "数据可能过期"
+            else -> "未连接"
+        },
+    )
+
+    private fun state(
+        panes: List<Pane>,
+        kind: HostsViewModel.ConnKind,
+        stale: Boolean,
+        hosts: List<HostsViewModel.HostState> = listOf(hostState(kind)),
+    ) = HostsViewModel.UiState(
+        hosts = hosts,
+        activeId = hosts.first().cfg.id,
+        board = HostsViewModel.BoardView(
+            hostId = hosts.first().cfg.id,
+            panes = panes,
             groups = BoardGrouper.group(panes),
             counts = BoardGrouper.counts(panes),
-            panes = panes,
             version = "0.9.5",
             protocol = 22,
             updatedAtMs = System.currentTimeMillis(),
             stale = stale,
-        )
+        ),
+    )
 
     @Test
     fun board_rendersGroupsCountsAndPanes() {
@@ -52,9 +71,7 @@ class BoardScreenTest {
             pane("w4:pA", AgentStatus.UNKNOWN, agent = null),
         )
         rule.setContent {
-            HerdrTheme {
-                BoardScreen(state(panes, BoardViewModel.ConnKind.CONNECTED, false), {}, {}, {}, {})
-            }
+            HerdrTheme { BoardScreen(state(panes, HostsViewModel.ConnKind.CONNECTED, false), {}, {}, {}, {}, {}) }
         }
         rule.onNodeWithText("Herdr 看板").assertIsDisplayed()
         rule.onNodeWithText("等你处理").assertIsDisplayed()
@@ -67,20 +84,18 @@ class BoardScreenTest {
 
     @Test
     fun board_showsStaleBannerAndReconnect() {
-        var reconnectClicked = false
+        var reconnected = false
         rule.setContent {
             HerdrTheme {
                 BoardScreen(
-                    state(listOf(pane("w1:p1", AgentStatus.IDLE)), BoardViewModel.ConnKind.STALE, true),
-                    onRefresh = {},
-                    onReconnect = { reconnectClicked = true },
-                    onOpenHosts = {},
-                    onSelectPane = {},
+                    state(listOf(pane("w1:p1", AgentStatus.IDLE)), HostsViewModel.ConnKind.STALE, true),
+                    onSelectHost = {}, onRefresh = {}, onReconnect = { reconnected = true },
+                    onOpenHosts = {}, onSelectPane = {},
                 )
             }
         }
         rule.onNodeWithText("重连").assertIsDisplayed().performClick()
-        rule.runOnIdle { assertEquals(true, reconnectClicked) }
+        rule.runOnIdle { assertEquals(true, reconnected) }
     }
 
     @Test
@@ -89,25 +104,43 @@ class BoardScreenTest {
         rule.setContent {
             HerdrTheme {
                 BoardScreen(
-                    state(emptyList(), BoardViewModel.ConnKind.IDLE, true),
-                    onRefresh = {},
-                    onReconnect = {},
-                    onOpenHosts = { opened = true },
-                    onSelectPane = {},
+                    state(emptyList(), HostsViewModel.ConnKind.IDLE, true),
+                    onSelectHost = {}, onRefresh = {}, onReconnect = {},
+                    onOpenHosts = { opened = true }, onSelectPane = {},
                 )
             }
         }
         rule.onNodeWithText("还没有数据").assertIsDisplayed()
-        rule.onNodeWithText("打开主机设置").assertIsDisplayed().performClick()
+        rule.onNodeWithText("主机设置").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(true, opened) }
         assertEquals(0, rule.onAllNodesWithText("等你处理").fetchSemanticsNodes().size)
     }
 
     @Test
-    fun paneDetail_rendersReadOnlyFields() {
+    fun multiHost_showsChipsAndSwitches() {
+        val a = hostState(HostsViewModel.ConnKind.CONNECTED)
+        val b = a.copy(
+            cfg = a.cfg.copy(id = "dead", label = "不可达测试机"),
+            connKind = HostsViewModel.ConnKind.FAILED,
+            connText = "连接失败",
+        )
+        var selected: String? = null
         rule.setContent {
-            HerdrTheme { PaneDetailScreen(pane("w4:pA", AgentStatus.DONE)) {} }
+            HerdrTheme {
+                BoardScreen(
+                    state(listOf(pane("w1:p1", AgentStatus.IDLE)), HostsViewModel.ConnKind.CONNECTED, false, listOf(a, b)),
+                    onSelectHost = { selected = it }, onRefresh = {}, onReconnect = {}, onOpenHosts = {}, onSelectPane = {},
+                )
+            }
         }
+        rule.onNodeWithText("开发机").assertIsDisplayed()
+        rule.onNodeWithText("不可达测试机").assertIsDisplayed().performClick()
+        rule.runOnIdle { assertEquals("dead", selected) }
+    }
+
+    @Test
+    fun paneDetail_rendersReadOnlyFields() {
+        rule.setContent { HerdrTheme { PaneDetailScreen(pane("w4:pA", AgentStatus.DONE)) {} } }
         rule.onNodeWithText("Pane 详情").assertIsDisplayed()
         rule.onNodeWithText("w4:pA").assertIsDisplayed()
         rule.onNodeWithText("done").assertIsDisplayed()

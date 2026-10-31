@@ -444,3 +444,11 @@
 - **现象**：`Could not load test results from '...TEST-22021211RC - 14-_core_data-.xml'`。
 - **规避**：改用 `:module:assembleDebugAndroidTest` + `adb shell am instrument -w`，结果直接看 stdout（Room 4/4 通过）。
 - **建议**：CI 里统一用 `am instrument` 或给设备起不带空格的 `adb -s` 别名。
+
+## I-61 `ConnectionSupervisor.reconciler` 是 lateinit，取用顺序错会导致启动崩溃
+
+- **现象**：M2 首版启动即 crash：`UninitializedPropertyAccessException` at `ConnectionSupervisor.getReconciler`，调用栈来自 `HostsViewModel.ensureStarted`。
+- **原因**：`reconciler` 在 `start()` 里初始化，而 ViewModel 先读 `sup.reconciler` 再 `sup.start()`。
+- **修复**：先 `start()`，再 `persistLoop(sup.reconciler)`。
+- **建议**：把 `reconciler` 改成构造期创建（`val reconciler = SessionReconciler(...)`），彻底消除顺序依赖；已记入 M3 清理项。
+- **状态**：已修复。

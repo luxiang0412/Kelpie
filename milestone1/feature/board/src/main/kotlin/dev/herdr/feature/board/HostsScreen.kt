@@ -1,21 +1,31 @@
 package dev.herdr.feature.board
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,138 +37,244 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
-import dev.herdr.core.data.SettingsStore
+import dev.herdr.core.data.HostRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HostsScreen(
-    state: BoardViewModel.UiState,
-    onSave: (SettingsStore.Host) -> Unit,
-    onImportKey: (String) -> Result<java.io.File>,
-    onClearKey: () -> Unit,
-    onConnect: () -> Unit,
+    state: HostsViewModel.UiState,
+    onSave: (HostRepository.HostConfig) -> Unit,
+    onDelete: (String) -> Unit,
+    onImportKey: (String, String) -> Result<Unit>,
+    onDeleteKey: (String) -> Unit,
+    onConnect: (String) -> Unit,
+    onDisconnect: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    var host by remember(state.host) { mutableStateOf(state.host.host) }
-    var port by remember(state.host) { mutableStateOf(state.host.port.toString()) }
-    var user by remember(state.host) { mutableStateOf(state.host.user) }
-    var session by remember(state.host) { mutableStateOf(state.host.session) }
-    var herdrBin by remember(state.host) { mutableStateOf(state.host.herdrBin) }
-    var showKeyDialog by remember { mutableStateOf(false) }
-    var keyText by remember { mutableStateOf("") }
-    var keyError by remember { mutableStateOf<String?>(null) }
+    var editing by remember { mutableStateOf<HostRepository.HostConfig?>(null) }
+    var isNew by remember { mutableStateOf(false) }
+    var keyTarget by remember { mutableStateOf<HostsViewModel.HostState?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("主机设置") },
+                title = { Text("主机") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
+                actions = {
+                    TextButton(onClick = { isNew = true; editing = null }) { Text("添加") }
+                },
             )
         },
     ) { padding ->
-        Column(
-            Modifier
-                .padding(padding)
-                .padding(16.dp)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            OutlinedTextField(host, { host = it }, label = { Text("主机地址") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    port, { port = it.filter(Char::isDigit) },
-                    label = { Text("端口") }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f),
-                )
-                OutlinedTextField(user, { user = it }, label = { Text("用户名") }, singleLine = true, modifier = Modifier.weight(2f))
+        if (state.hosts.isEmpty()) {
+            Column(
+                Modifier.padding(padding).fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("还没有主机", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+                Text("点右上角“添加”，填入主机 / 用户 / herdr 会话，并导入 OpenSSH 私钥。")
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { isNew = true; editing = null }) { Text("添加主机") }
             }
-            OutlinedTextField(session, { session = it }, label = { Text("herdr 会话名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(
-                herdrBin, { herdrBin = it },
-                label = { Text("herdr 绝对路径") },
-                supportingText = { Text("非交互 shell 的 PATH 通常不含 ~/.local/bin") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(4.dp))
-            Text("私钥（只读界面，密钥仅存于本机 app 私有目录）", style = MaterialTheme.typography.titleSmall)
-            Text(
-                if (state.hasKey) "已导入私钥 ✓" else "尚未导入私钥",
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (state.hasKey) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showKeyDialog = true }) { Text("导入私钥（粘贴）") }
-                if (state.hasKey) OutlinedButton(onClick = onClearKey) { Text("删除私钥") }
+        } else {
+            LazyColumn(
+                Modifier.padding(padding).fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(state.hosts, key = { it.cfg.id }) { h ->
+                    HostCard(
+                        host = h,
+                        active = h.cfg.id == state.activeId,
+                        onSelect = { onConnect(h.cfg.id) },
+                        onDisconnect = { onDisconnect(h.cfg.id) },
+                        onEdit = { isNew = false; editing = h.cfg },
+                        onDelete = { onDelete(h.cfg.id) },
+                        onKey = { keyTarget = h },
+                    )
+                }
             }
-
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = {
-                        onSave(
-                            SettingsStore.Host(
-                                hostId = state.host.hostId.ifBlank { "default" },
-                                host = host.trim(),
-                                port = port.toIntOrNull() ?: 22,
-                                user = user.trim(),
-                                session = session.trim().ifBlank { "test" },
-                                herdrBin = herdrBin.trim(),
-                            ),
-                        )
-                        onConnect()
-                    },
-                    enabled = host.isNotBlank() && user.isNotBlank() && state.hasKey,
-                ) { Text("保存并连接") }
-                OutlinedButton(onClick = onBack) { Text("取消") }
-            }
-
-            Text(
-                "指纹确认：首次连接会弹出主机指纹，请与 `ssh-keygen -lf` 的结果逐字核对后再信任。\n" +
-                    "本页不会修改远端任何配置。",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
         }
     }
 
-    if (showKeyDialog) {
-        AlertDialog(
-            onDismissRequest = { showKeyDialog = false },
-            title = { Text("粘贴 OpenSSH 私钥") },
-            text = {
-                Column {
-                    Text(
-                        "以 -----BEGIN OPENSSH PRIVATE KEY----- 开头。内容不会上传，只写入本机私有目录。",
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    OutlinedTextField(
-                        keyText,
-                        { keyText = it; keyError = null },
-                        label = { Text("私钥内容") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        textStyle = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp),
-                    )
-                    if (keyError != null) Text(keyError!!, color = MaterialTheme.colorScheme.error)
-                }
+    if (isNew || editing != null) {
+        HostEditorDialog(
+            initial = editing,
+            onDismiss = { editing = null; isNew = false },
+            onSave = { cfg ->
+                onSave(cfg)
+                editing = null
+                isNew = false
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val r = onImportKey(keyText)
-                    if (r.isSuccess) { showKeyDialog = false; keyText = "" } else keyError = r.exceptionOrNull()?.message
-                }) { Text("导入") }
-            },
-            dismissButton = { TextButton(onClick = { showKeyDialog = false }) { Text("取消") } },
         )
     }
+
+    keyTarget?.let { h ->
+        KeyDialog(
+            host = h,
+            onDismiss = { keyTarget = null },
+            onImport = { text -> onImportKey(h.cfg.id, text) },
+            onDeleteKey = { onDeleteKey(h.cfg.id); keyTarget = null },
+        )
+    }
+}
+
+@Composable
+private fun HostCard(
+    host: HostsViewModel.HostState,
+    active: Boolean,
+    onSelect: () -> Unit,
+    onDisconnect: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onKey: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .padding(end = 8.dp)
+                        .size(10.dp)
+                        .background(connColor(host.connKind), CircleShape),
+                )
+                Text(
+                    host.cfg.label.ifBlank { host.cfg.host },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (active) {
+                    Spacer(Modifier.width(8.dp))
+                    Text("当前", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "${host.cfg.user}@${host.cfg.host}:${host.cfg.port} · session ${host.cfg.session}",
+                style = MaterialTheme.typography.labelMedium,
+                fontFamily = FontFamily.Monospace,
+            )
+            Text(host.connText, style = MaterialTheme.typography.labelSmall)
+            if (host.lastError != null && host.connKind == HostsViewModel.ConnKind.FAILED) {
+                Text(host.lastError, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
+            Text(
+                if (host.hasKey) "私钥已导入" else "缺少私钥",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (host.hasKey) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (host.connKind == HostsViewModel.ConnKind.IDLE || host.connKind == HostsViewModel.ConnKind.FAILED) {
+                    Button(onClick = onSelect) { Text("连接") }
+                } else {
+                    OutlinedButton(onClick = onDisconnect) { Text("断开") }
+                }
+                OutlinedButton(onClick = onKey) { Text("私钥") }
+                OutlinedButton(onClick = onEdit) { Text("编辑") }
+                TextButton(onClick = onDelete) { Text("删除") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HostEditorDialog(
+    initial: HostRepository.HostConfig?,
+    onDismiss: () -> Unit,
+    onSave: (HostRepository.HostConfig) -> Unit,
+) {
+    var label by remember { mutableStateOf(initial?.label ?: "") }
+    var host by remember { mutableStateOf(initial?.host ?: "") }
+    var port by remember { mutableStateOf((initial?.port ?: 22).toString()) }
+    var user by remember { mutableStateOf(initial?.user ?: "") }
+    var session by remember { mutableStateOf(initial?.session ?: "test") }
+    var herdrBin by remember { mutableStateOf(initial?.herdrBin ?: "/home/luxiang/.local/bin/herdr") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initial == null) "添加主机" else "编辑主机") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(label, { label = it }, label = { Text("名称（可选）") }, singleLine = true)
+                OutlinedTextField(host, { host = it }, label = { Text("主机地址") }, singleLine = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        port, { port = it.filter(Char::isDigit) }, label = { Text("端口") }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.width(110.dp),
+                    )
+                    OutlinedTextField(user, { user = it }, label = { Text("用户名") }, singleLine = true)
+                }
+                OutlinedTextField(session, { session = it }, label = { Text("herdr 会话") }, singleLine = true)
+                OutlinedTextField(herdrBin, { herdrBin = it }, label = { Text("herdr 绝对路径") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        HostRepository.HostConfig(
+                            id = initial?.id ?: java.util.UUID.randomUUID().toString().take(8),
+                            label = label.trim().ifBlank { host.trim() },
+                            host = host.trim(),
+                            port = port.toIntOrNull() ?: 22,
+                            user = user.trim(),
+                            session = session.trim().ifBlank { "test" },
+                            herdrBin = herdrBin.trim(),
+                        ),
+                    )
+                },
+                enabled = host.isNotBlank() && user.isNotBlank(),
+            ) { Text("保存") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+@Composable
+private fun KeyDialog(
+    host: HostsViewModel.HostState,
+    onDismiss: () -> Unit,
+    onImport: (String) -> Result<Unit>,
+    onDeleteKey: () -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("私钥 · ${host.cfg.label}") },
+        text = {
+            Column {
+                Text(
+                    "粘贴 OpenSSH 私钥（-----BEGIN OPENSSH PRIVATE KEY-----）。只写入本机 app 私有目录，不外传。",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                OutlinedTextField(
+                    text, { text = it; error = null },
+                    label = { Text("私钥内容") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                    modifier = Modifier.fillMaxWidth().height(140.dp),
+                )
+                if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val r = onImport(text)
+                if (r.isSuccess) onDismiss() else error = r.exceptionOrNull()?.message
+            }) { Text("导入") }
+        },
+        dismissButton = {
+            Row {
+                if (host.hasKey) TextButton(onClick = onDeleteKey) { Text("删除已有私钥") }
+                TextButton(onClick = onDismiss) { Text("取消") }
+            }
+        },
+    )
 }

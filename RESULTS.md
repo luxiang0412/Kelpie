@@ -724,3 +724,38 @@ HOME=~/spike-sandbox/pihome herdr integration install pi
 
 结论：**连接代次 + 退避重连 + 订阅重建 + 快照对账**在真实断链下工作正常，恢复时间 **≈1.7 s**（P95 目标 3 s 内）。
 证据：`spike/results/m1-06-after-recovery.png`。
+
+---
+
+# 12. M2-1：多主机 / 多会话（2026-10-31 晚）
+
+## 12.1 实现
+
+| 层 | 变更 |
+| --- | --- |
+| `:core:data` | 新增 `HostRepository`（多主机 JSON 配置 + 每主机独立私钥 `keys/<hostId>.key`）；M1 单主机配置自动迁移 |
+| `:feature:board` | `BoardViewModel` → `HostsViewModel`：**每台主机一个 `ConnectionSupervisor`**，各自连接代次/退避/订阅/Stale；看板只展示当前选中主机；Room 以 `(hostId, session)` 隔离 |
+| UI | 看板顶部加主机 chips（状态点 + pane 数）；主机页改为列表（连接/断开/编辑/删除/私钥），支持添加/编辑对话框 |
+| `:app` | 每台主机独立信任库 `trust/<hostId>.known_hosts`（指纹互不影响） |
+
+## 12.2 真机验证（VERIFIED）
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 多主机 chips | ✅ 两台主机：`● 开发机 5`（绿）、`● 不可达测试机`（蓝/失败） | `m2-02-two-hosts.png` |
+| 连接隔离 | ✅ 主机 A `connected generation=1` + `ping ok`；主机 B `connect failed … SocketTimeoutException`，**A 完全不受影响** | logcat |
+| 切换主机 | ✅ 点 B → 看板显示 B 的 `重连中（第 3 次，4s 后）` + 空态；点回 A → 数据仍在（`已连接 … 更新于 47 秒前`） | `m2-03-second-host.png`、`m2-04-back-to-first.png` |
+| 缓存隔离 | ✅ Room 按 `(hostId, session)` 分开；B 无数据不影响 A | 代码 + UI |
+| 隐私/安全 | ✅ 每主机独立 known_hosts；私钥按主机分文件 | 代码 |
+
+## 12.3 过程中修掉的一个 crash
+
+`HostsViewModel.ensureStarted` 先取 `supervisor.reconciler` 再 `supervisor.start()`，
+而 `reconciler` 是 `lateinit`（在 `start()` 里初始化）→ 启动即 `UninitializedPropertyAccessException`。
+修复：先 `start()` 再订阅 `reconciler`（见 `ISSUES.md` I-61）。修复后连续两次重启均正常。
+
+## 12.4 仍然没做
+
+- Compose UI 测试在 MIUI 上仍挂起（I-59）；`BoardScreenTest` 已更新到多主机 API 并能编译，但只能在非 MIUI 设备跑。
+- 主机排序 / 分组 / 搜索、跨主机聚合视图（当前是“选中一台看一台”）。
+- 每主机独立的“只连活动主机/全部连接”开关（目前默认全部连接）。

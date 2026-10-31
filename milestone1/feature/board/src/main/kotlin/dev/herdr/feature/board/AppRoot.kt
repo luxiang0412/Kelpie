@@ -23,7 +23,7 @@ private const val SCREEN_HOSTS = "hosts"
 private const val SCREEN_DETAIL = "detail"
 
 @Composable
-fun AppRoot(vm: BoardViewModel) {
+fun AppRoot(vm: HostsViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
 
@@ -35,22 +35,25 @@ fun AppRoot(vm: BoardViewModel) {
     when (screen) {
         SCREEN_HOSTS -> HostsScreen(
             state = state,
-            onSave = vm::saveHost,
+            onSave = { cfg -> vm.addHost(cfg) },
+            onDelete = vm::removeHost,
             onImportKey = vm::importKey,
-            onClearKey = vm::clearKey,
-            onConnect = { vm.connect(); screen = SCREEN_BOARD },
+            onDeleteKey = vm::deleteKey,
+            onConnect = { id -> vm.selectHost(id); vm.connect(id) },
+            onDisconnect = vm::disconnect,
             onBack = { screen = SCREEN_BOARD },
         )
 
-        SCREEN_DETAIL -> PaneDetailScreen(state.selectedPane) {
+        SCREEN_DETAIL -> PaneDetailScreen(state.board.selectedPane) {
             vm.selectPane(null)
             screen = SCREEN_BOARD
         }
 
         else -> BoardScreen(
             state = state,
-            onRefresh = vm::refreshNow,
-            onReconnect = vm::reconnect,
+            onSelectHost = vm::selectHost,
+            onRefresh = vm::refreshActive,
+            onReconnect = { vm.reconnect(state.activeId ?: return@BoardScreen) },
             onOpenHosts = { screen = SCREEN_HOSTS },
             onSelectPane = { pane ->
                 vm.selectPane(pane)
@@ -65,14 +68,12 @@ fun AppRoot(vm: BoardViewModel) {
             title = { Text("确认主机指纹（请带外核对）") },
             text = {
                 Column {
-                    Text(prompt.hostId, style = MaterialTheme.typography.labelMedium)
+                    Text("${prompt.label} · ${prompt.hostId}", style = MaterialTheme.typography.labelMedium)
                     Text(
                         prompt.fingerprint,
                         style = MaterialTheme.typography.bodyMedium,
                         fontFamily = FontFamily.Monospace,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     )
                     Text(
                         "请与主机上 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` 的结果逐字核对。\n" +

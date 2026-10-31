@@ -138,3 +138,17 @@ P-4  → 只在你想把“9”变成确定值时做                            
 ## 当前未做、也不打算在 M1 做的
 
 - 读屏审批、终端接管、后台常驻服务、推送、多主机 UI、性能优化。
+
+## M2-1 完成情况（2026-10-31）
+
+- ✅ 多主机配置（每主机独立私钥、独立 known_hosts、独立 `ConnectionSupervisor`）
+- ✅ 看板主机 chips（状态点 + pane 数）+ 主机管理页（增删改、连接/断开、私钥导入）
+- ✅ 真机验证：两台主机（一台不可达）互不影响；切换主机数据正确
+- ⛔ Compose UI 测试仍在 MIUI 上挂起（I-59）
+
+### M2-2 候选
+
+1. **性能基线（Spike 7）**：冷启动/滚动/键盘/120 Hz，Macrobenchmark + JankStats。
+2. **transcript 视图（只读）**：用 `agent_session.path`（D35）+ SFTP + `SftpTail` 渲染 pi 的 JSONL。
+3. **主机体验**：只连活动主机开关、排序/搜索、跨主机聚合“等你处理”总数。
+4. **写操作（仅 L1）**：需先定审批路线（Claude hook / herdr-acp）。

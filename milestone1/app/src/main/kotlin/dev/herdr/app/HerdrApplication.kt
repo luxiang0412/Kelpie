@@ -4,17 +4,22 @@ import android.app.Application
 import androidx.room.Room
 import dev.herdr.core.data.BoardDatabase
 import dev.herdr.core.data.BoardRepository
-import dev.herdr.core.data.SettingsStore
+import dev.herdr.core.data.HostRepository
 import dev.herdr.core.ssh.SshConnector
 import java.io.File
 
 class AppContainer(app: Application) {
-    val settings = SettingsStore(app)
+    val hosts = HostRepository(app)
     val database: BoardDatabase = Room.databaseBuilder(app, BoardDatabase::class.java, "herdr.db")
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
-    val repository = BoardRepository(database.boardDao())
-    val connector = SshConnector(File(app.filesDir, "trust/known_hosts.spike"))
+    val boards = BoardRepository(database.boardDao())
+
+    /** 每台主机独立信任库（指纹互不影响）。 */
+    fun connectorFor(hostId: String): SshConnector =
+        SshConnector(File(app.filesDir, "trust/$hostId.known_hosts"))
+
+    private val app: Application = app
 }
 
 class HerdrApplication : Application() {

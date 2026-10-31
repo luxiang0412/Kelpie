@@ -7,7 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.herdr.feature.board.AppRoot
-import dev.herdr.feature.board.BoardViewModel
+import dev.herdr.feature.board.HostsViewModel
 import dev.herdr.feature.board.HerdrTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,11 +19,11 @@ class MainActivity : ComponentActivity() {
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                BoardViewModel(container.settings, container.repository, container.connector) as T
+                HostsViewModel(container.hosts, container.boards, container::connectorFor) as T
         }
         setContent {
             HerdrTheme {
-                val vm: BoardViewModel = viewModel(factory = factory)
+                val vm: HostsViewModel = viewModel(factory = factory)
                 AppRoot(vm)
             }
         }
