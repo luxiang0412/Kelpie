@@ -14,6 +14,7 @@ class AppContainer(app: Application) {
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
     val boards = BoardRepository(database.boardDao())
+    val transcripts = dev.herdr.core.data.TranscriptStore(database.transcriptDao())
 
     /** 每台主机独立信任库（指纹互不影响）。 */
     fun connectorFor(hostId: String): SshConnector =

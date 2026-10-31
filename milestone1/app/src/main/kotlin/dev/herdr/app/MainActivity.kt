@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                HostsViewModel(container.hosts, container.boards, container::connectorFor) as T
+                HostsViewModel(container.hosts, container.boards, container.transcripts, container::connectorFor) as T
         }
         setContent {
             HerdrTheme {

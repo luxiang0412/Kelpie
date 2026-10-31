@@ -839,3 +839,37 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 
 1. `LazyColumn` 的 item key 改成 `"${activeId}-${paneId}"`，避免切换主机时列表状态复用导致偶发的“卡片缺失”观感（未稳定复现，预防性修复）。
 2. 多主机切换后，看板重进会与主机真实快照逐项一致（本轮核对过 5 个 pane 的状态与 agent）。
+
+---
+
+# 15. M3-1：transcript 增量化 + Room 缓存（2026-10-31 晚，VERIFIED）
+
+## 15.1 实现
+
+| 组件 | 作用 |
+| --- | --- |
+| `JsonlChunker`（`:core:herdr`，纯函数） | 只在 `\n` 处切行 → UTF-8 多字节永不截断；末尾半行不消费，offset 停在最后一个换行后 |
+| `TranscriptDao` / `TranscriptStore`（`:core:data`） | `transcript_messages(hostId, path, seq)` + `transcript_cursor(hostId, path, offset, headHash)` |
+| `TranscriptTailer`（`:core:data`） | 复用 SFTP 句柄；按 cursor 续读；`size < offset` 或文件头 64 字节 hash 变化 → 清空重读；单次最多读 1 MiB |
+| `HostsViewModel` | 打开对话页时：先订阅 Room（离线可看）→ 跑一次增量同步 → 每 1.5 s 增量；退出即取消并关 SFTP |
+
+## 15.2 验证（真机）
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 首次打开（回填 256 KiB 尾部） | ✅ 显示 #1 user / #2 assistant | 交互实测 |
+| 增量追加（不点刷新） | ✅ pi 又跑一轮后 1.5–2 s 内出现 #3（THINKING）、#4（ASSISTANT "3 乘 7 等于 21"） | `m3-01-transcript-incremental.png` |
+| Room 持久化 | ✅ 直接拉库校验：`transcript_messages` 5 条（seq 0..4）、`transcript_cursor` offset=10107 + headHash | sqlite 查询 |
+| 续读语义 | ✅ offset 只在完整行后推进；重启后从 cursor 继续，不重复插入 | 代码 + 单测 |
+| 单测 | ✅ **23/23**（分组 5 + 编解码 9 + JsonlChunker 6 + 解析器 3） | test-results |
+
+## 15.3 与 M2 的差别
+
+- M2：每次整段读 256 KiB、消息只存在内存；切页/重进要重读。
+- M3：**增量**（通常每次只读几十~几百字节）+ **Room 缓存**（离线可看、重进秒开）+ 文件被替换/截断会自动重读。
+
+## 15.4 已知限制
+
+- 每条消息仍按“一行 = 一条”解析（pi 的 `message` 行）；同一条 assistant 消息被拆多行时按多条显示（M4 再合并）。
+- 不做消息去重/编辑（`Upsert`），只追加。
+- 只支持 pi 格式；Claude/Codex 需要各自 parser（M4 Provider 化）。

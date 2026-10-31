@@ -42,6 +42,53 @@ data class SessionMetaEntity(
     val lastError: String?,
 )
 
+@Entity(tableName = "transcript_messages", primaryKeys = ["hostId", "path", "seq"])
+data class TranscriptMessageEntity(
+    val hostId: String,
+    val path: String,
+    val seq: Int,
+    val kind: String,
+    val text: String,
+    val toolName: String?,
+    val timestamp: Long?,
+)
+
+@Entity(tableName = "transcript_cursor", primaryKeys = ["hostId", "path"])
+data class TranscriptCursorEntity(
+    val hostId: String,
+    val path: String,
+    val offset: Long,
+    val headHash: String?,
+    val updatedAtMs: Long,
+)
+
+@Dao
+interface TranscriptDao {
+    @Query("SELECT * FROM transcript_messages WHERE hostId = :hostId AND path = :path ORDER BY seq")
+    fun observe(hostId: String, path: String): Flow<List<TranscriptMessageEntity>>
+
+    @Query("SELECT COALESCE(MAX(seq), -1) FROM transcript_messages WHERE hostId = :hostId AND path = :path")
+    suspend fun maxSeq(hostId: String, path: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun append(messages: List<TranscriptMessageEntity>)
+
+    @Query("DELETE FROM transcript_messages WHERE hostId = :hostId AND path = :path")
+    suspend fun clearMessages(hostId: String, path: String)
+
+    @Query("SELECT * FROM transcript_cursor WHERE hostId = :hostId AND path = :path")
+    suspend fun cursor(hostId: String, path: String): TranscriptCursorEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveCursor(cursor: TranscriptCursorEntity)
+
+    @Query("DELETE FROM transcript_cursor WHERE hostId = :hostId AND path = :path")
+    suspend fun clearCursor(hostId: String, path: String)
+
+    @Query("DELETE FROM transcript_messages WHERE hostId = :hostId")
+    suspend fun clearHost(hostId: String)
+}
+
 @Dao
 interface BoardDao {
     @Query("SELECT * FROM panes WHERE hostId = :hostId AND session = :session ORDER BY paneId")
@@ -75,7 +122,12 @@ interface BoardDao {
     }
 }
 
-@Database(entities = [PaneEntity::class, SessionMetaEntity::class], version = 2, exportSchema = false)
+@Database(
+    entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
+    version = 3,
+    exportSchema = false,
+)
 abstract class BoardDatabase : RoomDatabase() {
     abstract fun boardDao(): BoardDao
+    abstract fun transcriptDao(): TranscriptDao
 }

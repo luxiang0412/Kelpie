@@ -463,3 +463,13 @@
 - 轮询只在**对话页可见时**运行，退出即取消（不后台耗电）。
 
 **状态**：`已定`。
+
+## D39. transcript 增量：以“完整行”为消费单位，cursor 落 Room
+
+- 只在换行处推进 offset（`JsonlChunker`），因此 **UTF-8 不会被截断**、半行下次重读；
+- cursor = `(offset, headHash)`，`headHash` 是文件头 64 字节 SHA-256：变化即视为“文件被替换”，清空重读；
+- 首次打开只回填尾部 256 KiB；之后单次读取上限 1 MiB；
+- SFTP 句柄在 tailer 生命周期内复用，退出对话页即 close；
+- 消息落 Room（`hostId, path, seq`），UI 只订阅 Room → 离线可看、重进秒开。
+
+**状态**：`已实现 + 真机验证`。

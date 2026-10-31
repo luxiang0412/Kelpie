@@ -30,6 +30,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class HostsViewModel(
     private val hosts: HostRepository,
     private val boards: BoardRepository,
+    private val transcriptStore: dev.herdr.core.data.TranscriptStore,
     private val connectorFor: (String) -> SshConnector,
 ) : ViewModel() {
 
@@ -78,8 +79,9 @@ class HostsViewModel(
 
     private val _transcript = MutableStateFlow(TranscriptState())
     val transcript: StateFlow<TranscriptState> = _transcript.asStateFlow()
-    private val loader = dev.herdr.core.herdr.TranscriptLoader()
+    private var transcriptTailer: dev.herdr.core.data.TranscriptTailer? = null
     private var transcriptPoll: Job? = null
+    private var transcriptObserve: Job? = null
 
     private class Runtime(
         val cfg: HostRepository.HostConfig,
@@ -176,7 +178,7 @@ class HostsViewModel(
         runtimes[id]?.supervisor?.reconciler?.markDirty()
     }
 
-    // ---------------- transcript（只读） ----------------
+    // ---------------- transcript（只读，增量 + Room 缓存） ----------------
 
     fun openTranscript(pane: Pane) {
         val path = pane.agentSessionPath
@@ -184,61 +186,67 @@ class HostsViewModel(
             _transcript.value = TranscriptState(error = "这台 pane 没有上报 transcript 路径（agent_session=null）")
             return
         }
-        _transcript.value = TranscriptState(path = path, loading = true)
-        loadTranscript(path)
-        startTranscriptPolling(path)
-    }
-
-    fun reloadTranscript() {
-        val path = _transcript.value.path ?: return
-        _transcript.value = _transcript.value.copy(loading = true, error = null)
-        loadTranscript(path)
-    }
-
-    fun closeTranscript() {
-        transcriptPoll?.cancel()
-        transcriptPoll = null
-        _transcript.value = TranscriptState()
-    }
-
-    /**
-     * 只读对话的**自动刷新**（M3）：打开期间每 2 s 重新读一次尾部快照。
-     * 不做增量 offset（M4 再接 SftpTail），但避免“手动点刷新才更新”的割裂感。
-     */
-    private fun startTranscriptPolling(path: String) {
-        transcriptPoll?.cancel()
-        transcriptPoll = viewModelScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(2_000)
-                val hostId = _state.value.activeId ?: continue
-                val conn = runtimes[hostId]?.supervisor?.currentConnection() ?: continue
-                val r = runCatching { loader.load(conn, path) }
-                val msgs = r.getOrNull() ?: continue
-                if (msgs.size != _transcript.value.messages.size || msgs.lastOrNull() != _transcript.value.messages.lastOrNull()) {
-                    _transcript.value = _transcript.value.copy(messages = msgs, loading = false, error = null)
-                }
-            }
-        }
-    }
-
-    private fun loadTranscript(path: String) {
         val hostId = _state.value.activeId ?: run {
-            _transcript.value = _transcript.value.copy(loading = false, error = "没有活动主机")
+            _transcript.value = TranscriptState(error = "没有活动主机")
             return
         }
         val conn = runtimes[hostId]?.supervisor?.currentConnection()
         if (conn == null) {
-            _transcript.value = _transcript.value.copy(loading = false, error = "主机未连接")
+            _transcript.value = TranscriptState(path = path, error = "主机未连接")
             return
         }
+        closeTranscriptInternal()
+        _transcript.value = TranscriptState(path = path, loading = true)
+
+        // 1) 先订阅本地缓存（离线也能看到历史）
+        transcriptObserve = viewModelScope.launch {
+            transcriptStore.observe(hostId, path).collect { msgs ->
+                if (_transcript.value.path != path) return@collect
+                _transcript.value = _transcript.value.copy(messages = msgs)
+            }
+        }
+
+        // 2) 增量同步：先跑一次（首次会回填尾部），之后每 1.5s 增量
+        val tailer = dev.herdr.core.data.TranscriptTailer(conn, transcriptStore, hostId, path)
+        transcriptTailer = tailer
+        transcriptPoll = viewModelScope.launch {
+            var first = true
+            while (true) {
+                val r = runCatching { tailer.sync() }
+                if (first) {
+                    _transcript.value = _transcript.value.copy(
+                        loading = false,
+                        error = r.exceptionOrNull()?.message,
+                    )
+                    first = false
+                }
+                kotlinx.coroutines.delay(1_500)
+            }
+        }
+    }
+
+    fun reloadTranscript() {
+        val path = _transcript.value.path ?: return
+        val tailer = transcriptTailer ?: return
         viewModelScope.launch {
-            val r = runCatching { loader.load(conn, path) }
+            _transcript.value = _transcript.value.copy(loading = true)
+            val r = runCatching { tailer.sync() }
             _transcript.value = _transcript.value.copy(
                 loading = false,
-                messages = r.getOrDefault(emptyList()),
                 error = r.exceptionOrNull()?.message,
             )
         }
+    }
+
+    fun closeTranscript() {
+        closeTranscriptInternal()
+        _transcript.value = TranscriptState()
+    }
+
+    private fun closeTranscriptInternal() {
+        transcriptPoll?.cancel(); transcriptPoll = null
+        transcriptObserve?.cancel(); transcriptObserve = null
+        transcriptTailer?.close(); transcriptTailer = null
     }
 
     fun selectPane(pane: Pane?) {
