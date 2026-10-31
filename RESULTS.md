@@ -514,3 +514,41 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 1. **App 可以直连 `192.168.5.8:22`**，不需要 adb reverse；之前“不可达”的判断只在 VPN 路由缺失时成立。
 2. 手机侧 RTT ≈ **55 ms**，与 PC 的 50 ms 基本一致 → 之前 PC 上测的延迟数据对手机同样适用。
 3. **不能用 ICMP 做连通性诊断**（这里 ping 全丢但 TCP 正常）。App 的诊断必须用 TCP 建连 + SSH banner，而不是 ping。
+
+## 9.15 Android 真机 Spike 1（VERIFIED，2026-10-31）
+
+App：`spike/android`（最小 Activity，非 Compose；源码见该目录 README）。
+设备：Redmi 22021211RC / Android 14（SDK 34）/ 1080×2400@440dpi / 120 Hz。
+链路：**手机直连 `192.168.5.8:22`**（经 VPN `tun0`，TCP ≈55 ms）。
+
+### 四个用例
+
+| 用例 | 结果 | 证据 |
+| --- | --- | --- |
+| F1 未知主机、用户不确认 | **rejected=true, store_written=false**（信任库文件未创建） | `s1-android-results.txt` |
+| F2 显式确认后 pin | **prompts=1**，pin 值 = `192.168.5.8:22:ssh-ed25519 SHA256:lfFYDnJNKAPT1jtyrA6bU89XDcKtHQiy7PPdiX0G0T8`（与 `ssh-keygen -lf` 完全一致） | 同上 + `s1-android-dialog.png` |
+| F3 再次连接 | **extra_prompts=0** | 同上 |
+| F4 篡改指纹 | **mismatch=true, pin_unchanged=true** | 同上 |
+
+对话框是真弹出来的（uiautomator dump 到 `android:id/alertTitle` = “确认主机指纹（请带外核对）”，
+正文含 `192.168.5.8:22:ssh-ed25519` 与 SHA256 指纹，按钮 `信任该主机` / `取消`），
+本轮用 `adb shell input tap` 点了“信任”，日志 `DIALOG,answered=true`。
+
+### 延迟（同一台设备、直连）
+
+| 测量 | 平均值 | 范围 |
+| --- | --- | --- |
+| `exec true`（复用连接） | **331 ms** | 280–370 ms |
+| `ping` 经 `remote-api-bridge` | **≈416 ms** | 300–513 ms（5/5 返回 `pong 0.9.5`） |
+
+对比 PC（同一条 SSH 路径、RTT 50 ms）：exec 201 ms、ping 248 ms → **Android 侧多 ~130–170 ms**。
+原因候选：Android 上的 BC/JCE 实现、VPN 路径、无 JIT 预热、进程冷启动。持平结论：**手机端每请求 300–500 ms，Phase 1 必须事件驱动 + 少请求**。
+
+### Android 上必须处理的两个坑（否则连不上）
+
+1. **BouncyCastle 冲突**：Android 自带的老 BC 缺少 `X25519` 与 `SHA-256`，
+   sshj 直接报 `no such algorithm: X25519 for provider BC` / `SHA-256 for provider BC`。
+   解决：`Security.removeProvider("BC")` → 注册 APK 内的 `bcprov-jdk18on`，再让 sshj 使用它。
+2. **KEX 协商**：把 `keyExchangeFactories` 限定为 `curve25519-sha256` / `ecdh-sha2-*` / `dh-group14/16/gex`。
+
+两个坑都已写进 `ISSUES.md` I-48 与 `DECISIONS.md` D27。

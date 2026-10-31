@@ -334,3 +334,22 @@
 - 备用路径：当直连不可达时，支持用户配置跳板/隧道（测试期用过 `adb reverse` + `ssh -L`）。
 
 **状态**：`已定`。
+
+## D27. Android 上的 sshj 初始化顺序（硬性）
+
+1. `Security.removeProvider("BC")` → `Security.addProvider(BouncyCastleProvider())`（APK 内置 `bcprov-jdk18on`，版本需与 sshj 传递依赖一致）；
+2. `SecurityUtils.setRegisterBouncyCastle(true)` → `SecurityUtils.registerSecurityProvider("BC")`；
+3. `DefaultConfig.keyExchangeFactories` 只保留 `curve25519-sha256`、`curve25519-sha256@libssh.org`、`ecdh-sha2-nistp256/384/521`、`dh-group14-sha256`、`dh-group16-sha512`、`dh-group-exchange-sha256`；
+4. 私钥用 `OpenSSHKeyV1KeyFile` 读取（OpenSSH 格式），RSA/PKCS#1 直接拒绝并提示重新生成。
+
+**依据**：`RESULTS.md` §9.15；`ISSUES.md` I-48。
+
+**状态**：`已定`（真机验证通过）。
+
+## D28. 手机端延迟预算修正
+
+- 真机实测（直连、RTT 55 ms）：exec 331 ms、`ping` ≈416 ms（P50 ~390）。
+- Phase 1 指标改为：**单请求 P95 < 500 ms**（原 <300 ms 只在 PC 上成立）；状态更新 P95 < 1.5 s。
+- UI 必须事件驱动 + 批量读取（一次 snapshot 覆盖多 pane），禁止逐 pane 轮询。
+
+**状态**：`已定`。

@@ -358,3 +358,21 @@
   - “手机不可达主机”只在缺少路由时成立；现在的测试链路走**直连**，adb reverse 仅作备用。
   - **连通性诊断禁止用 ICMP**：必须用 TCP 建连（可指定端口）+ SSH banner 校验。
 - 状态：直连已验证；诊断策略写入 Phase 1 要求。
+
+## I-48 Android 自带 BouncyCastle 太旧，sshj 连不上
+
+- **现象**：真机上首次运行报 `TransportException: no such algorithm: X25519 for provider BC`；换成 ECDH KEX 后又报 `no such algorithm: SHA-256 for provider BC`。
+- **原因**：Android 的 `BC` provider 是裁剪版，没有 X25519，也没有给 `MessageDigest("SHA-256")` 注册 BC 实现；而 sshj 的 `SecurityUtils` 检测到有 BC 就优先用它。
+- **解决**（已验证）：
+  1. `Security.removeProvider("BC")`；
+  2. `Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())`（APK 内 `bcprov-jdk18on:1.84`）；
+  3. `SecurityUtils.setRegisterBouncyCastle(true)` + `registerSecurityProvider("BC")`；
+  4. `keyExchangeFactories` 白名单：`curve25519-sha256` / `ecdh-sha2-*` / `dh-group14/16/gex`。
+- **影响**：Phase 1 的 SSH 层必须内置 BC 并按此顺序初始化；否则真机直接失败（JVM 上不会暴露）。
+- **状态**：已解决，真机验证通过。
+
+## I-49 Android 上的每请求延迟比 PC 高 130–170 ms
+
+- **现象**：同一路径，真机 exec 331 ms（PC 201 ms）、ping 416 ms（PC 248 ms）。
+- **影响**：手机端每请求 300–500 ms；之前基于 PC 的 248 ms 预算需要上调。
+- **建议**：Phase 1 一律事件驱动 + 批量读取；不要做轮询式 UI；把“每请求 <300 ms”从硬指标改为“P95 < 500 ms”。

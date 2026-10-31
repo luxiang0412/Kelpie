@@ -16,3 +16,11 @@ known_hosts.spike
 *.iml
 .DS_Store
 Thumbs.db
+
+# Android 构建产物与本机 SDK 路径
+spike/android/.gradle/
+spike/android/build/
+spike/android/app/build/
+spike/android/local.properties
+*.apk
+*.aab
