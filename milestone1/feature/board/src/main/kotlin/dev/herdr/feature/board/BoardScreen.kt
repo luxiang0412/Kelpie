@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -110,7 +111,7 @@ fun BoardScreen(
                 val compactWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 360
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Agent 工作台",
+                        stringResource(R.string.board_title),
                         style = MaterialTheme.typography.titleLarge,
                         color = palette.textPrimary,
                         maxLines = if (compactWidth) 2 else 1,
@@ -124,7 +125,7 @@ fun BoardScreen(
                         modifier = Modifier.heightIn(min = 48.dp),
                     ) {
                         Text(
-                            if (state.board.refreshing) "刷新中" else "刷新",
+                            if (state.board.refreshing) stringResource(R.string.board_refreshing) else stringResource(R.string.board_refresh),
                             style = MaterialTheme.typography.labelLarge,
                         )
                     }
@@ -144,7 +145,7 @@ fun BoardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            active?.cfg?.label?.ifBlank { active.cfg.host } ?: "选择主机",
+                            active?.cfg?.label?.ifBlank { active.cfg.host } ?: stringResource(R.string.board_host_pick),
                             style = MaterialTheme.typography.labelSmall,
                             color = palette.textSecondary,
                             maxLines = 1,
@@ -167,7 +168,7 @@ fun BoardScreen(
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("主机管理…", style = MaterialTheme.typography.bodyMedium) },
+                            text = { Text(stringResource(R.string.board_host_manage), style = MaterialTheme.typography.bodyMedium) },
                             onClick = { hostMenu = false; onOpenHosts() },
                         )
                     }
@@ -362,7 +363,7 @@ private fun CollapsibleHeader(title: String, count: Int, expanded: Boolean, onTo
         Spacer(Modifier.width(Space.s))
         Text("$count", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
         Spacer(Modifier.weight(1f))
-        Text(if (expanded) "收起" else "展开", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+        Text(if (expanded) stringResource(R.string.board_collapse) else stringResource(R.string.board_expand), style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
     }
 }
 
@@ -555,11 +556,11 @@ private fun EmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("暂无 agent", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+        Text(stringResource(R.string.board_empty_no_agents), style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
         Spacer(Modifier.height(Space.s))
         Text(
             when {
-                active == null -> "先添加一台主机"
+                active == null -> stringResource(R.string.board_empty_add_host)
                 !active.hasKey -> "导入这台主机的私钥后再连接"
                 active.connKind == HostConnectionManager.ConnKind.FAILED -> active.lastError ?: "连接失败"
                 active.connKind != HostConnectionManager.ConnKind.CONNECTED -> "正在连接，或需要重新验证…"
@@ -570,8 +571,8 @@ private fun EmptyState(
         )
         Spacer(Modifier.height(Space.l))
         Row(horizontalArrangement = Arrangement.spacedBy(Space.s)) {
-            TextButton(onClick = onOpenHosts) { Text("主机设置") }
-            TextButton(onClick = onReconnect) { Text("重试") }
+            TextButton(onClick = onOpenHosts) { Text(stringResource(R.string.board_host_settings)) }
+            TextButton(onClick = onReconnect) { Text(stringResource(R.string.label_retry)) }
         }
         if (state.board.updatedAtMs > 0) {
             Spacer(Modifier.height(Space.s))

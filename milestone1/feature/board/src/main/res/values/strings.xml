@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="board_title">Agent Console</string>
+    <string name="board_refresh">Refresh</string>
+    <string name="board_refreshing">Refreshing</string>
+    <string name="board_host_pick">Select host</string>
+    <string name="board_host_manage">Manage hosts…</string>
+    <string name="board_section_blocked">Needs you</string>
+    <string name="board_section_working">Running</string>
+    <string name="board_section_done">Completed</string>
+    <string name="board_section_idle">Idle</string>
+    <string name="board_section_unknown">Unknown</string>
+    <string name="board_expand">Expand</string>
+    <string name="board_collapse">Collapse</string>
+    <string name="board_status_blocked">Needs you</string>
+    <string name="board_status_working">Running</string>
+    <string name="board_status_done">Completed</string>
+    <string name="board_status_idle">Idle</string>
+    <string name="board_status_unknown">Unknown</string>
+    <string name="board_empty_no_agents">No agents</string>
+    <string name="board_empty_add_host">Add a host to start</string>
+    <string name="conversation_back">Board</string>
+    <string name="conversation_more">More</string>
+    <string name="composer_hint">Send the next instruction…</string>
+    <string name="composer_send">Send</string>
+    <string name="composer_sending">Sending</string>
+    <string name="composer_no_agent">No agent runs in this pane</string>
+    <string name="composer_footnote">Accepted only means the remote received the input, not that it finished. Unknown results are never resent automatically.</string>
+    <string name="composer_long_prompt">Long prompt</string>
+    <string name="composer_done">Done</string>
+    <string name="composer_cancel">Cancel</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_copied">Copied</string>
+    <string name="action_more">More</string>
+    <string name="action_copy_raw">Copy raw markdown</string>
+    <string name="action_quote">Quote into composer</string>
+    <string name="label_thinking">Thinking</string>
+    <string name="label_retry">Retry</string>
+    <string name="label_dismiss">Got it</string>
+    <string name="nav_board">Board</string>
+    <string name="nav_hosts">Hosts</string>
+    <string name="board_host_settings">Host settings</string>
+    <string name="board_host_all_problems">All problems</string>
+</resources>

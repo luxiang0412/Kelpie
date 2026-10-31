@@ -24,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -89,13 +90,13 @@ private fun AppContent(vm: HostsViewModel) {
                         selected = screen == SCREEN_BOARD,
                         onClick = { screen = SCREEN_BOARD },
                         icon = { Text("▤", style = MaterialTheme.typography.titleMedium) },
-                        label = { Text("看板") },
+                        label = { Text(stringResource(dev.herdr.feature.board.R.string.nav_board)) },
                     )
                     NavigationBarItem(
                         selected = screen == SCREEN_HOSTS,
                         onClick = { screen = SCREEN_HOSTS },
                         icon = { Text("⚙", style = MaterialTheme.typography.titleMedium) },
-                        label = { Text("主机") },
+                        label = { Text(stringResource(dev.herdr.feature.board.R.string.nav_hosts)) },
                     )
                 }
             }

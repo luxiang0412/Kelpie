@@ -1,0 +1,22 @@
+# UX-05a report — i18n 资源梳理与中英文覆盖（PARTIAL）
+
+- baseline：`8f580ce` / `ux/graphite-editorial`
+- goal：默认 `values/strings.xml` = 英语基准，`values-zh-rCN` = 简体中文；不翻译 host 名/项目名/代码/命令/transcript
+- changed：
+  - 新增 `feature/board/src/main/res/values/strings.xml`（**42 个 key，英语基准**）
+  - 新增 `feature/board/src/main/res/values-zh-rCN/strings.xml`（同 42 个 key，简体中文）
+  - 已接线（`stringResource`）：
+    - `BoardScreen`：标题、刷新/刷新中、选择主机、主机管理…、展开/收起、空态（暂无 agent / 先添加一台主机 / 主机设置 / 重试）
+    - `AppRoot`：底部导航（Board / Hosts ↔ 看板 / 主机）
+    - `ConversationScreen`：返回、更多、Composer 占位符/发送/发送中/无 agent/三态说明、长 Prompt 标题/取消/完成、复制/已复制/更多/复制原文/引用到输入框、思考过程
+  - 未接线的仍是硬编码（见「未实现」）
+- 验证：
+  - AVD 切换 `persist.sys.locale` → `en-US`，截图 `spike/results/ux05a-en.png`：**Agent Console / Refresh / Select host / No agents / Host settings / Retry / Board / Hosts** 全部英文
+  - 切回 `zh-CN`，截图 `spike/results/ux05a-zh.png`
+  - 中文模式下 `Pi · herdr-gui-research`、`w7 · herdr-gui-research`、代码块内容保持原文（未翻译），符合要求
+- 四类结论：
+  - **已实现并验证**：42 key 双语资源；看板/导航/Composer/消息操作条双语实测截图
+  - **已实现但未验证**：仅做了 locale 切换截图，未做 en 下 320dp/1.6 的英文换行测试
+  - **未实现**：`HostsScreen`（主机管理表单）、`TechnicalInfoSheet`、`StatusText.section/label`（非 Composable，仍在代码里写死中文）、通知文案、错误文案、TalkBack `contentDescription` 的大量中文串；未加「未翻译 key 一致性检查」脚本
+  - **已知问题**：`StatusText` 是普通 object，改成资源需要 Context 传入或改成 Composable 函数——属结构性改动，留下一轮；因此**英文模式下看板分区标题仍可能是中文**
+- commit：见提交

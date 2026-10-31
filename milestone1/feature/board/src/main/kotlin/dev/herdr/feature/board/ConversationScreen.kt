@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -128,7 +129,7 @@ fun ConversationScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("看板", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.conversation_back), style = MaterialTheme.typography.labelLarge)
                     }
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -150,7 +151,7 @@ fun ConversationScreen(
                     }
                     StatusChip(pane.status)
                     TextButton(onClick = onOpenTechSheet, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("更多", style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.conversation_more), style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -297,7 +298,7 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (Strin
                         if (startsGroup) AgentGroupHeader(pane)
                         AssistantMessage(item.text, onQuote)
                     }
-                    is ConversationItem.Thinking -> CollapsibleRow("思考过程", item.text, muted = true)
+                    is ConversationItem.Thinking -> CollapsibleRow(stringResource(R.string.label_thinking), item.text, muted = true)
                     is ConversationItem.Tool -> ToolRow(item)
                     is ConversationItem.Unknown -> CollapsibleRow("未知内容", item.text, muted = true)
                 }
@@ -485,7 +486,7 @@ private fun MessageActions(text: String, onQuote: (String) -> Unit) {
                 .semantics { contentDescription = "复制这条回复" },
         ) {
             Text(
-                if (copied) "已复制" else "复制",
+                if (copied) stringResource(R.string.action_copied) else stringResource(R.string.action_copy),
                 style = MaterialTheme.typography.labelMedium,
                 color = palette.textSecondary,
             )
@@ -497,18 +498,18 @@ private fun MessageActions(text: String, onQuote: (String) -> Unit) {
                     .heightIn(min = 48.dp)
                     .semantics { contentDescription = "更多操作" },
             ) {
-                Text("更多", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+                Text(stringResource(R.string.action_more), style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
-                    text = { Text("复制原文（Markdown）", style = MaterialTheme.typography.bodyMedium) },
+                    text = { Text(stringResource(R.string.action_copy_raw), style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         clipboard.setText(AnnotatedString(text))
                         menu = false
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("引用到输入框", style = MaterialTheme.typography.bodyMedium) },
+                    text = { Text(stringResource(R.string.action_quote), style = MaterialTheme.typography.bodyMedium) },
                     onClick = {
                         menu = false
                         onQuote(text)
@@ -714,7 +715,7 @@ private fun ComposerBar(
                         },
                     placeholder = {
                         Text(
-                            if (!hasAgent) "这个 pane 没有运行 agent" else "发送下一步指令…",
+                            if (!hasAgent) stringResource(R.string.composer_no_agent) else stringResource(R.string.composer_hint),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     },
@@ -745,7 +746,7 @@ private fun ComposerBar(
                 ) {
                     Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
                         Text(
-                            if (composer.sending) "发送中" else "发送",
+                            if (composer.sending) stringResource(R.string.composer_sending) else stringResource(R.string.composer_send),
                             color = palette.accentOn,
                             style = MaterialTheme.typography.labelLarge,
                             modifier = Modifier.padding(horizontal = Space.m),
@@ -814,10 +815,10 @@ private fun LongPromptEditor(
                     Modifier.fillMaxWidth().padding(horizontal = Space.page, vertical = Space.s),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("取消") }
-                    Text("长 Prompt", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+                    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.composer_cancel)) }
+                    Text(stringResource(R.string.composer_long_prompt), style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("完成") }
+                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.composer_done)) }
                 }
                 OutlinedTextField(
                     value = text,
