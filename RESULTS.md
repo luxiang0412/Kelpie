@@ -695,3 +695,32 @@ HOME=~/spike-sandbox/pihome herdr integration install pi
 
 **结论**：装上官方 pi 集成后，`agent_session` 能给出**精确的 JSONL 路径**，Spike 3 的“定位会话文件”问题基本解决；
 代价是需要一个扩展文件（可在隔离 HOME 下安装，不影响全局），且 `agent_session` 在首次活动后才出现。
+
+## 11.4 M1 自动化测试与断线恢复（VERIFIED / 部分 BLOCKED）
+
+### Android 仪器测试（真机 Redmi 22021211RC / Android 14）
+
+| 模块 | 用例 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| `:core:data`（Room） | `BoardDaoTest` ×4：host/session 隔离、消失的 pane 被清理、meta 的 stale/protocol、未知 host 无数据 | **4/4 PASS**（`Time: 0.381`，`OK (4 tests)`） | `adb shell am instrument` 输出 |
+| `:feature:board`（Compose UI） | `BoardScreenTest` ×4：分组/计数/pane 卡片、stale 横幅 + 重连回点、空态引导、详情只读字段 | **BLOCKED**：真机上 instrumentation 启动后不返回（进程存活，无异常日志），见 `ISSUES.md` I-59 | — |
+| JVM 单测 | `BoardGrouperTest` ×5 + `HerdrCodecTest` ×7 | **12/12 PASS** | `:core:herdr:test` |
+
+> 说明：`connectedDebugAndroidTest` 本身在 AGP 9 + 设备名含空格时，会因
+> `Could not load test results from 'TEST-22021211RC - 14-_core_data-.xml'` 失败；
+> 因此改用 `assembleDebugAndroidTest` + `adb shell am instrument` 直接跑，Room 测试即通过。
+
+### 真实断线恢复（端到端）
+
+做法：在主机上用 `pkill -f "sshd: luxiang@notty"` 切断**所有** luxiang 的 SSH 会话（包括手机 App 的两条通道），
+观察 App 是否自动重连（不动手机网络，避免丢失 adb）。
+
+| 时间 | 事件 |
+| --- | --- |
+| `18:25:11.191` | `HerdrConn: session failed kind=NETWORK msg=网络错误：connection lost` |
+| `18:25:12.864` | `connected generation=6; ping…`（**间隔 1.67 s**） |
+| `18:25:13.210` | `ping ok version=0.9.5 protocol=22` |
+| 之后 UI | `已连接 · herdr 0.9.5 · protocol 22`，看板数据仍在 | 
+
+结论：**连接代次 + 退避重连 + 订阅重建 + 快照对账**在真实断链下工作正常，恢复时间 **≈1.7 s**（P95 目标 3 s 内）。
+证据：`spike/results/m1-06-after-recovery.png`。

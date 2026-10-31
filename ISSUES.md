@@ -431,3 +431,16 @@
 - **现象**：`core/ssh/build/.../bundleLibCompileToJarDebug/classes.jar: The process cannot access the file`。
 - **规避**：`gradle --stop` + 删除 `**/build` 后重建；或长期使用 `--no-daemon`（本轮采用）。
 - **状态**：已规避，非代码问题。
+
+## I-59 Compose UI 测试在真机（MIUI）上挂起，不返回结果
+
+- **现象**：`adb shell am instrument -w -e class dev.herdr.feature.board.BoardScreenTest ...` 输出 `INSTRUMENTATION_STATUS_CODE: 1`（测试开始）后一直不结束；测试进程存活，`logcat` 无异常。
+- **已排除**：屏幕休眠/锁屏（`mWakefulness=Awake`、`mDreamingLockscreen=false`）、测试 APK 未安装（已安装，包名可见）。
+- **影响**：Compose 层的 UI 断言目前无法自动化；UI 逻辑（分组/计数/状态映射）已由 JVM 单测覆盖，UI 呈现靠真机截图验收。
+- **后续**：换一台非 MIUI 设备或用 `androidx.compose.ui:ui-test-junit4` v2 API 再试；或改用 `UiAutomator`（跨进程，不依赖 Compose test rule）。
+
+## I-60 `connectedDebugAndroidTest` 在设备名含空格时解析结果失败
+
+- **现象**：`Could not load test results from '...TEST-22021211RC - 14-_core_data-.xml'`。
+- **规避**：改用 `:module:assembleDebugAndroidTest` + `adb shell am instrument -w`，结果直接看 stdout（Room 4/4 通过）。
+- **建议**：CI 里统一用 `am instrument` 或给设备起不带空格的 `adb -s` 别名。
