@@ -79,14 +79,18 @@ fun BoardScreen(
     val palette = LocalHerdrPalette.current
     val active = state.hosts.firstOrNull { it.cfg.id == state.activeId }
     var hostMenu by remember { mutableStateOf(false) }
-    var showDone by remember { mutableStateOf(true) }
-    var showOther by remember { mutableStateOf(true) }
+    // BOARD-DONE-001（已批准）：已完成默认收起，仅用户主动展开
+    var showDone by remember { mutableStateOf(false) }
+    // 只有「已完成」默认收起（BOARD-DONE-001）；idle / unknown 数量少，默认展开
+    var showIdle by remember { mutableStateOf(true) }
+    var showUnknown by remember { mutableStateOf(true) }
 
     val panes = state.board.panes
     val blocked = panes.filter { it.status == AgentStatus.BLOCKED }
     val working = panes.filter { it.status == AgentStatus.WORKING }
     val done = panes.filter { it.status == AgentStatus.DONE }
-    val other = panes.filter { it.status == AgentStatus.IDLE || it.status == AgentStatus.UNKNOWN }
+    val idle = panes.filter { it.status == AgentStatus.IDLE }
+    val unknown = panes.filter { it.status == AgentStatus.UNKNOWN }
 
     Scaffold(
         containerColor = palette.background,
@@ -188,10 +192,16 @@ fun BoardScreen(
                     contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = Space.huge),
                     verticalArrangement = Arrangement.spacedBy(Space.s),
                 ) {
+                    // Attention First：blocked 前 2 条用卡片，其余紧凑；working 紧凑；done 默认收起。
                     if (blocked.isNotEmpty()) {
                         item(key = "sec-blocked") { SectionHeader(StatusText.section(AgentStatus.BLOCKED), blocked.size) }
-                        items(blocked, key = { "b-${it.paneId}" }) { pane ->
+                        items(blocked.take(2), key = { "b-${it.paneId}" }) { pane ->
                             AttentionCard(pane, onSelectAgent)
+                        }
+                        if (blocked.size > 2) {
+                            items(blocked.drop(2), key = { "bc-${it.paneId}" }) { pane ->
+                                CompactAgentRow(pane, Palette.blocked, onSelectAgent)
+                            }
                         }
                     }
                     if (working.isNotEmpty()) {
@@ -212,12 +222,27 @@ fun BoardScreen(
                             }
                         }
                     }
-                    if (other.isNotEmpty()) {
-                        item(key = "sec-other") {
-                            CollapsibleHeader("其他", other.size, showOther) { showOther = !showOther }
+                    // idle 与 unknown 语义不同，分成两个分区（不再合并成“其他”）
+                    if (idle.isNotEmpty()) {
+                        item(key = "sec-idle") {
+                            CollapsibleHeader(StatusText.label(AgentStatus.IDLE), idle.size, showIdle) {
+                                showIdle = !showIdle
+                            }
                         }
-                        if (showOther) {
-                            items(other, key = { "o-${it.paneId}" }) { pane ->
+                        if (showIdle) {
+                            items(idle, key = { "i-${it.paneId}" }) { pane ->
+                                CompactAgentRow(pane, Palette.muted, onSelectAgent)
+                            }
+                        }
+                    }
+                    if (unknown.isNotEmpty()) {
+                        item(key = "sec-unknown") {
+                            CollapsibleHeader(StatusText.label(AgentStatus.UNKNOWN), unknown.size, showUnknown) {
+                                showUnknown = !showUnknown
+                            }
+                        }
+                        if (showUnknown) {
+                            items(unknown, key = { "u-${it.paneId}" }) { pane ->
                                 CompactAgentRow(pane, Palette.muted, onSelectAgent)
                             }
                         }
@@ -323,8 +348,6 @@ private fun AttentionCard(pane: Pane, onSelectAgent: (Pane) -> Unit) {
             },
     ) {
         Row(Modifier.padding(Space.l), verticalAlignment = Alignment.Top) {
-            StatusDot(pane.status)
-            Spacer(Modifier.width(Space.m))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -378,7 +401,7 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
         Modifier
             .fillMaxWidth()
             .clickable { onSelectAgent(pane) }
-            .heightIn(min = 56.dp)
+            .heightIn(min = 64.dp)
             .padding(horizontal = Space.s, vertical = Space.m)
             .semantics(mergeDescendants = true) {
                 contentDescription =
@@ -386,8 +409,6 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusDot(pane.status)
-        Spacer(Modifier.width(Space.m))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 状态必须同时有文字（不能只靠颜色点，色弱/强光下也能读）

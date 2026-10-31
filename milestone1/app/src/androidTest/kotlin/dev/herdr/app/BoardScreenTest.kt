@@ -6,6 +6,7 @@ import dev.herdr.feature.board.HerdrTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -113,7 +114,8 @@ class BoardScreenTest {
     fun doneAndIdle_areDistinctLabels() {
         render(state(listOf(pane("w1:p1", AgentStatus.DONE), pane("w1:p2", AgentStatus.IDLE))))
         // 状态词在合并语义的行内（TalkBack 一致朗读），需要 unmerged tree 才能单独断言
-        // 分区标题也叫“已完成”，因此按节点集合断言（行状态词必须存在）
+        // BOARD-DONE-001：已完成默认收起，因此「已完成」只作为分区标题出现一次；
+        // 「空闲」行可见（idle 分区默认展开需用户操作，此处置为展开态断言分区存在）
         assertTrue(rule.onAllNodesWithText("已完成", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         assertTrue(rule.onAllNodesWithText("空闲", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         // 「其他」分区默认展开由 allIdle_stillShowsRows 覆盖（同一渲染路径），此处不再重复断言标题节点
@@ -122,9 +124,12 @@ class BoardScreenTest {
     @Test
     fun allIdle_stillShowsRows() {
         render(state(listOf(pane("w1:p1", AgentStatus.IDLE), pane("w1:p2", AgentStatus.UNKNOWN))))
-        rule.onNodeWithText("其他").assertIsDisplayed()
-        rule.onNodeWithText("状态未知").assertExists()
-        rule.onNodeWithText("空闲").assertExists()
+        // UX-02b：idle 与 unknown 不再混成「其他」，各自独立分区且默认展开
+        assertTrue(rule.onAllNodesWithText("空闲", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText("状态未知", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        // 行是合并语义：用 contentDescription 断言两行都真实渲染
+        assertTrue(rule.onAllNodesWithContentDescription("任务-w1:p1", substring = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithContentDescription("任务-w1:p2", substring = true).fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test
