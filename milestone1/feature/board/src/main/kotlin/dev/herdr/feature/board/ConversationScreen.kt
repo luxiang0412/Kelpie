@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
@@ -43,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -97,30 +99,48 @@ fun ConversationScreen(
     Scaffold(
         containerColor = palette.background,
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = palette.background,
-                    titleContentColor = palette.textPrimary,
-                ),
-                navigationIcon = { TextButton(onClick = onBack) { Text("看板") } },
-                title = {
-                    Column {
-                        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // UX-01a：不用固定高度的 TopAppBar（大字体下会裁剪并压住首条消息）。
+            // 行高由内容决定：标题单行省略，副标题仅在正常字号显示，返回/更多恒为 48dp。
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(palette.background)
+                    .statusBarsPadding(),
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .padding(start = Space.xs, end = Space.s, top = Space.xs, bottom = Space.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text("看板", style = MaterialTheme.typography.labelLarge)
+                    }
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            projectLine(pane),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = palette.textSecondary,
+                            title,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = palette.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        if (LocalDensity.current.fontScale <= 1.05f) {
+                            Text(
+                                projectLine(pane),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = palette.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                },
-                actions = {
                     StatusChip(pane.status)
-                    Spacer(Modifier.width(Space.xs))
-                    TextButton(onClick = onOpenTechSheet) { Text("技术信息") }
-                },
-            )
+                    TextButton(onClick = onOpenTechSheet, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text("更多", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
         },
         bottomBar = {
             ComposerBar(composer, pane, onTextChange, onSend, onDismissOutcome)
