@@ -242,9 +242,11 @@ private fun inline(spans: List<MdSpan>): AnnotatedString {
                 is MdSpan.Text -> builder.append(s.text)
                 is MdSpan.Bold -> builder.withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { build(builder, s.spans) }
                 is MdSpan.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { build(builder, s.spans) }
+                // UX-01b：原实现用 " code " 的前后空格伪造 padding，会污染真实文本（复制/选区/搜索都会带上空格）。
+                // 改为保真追加：只用背景 Span 做视觉区分，不再改变字符内容。
                 is MdSpan.Code -> builder.withStyle(
                     SpanStyle(fontFamily = mono, background = codeBg, fontSize = 14.sp),
-                ) { builder.append(" ${s.text} ") }
+                ) { builder.append(s.text) }
                 is MdSpan.Link -> {
                     if (s.safe) {
                         val url = s.url
