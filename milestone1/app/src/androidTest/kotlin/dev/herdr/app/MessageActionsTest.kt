@@ -23,6 +23,9 @@ class MessageActionsTest {
     @get:Rule
     val rule = createAndroidComposeRule<TestHostActivity>()
 
+    private fun res(id: Int): String =
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
+
     private val pane = Pane(
         "w1:p1", "t", "w1", "w1:t1", "pi", AgentStatus.DONE, "任务", "/repo", 0,
         agentSessionPath = "/a.jsonl",
@@ -60,13 +63,13 @@ class MessageActionsTest {
     fun moreMenu_offersOnlyImplementedAction() {
         render(ChatMessage(ChatMessage.Kind.ASSISTANT, "简短回复", id = "m1"))
         rule.onNodeWithContentDescription("更多操作").performClick()
-        rule.onNodeWithText("复制原文（Markdown）").assertExists()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.action_copy_raw)).assertExists()
     }
 
     @Test
     fun copyMarksStateWithoutChangingLayout() {
         render(ChatMessage(ChatMessage.Kind.ASSISTANT, "简短回复", id = "m1"))
         rule.onNodeWithContentDescription("复制这条回复").performClick()
-        rule.onNodeWithText("已复制").assertExists()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.action_copied)).assertExists()
     }
 }

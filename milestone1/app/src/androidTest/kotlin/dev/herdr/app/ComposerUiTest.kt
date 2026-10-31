@@ -35,6 +35,9 @@ class ComposerUiTest {
     @get:Rule
     val rule = createAndroidComposeRule<TestHostActivity>()
 
+    private fun res(id: Int): String =
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
+
     private val pane = Pane(
         paneId = "w1:p1",
         terminalId = "term-1",
@@ -136,7 +139,7 @@ class ComposerUiTest {
     fun longPromptEditor_opensAndKeepsText() {
         render(HostConnectionManager.ComposerState(text = "第一行"))
         rule.onNodeWithContentDescription("打开长 Prompt 编辑").performClick()
-        rule.onNodeWithText("长 Prompt").assertExists()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.composer_long_prompt)).assertExists()
         rule.onNodeWithText("3 字符（草稿会自动保存）").assertExists()
     }
 
@@ -144,6 +147,6 @@ class ComposerUiTest {
     fun sendButton_isNotClickableWhileSending() {
         render(HostConnectionManager.ComposerState(text = "x", sending = true, message = "发送中…"))
         rule.onNodeWithContentDescription("发送中，请稍候").assertExists()
-        rule.onNodeWithText("发送中").assertExists()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.composer_sending)).assertExists()
     }
 }
