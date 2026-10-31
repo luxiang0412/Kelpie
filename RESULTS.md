@@ -1164,3 +1164,10 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - Pi 回复内容 `M2C2V-ACK-0120` 与预期一致；App **增量显示**该回复，底部时自动跟随；
 - 未验证：上滑不跳底/新消息提示、断线重连、分支切换、Tool 关联、APPEND/PATCH/FULL 计数（无埋点）。
 - 证据：`spike/results/m2c2v-{board-before,conv-before,typed,sent,reply}.png`
+
+## 真机补充验收（同日）
+
+- **杀进程草稿恢复（I-87）**：✅ force-stop 后重进会话，草稿 `DRAFT-RESTORE-*` 完整恢复。
+- **横屏旋转**：✅ 草稿保留、布局重排、发送可用。
+- **最大字体 1.3**：⚠️ 输入栏/正文/按钮可用，但对话页标题栏被裁剪（新 I-93）。
+- 证据：`spike/results/m2c2v-{draft-restore,font-max,font-max-dark,rotated}.png`
