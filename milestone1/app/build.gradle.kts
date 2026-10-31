@@ -10,6 +10,13 @@ android {
         versionName = "0.1.0-m1"
     }
     buildFeatures { compose = true }
+    buildTypes {
+        getByName("release") {
+            // M3 只用 debug 版验收；release 的 R8/Baseline Profile 留到 M4 再开
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     packaging {
         resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/*.kotlin_module")

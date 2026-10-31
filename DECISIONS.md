@@ -473,3 +473,11 @@
 - 消息落 Room（`hostId, path, seq`），UI 只订阅 Room → 离线可看、重进秒开。
 
 **状态**：`已实现 + 真机验证`。
+
+## D40. M3-2 结论：性能工作推迟到 M4，先建可控测量
+
+- 看板已达标（jank 0.9%）；长对话滚动是瓶颈（30–44%），但当前“`input swipe` + `gfxinfo`”的测法不可信（I-63），继续盲调没有意义。
+- 决策：M4 第一步建 `:benchmark`（Macrobenchmark + Baseline Profile + R8），用可控负载建立基线，再决定优化手段（文本 measure 缓存 / 分页 / 渲染降级）。
+- 在此之前不改动 transcript 的渲染结构（保持简单、可读）。
+
+**状态**：`已定`。

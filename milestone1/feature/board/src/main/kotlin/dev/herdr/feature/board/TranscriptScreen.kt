@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.herdr.core.herdr.ChatMessage
@@ -92,7 +93,11 @@ fun TranscriptScreen(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    itemsIndexed(state.messages) { index, msg -> MessageCard(index, msg) }
+                    itemsIndexed(
+                        items = state.messages,
+                        key = { index, msg -> "$index-${msg.kind}-${msg.text.length}" },
+                        contentType = { _, msg -> msg.kind },
+                    ) { index, msg -> MessageCard(index, msg) }
                 }
             }
         }
@@ -101,36 +106,35 @@ fun TranscriptScreen(
 
 @Composable
 private fun MessageCard(index: Int, msg: ChatMessage) {
-    val label: String
-    val tint = when (msg.kind) {
-        ChatMessage.Kind.USER -> { label = "你"; MaterialTheme.colorScheme.primary }
-        ChatMessage.Kind.ASSISTANT -> { label = "assistant"; MaterialTheme.colorScheme.secondary }
-        ChatMessage.Kind.THINKING -> { label = "thinking"; MaterialTheme.colorScheme.outline }
-        ChatMessage.Kind.TOOL_CALL -> { label = "tool · ${msg.toolName ?: "?"}"; MaterialTheme.colorScheme.tertiary }
-        ChatMessage.Kind.TOOL_RESULT -> { label = "tool result"; MaterialTheme.colorScheme.outline }
-        ChatMessage.Kind.SYSTEM -> { label = "system"; MaterialTheme.colorScheme.outline }
+    val (label, tint) = when (msg.kind) {
+        ChatMessage.Kind.USER -> "你" to MaterialTheme.colorScheme.primary
+        ChatMessage.Kind.ASSISTANT -> "assistant" to MaterialTheme.colorScheme.secondary
+        ChatMessage.Kind.THINKING -> "thinking" to MaterialTheme.colorScheme.outline
+        ChatMessage.Kind.TOOL_CALL -> ("tool · ${msg.toolName ?: "?"}") to MaterialTheme.colorScheme.tertiary
+        ChatMessage.Kind.TOOL_RESULT -> "tool result" to MaterialTheme.colorScheme.outline
+        ChatMessage.Kind.SYSTEM -> "system" to MaterialTheme.colorScheme.outline
     }
-    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(color = tint.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
-                    Text(
-                        label,
-                        color = tint,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text("#${index + 1}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                msg.text.ifBlank { "（空）" },
-                style = MaterialTheme.typography.bodyMedium,
-                fontFamily = if (msg.kind == ChatMessage.Kind.TOOL_CALL) FontFamily.Monospace else null,
-            )
+    // 性能取舍：整条消息只用一个 Text（AnnotatedString 分段着色），
+    // 避免 Card+Row+Surface+多个 Text 带来的多次 measure/layout。
+    val body = msg.text.ifBlank { "（空）" }
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        withStyle(androidx.compose.ui.text.SpanStyle(color = tint, fontWeight = FontWeight.Medium)) {
+            append(label)
         }
+        withStyle(androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.outline)) {
+            append("  #${index + 1}\n")
+        }
+        withStyle(
+            androidx.compose.ui.text.SpanStyle(
+                fontFamily = if (msg.kind == ChatMessage.Kind.TOOL_CALL) FontFamily.Monospace else null,
+            ),
+        ) { append(body) }
     }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+    )
 }

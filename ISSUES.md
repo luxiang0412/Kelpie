@@ -459,3 +459,18 @@
 - **原因**：herdr `session.snapshot` 的 `panes[]` 不带 `agent_session`，它只在 `agents[]`（和 `agent.get`）里。
 - **修复**：`HerdrCodec.parseSnapshot` 先解析 `agents[]` 建立 `paneId → path` 映射，再合并进 `Pane.agentSessionPath`；补了 2 个单测。
 - **状态**：已修复（真机验证）。
+
+## I-63 `input swipe` + `dumpsys gfxinfo` 不适合比较优化优劣
+
+- **现象**：同一功能（长对话滚动）三次测量帧数 476 / 493 / 388，jank 37.2% / 34.9% / 44.1%，无法归因到代码改动。
+- **原因**：swipe 的惯性距离、起始帧、系统负载都不受控；`gfxinfo` 统计包含启动/停止阶段的帧。
+- **影响**：不能用它判断“优化有没有用”，只能给出“这个场景确实很慢”的量级结论。
+- **建议**：M4 建 `:benchmark` 模块，用 Macrobenchmark 的 `FrameTimingMetric` + 固定 `CompilationMode` + 受控滚动（`UiAutomator` fling 或 `benchmarkRule` 的滚动动作）。
+
+## I-64 长对话滚动 30–44% 掉帧（真实瓶颈）
+
+- **现象**：500 条消息的对话页，滚动时 jank 30–44%，P50 17–20 ms（120 Hz 预算 8.3 ms）。
+- **对比**：同样 swipe 在看板（5 个 pane）只有 0.9%。
+- **原因假设**：每屏多条富文本的 measure/layout 成本 + 可能的 debug 构建开销。
+- **已知无效**：去 Card/阴影、合并为单 Text（甚至更差）。
+- **建议**：M4 用 Macrobenchmark 量化后，再考虑：文本 measure 缓存、消息分页/窗口化、release+R8+Baseline Profile。

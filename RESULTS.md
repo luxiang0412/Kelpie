@@ -873,3 +873,33 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - 每条消息仍按“一行 = 一条”解析（pi 的 `message` 行）；同一条 assistant 消息被拆多行时按多条显示（M4 再合并）。
 - 不做消息去重/编辑（`Upsert`），只追加。
 - 只支持 pi 格式；Claude/Codex 需要各自 parser（M4 Provider 化）。
+
+---
+
+# 16. M3-2：性能实测（长对话滚动是当前最大瓶颈）
+
+## 16.1 数据
+
+| 场景 | 构建 | 帧数 | Janky | 50th | 90th | 95th | 99th |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 看板滚动（5 pane） | debug | 667 | **0.90%** | 9 ms | 11 ms | 12 ms | 18 ms |
+| 长对话滚动（500 条消息） | debug，Card 版 | 476 | **37.2%** | 19 ms | 36 ms | 44 ms | 61 ms |
+| 同上（加 contentType/key、去阴影） | debug | 493 | 34.9% | 17 ms | 34 ms | 40 ms | 57 ms |
+| 同上（每种消息合成单个 `Text`） | debug | 388 | 44.1% | 20 ms | 36 ms | 40 ms | 57 ms |
+| release（未开 R8，debuggable）冷启动 ×5 | release | — | — | — | — | — | 557–582 ms（中位 573） |
+
+冷启动对照：debug 中位 **555 ms**；release（本配置未开 R8）**573 ms** —— 无显著差异，说明当前瓶颈不在 R8。
+
+## 16.2 结论
+
+1. **看板足够流畅**（jank < 1%，120 Hz），不需要额外优化。
+2. **长对话滚动是明确瓶颈**（30–44% jank）：每屏多条富文本 + 120 Hz 预算 8.3 ms，`Text` 的 measure/layout 成本占主导。
+3. 去掉 Card/阴影、减少节点数（单 `Text`）**没有稳定改善**；三次测量之间帧数从 388 到 493 不等 —— **`input swipe` + `gfxinfo` 的测法本身不可控**，不能用于比较优化优劣。
+4. 因此 **M3-2 不继续盲调**：正确做法是 M4 引入 `:benchmark`（Macrobenchmark `FrameTimingMetric`）+ Baseline Profile + R8，用可控负载比较。
+
+## 16.3 未做（明确留到 M4）
+
+- Macrobenchmark 模块（`StartupTimingMetric` / `FrameTimingMetric` / `CompilationMode`）
+- Baseline Profile 生成与验证
+- 长列表优化：文本 measure 缓存、消息分页（只保留最近 N 条 + 向上加载）、`TextLayoutResult` 复用
+- 流式输出 + 滚动叠加负载（需要可控的流式数据源）
