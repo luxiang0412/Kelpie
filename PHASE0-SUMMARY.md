@@ -77,3 +77,18 @@
 2. Spike 3 收尾（pi 会话定位的“首次落盘时机”与多会话区分）。
 3. 决定审批路线：做 L1（Claude hook / ACP）还是 Phase 1–2 只读。
 4. 若仍想降延迟：评估方案 C（主机端复用脚本，需批准安装）。
+
+---
+
+## 附：Milestone 1（2026-10-31）结果速览
+
+| 项 | 状态 |
+| --- | --- |
+| 只读看板（模块化 + Compose + Room + 事件驱动对账） | ✅ 真机可用（截图 `m1-05`） |
+| 指纹 fail-closed | ✅ 真机弹窗 + 与 `ssh-keygen` 一致的 SHA256 |
+| 真实断链恢复 | ✅ 1.67 s 自动重连（generation 递增） |
+| JVM 单测 / Room 仪器测试 | ✅ 12/12、4/4 |
+| Compose UI 自动化测试 | ⛔ MIUI 上挂起（I-59），改用截图验收 |
+| Spike A（BCAPP 委托） | ✅ 不删系统 BC 即可用；JSch exec 快一倍（备选） |
+| Spike B（pi 集成隔离安装） | ✅ `agent_session` 返回 JSONL 精确路径 |
+| 真机性能基线 | ⛔ 未做（留 M2/Spike 7） |

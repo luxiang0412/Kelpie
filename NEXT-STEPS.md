@@ -112,3 +112,29 @@ P-4  → 只在你想把“9”变成确定值时做                            
 - 未做 `pane split` 压力测试、未做故障注入。
 - 未改 `~/.claude`、`~/.pi` 的配置；未装 `herdr integration install pi`。
 - 未用 sudo；未改 `sshd_config`；未升级/降级 herdr。
+
+---
+
+# Milestone 1 完成后的建议（M2 计划）
+
+## 已完成（M1 验收）
+
+- 只读看板：指纹确认 → 连接 → snapshot → 双层订阅 → 事件驱动对账 → Room 缓存 → 分组看板 + Pane 详情
+- 真机验证：连接/分组/详情/手动重连/**真实断链 1.67 s 自动恢复**
+- 测试：JVM 12/12；Room 仪器测试 4/4；Compose UI 测试在 MIUI 上挂起（I-59，BLOCKED）
+- Spike A：BCAPP 委托方案可行（不删系统 BC）；JSch exec 快一倍（备选）
+- Spike B：隔离 HOME 安装 pi 集成成功，`agent_session` 返回精确 JSONL 路径
+
+## M2 建议（按优先级）
+
+1. **多主机 / 多会话**：数据结构已按 `hostId+session` 设计；补 UI（列表 + 切换）与连接生命周期隔离（每主机一个 Supervisor）。
+2. **Compose UI 测试**：换设备或改用 UiAutomator（I-59）；把它纳入 CI，避免 UI 回归靠肉眼。
+3. **性能基线（Spike 7）**：冷启动、看板滚动、120 Hz 掉帧、键盘动画；用 Macrobenchmark + JankStats。
+4. **写操作（Phase 2，仅 L1）**：`agent.prompt` + 结构化审批；用 pi 集成（D35）或 Claude hook；**不做读屏一键批准**（D22）。
+5. **transcript 视图**：用 `agent_session.path`（D35）走 SFTP + `SftpTail`；先做 pi 的 JSONL 渲染。
+6. **主机端 pi 集成**：若要在真实使用中拿 `agent_session`，需要在用户真实 `~/.pi` 安装集成（需批准，D35 已说明隔离方案）。
+7. **传输优化（可选）**：JSch 对照（D33）或 streamlocal 自研 channel（D20）—— 都要先有明确收益。
+
+## 当前未做、也不打算在 M1 做的
+
+- 读屏审批、终端接管、后台常驻服务、推送、多主机 UI、性能优化。
