@@ -1133,3 +1133,14 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
   **Compose UI 测试 9/9 通过**；Macrobenchmark `startup_500` 在模拟器跑通（median 2869.6 ms，仅验证流程）。
 - **未获得**：真机 FrameTimingMetric（MIUI BAL + dropShaderCache）。
 - **单元测试**：新增 38 个（配对 9 / 分支 5 / 增量一致性 7 / Mapper 成本 2 / 缓存 5 / Markdown 12 既有）全绿。
+
+## M2-C2（2026-10-31）
+
+- **Composer**：1–5 行 + 内部滚动、Enter 换行、48dp 发送键、长 Prompt 全屏编辑、IME/TalkBack 语义、动态字体兼容。
+- **草稿**：独立 Room 库 `herdr-drafts.db`（不被 `herdr.db` 的 destructive migration 清空）；
+  DraftKey = host|session|agentSession(或 pane 占用指纹)；防抖 400ms、上限 8000 字符、删除主机联动清理、不覆盖新输入。
+- **发送状态机**：快照提交 + 单飞；Accepted 仅在草稿未变时清空；Rejected 保留内容；
+  Unknown 保留 `pendingText`/`pendingActionId`，重发必须二次确认并生成新 Action ID。
+- **目标校验**：pane/agent/可写性/agent session/占用指纹；离线只存草稿不排队。
+- **测试**：Compose UI **16/16**（看板 9 + Composer 7，AVD）；JVM 新增 15（`:core:data` DraftTest）。
+- **未执行**：真实 Pi 会话 E2E（未取得本轮写入授权，I-86）；草稿跨进程恢复未实测（I-87）。

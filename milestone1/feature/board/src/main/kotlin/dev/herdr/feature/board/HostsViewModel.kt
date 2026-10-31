@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 class HostsViewModel(
     private val manager: HostConnectionManager,
     private val hosts: HostRepository,
+    private val drafts: dev.herdr.core.data.drafts.DraftStore? = null,
 ) : ViewModel() {
 
     data class HostState(
@@ -69,6 +70,10 @@ class HostsViewModel(
     val composer: StateFlow<HostConnectionManager.ComposerState> = manager.composer
     val approvals: StateFlow<List<HostConnectionManager.ApprovalItem>> = manager.approvals
 
+    init {
+        viewModelScope.launch { manager.composer.collect { onComposerChanged(it) } }
+    }
+
     private val _paneOutput = MutableStateFlow("")
     val paneOutput: StateFlow<String> = _paneOutput.asStateFlow()
     private var outputJob: Job? = null
@@ -112,6 +117,8 @@ class HostsViewModel(
     }
 
     fun removeHost(id: String) {
+        // 删除主机时一并删除它的草稿（避免遗留敏感代码）
+        viewModelScope.launch { runCatching { drafts?.deleteByHost(id) } }
         manager.disconnect(id)
         hosts.remove(id)
         manager.reload(startConnections = true)
@@ -196,17 +203,84 @@ class HostsViewModel(
 
     // ---------------- 写操作 ----------------
 
-    fun updateComposerText(text: String) = manager.updateComposer(_state.value.activeId, text)
+    fun updateComposerText(text: String) {
+        manager.updateComposer(_state.value.activeId, text)
+        scheduleDraftSave(text)
+    }
 
     fun clearComposerOutcome() = manager.clearComposerOutcome()
 
     fun sendPrompt(pane: Pane) {
         val hostId = _state.value.activeId ?: return
-        manager.sendPrompt(hostId, pane)
+        val writable = _state.value.hosts.firstOrNull { it.cfg.id == hostId }
+            ?.connKind == HostConnectionManager.ConnKind.CONNECTED
+        manager.sendPrompt(hostId, pane, writable)
         // 发送后立刻刷一次输出，别等 2s 轮询
         viewModelScope.launch {
             manager.readPane(hostId, pane.paneId)?.let { _paneOutput.value = it }
         }
+    }
+
+    // ---------------- 草稿（M2-C2） ----------------
+
+    private var draftKey: String? = null
+    private var draftJob: Job? = null
+
+    /** 当前 pane 对应的草稿身份（Host + Herdr session + agent session/占用指纹）。 */
+    private fun draftKeyFor(pane: Pane?): String? {
+        val hostId = _state.value.activeId ?: return null
+        val cfg = hosts.get(hostId) ?: return null
+        return dev.herdr.core.data.drafts.DraftKey.of(hostId, cfg.session, pane)
+    }
+
+    private fun loadDraft(pane: Pane) {
+        val key = draftKeyFor(pane) ?: return
+        draftKey = key
+        val store = drafts ?: return
+        viewModelScope.launch {
+            val saved = runCatching { store.load(key) }.getOrNull() ?: return@launch
+            // 不覆盖用户在加载完成前已经开始输入的内容
+            if (draftKey != key) return@launch
+            if (manager.composer.value.text.isEmpty()) {
+                manager.updateComposer(_state.value.activeId, saved)
+            }
+        }
+    }
+
+    private fun scheduleDraftSave(text: String) {
+        val key = draftKey ?: return
+        val store = drafts ?: return
+        val hostId = _state.value.activeId ?: return
+        val session = hosts.get(hostId)?.session ?: return
+        val pane = _state.value.board.selectedPane
+        draftJob?.cancel()
+        draftJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(dev.herdr.core.data.drafts.DraftStore.DEBOUNCE_MS)
+            runCatching { store.save(key, hostId, session, pane?.agentSessionPath, text) }
+        }
+    }
+
+    /** 页面离开/生命周期切换时尽力写入最新内容（取消防抖等待）。 */
+    fun flushDraft() {
+        val key = draftKey ?: return
+        val store = drafts ?: return
+        val hostId = _state.value.activeId ?: return
+        val session = hosts.get(hostId)?.session ?: return
+        val pane = _state.value.board.selectedPane
+        val text = manager.composer.value.text
+        draftJob?.cancel()
+        viewModelScope.launch {
+            runCatching { store.save(key, hostId, session, pane?.agentSessionPath, text) }
+        }
+    }
+
+    /** Accepted 后若输入已清空，说明这份草稿已被消费。 */
+    private fun onComposerChanged(state: HostConnectionManager.ComposerState) {
+        if (state.outcome !is WriteOutcome.Accepted) return
+        if (state.text.isNotEmpty()) return
+        val key = draftKey ?: return
+        val store = drafts ?: return
+        viewModelScope.launch { runCatching { store.clear(key) } }
     }
 
     // ---------------- 对话（只读） ----------------
@@ -214,12 +288,16 @@ class HostsViewModel(
     /** W2：进入对话（有 agent_session 走结构化；否则降级终端输出）。 */
     fun openConversation(pane: Pane) {
         selectPane(pane)   // 启动终端尾部轮询，作为兜底
+        manager.setComposerTarget(_state.value.activeId, pane)
+        loadDraft(pane)
         if (pane.agentSessionPath != null) openTranscript(pane) else _transcript.value = TranscriptState()
     }
 
     fun closeConversation() {
+        flushDraft()
         closeTranscript()
         selectPane(null)
+        draftKey = null
     }
 
     fun reloadConversation() {

@@ -43,7 +43,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -275,7 +278,7 @@ private fun ToolRow(item: ConversationItem.Tool) {
             Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
             if (!item.pairedById && hasResult) {
                 Spacer(Modifier.width(Space.s))
-                Text("按顺序配对", style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
+                Text("未配对（无可靠 ID）", style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
             }
         }
         if (item.argumentsSummary.isNotBlank()) {
@@ -473,7 +476,11 @@ private fun ComposerBar(
     onDismissOutcome: () -> Unit,
 ) {
     val palette = LocalHerdrPalette.current
-    val canSend = pane.agent != null && !composer.sending
+    var longEditor by remember(pane.paneId) { mutableStateOf(false) }
+    var confirmResend by remember { mutableStateOf(false) }
+    val hasAgent = pane.agent != null
+    val canSend = hasAgent && !composer.sending && composer.text.isNotBlank()
+
     Column(
         Modifier
             .fillMaxWidth()
@@ -481,53 +488,177 @@ private fun ComposerBar(
             .navigationBarsPadding()
             .padding(horizontal = Space.page, vertical = Space.s),
     ) {
+        // 发送结果：Accepted / Rejected / Unknown 三态文案不同，TalkBack 也读得到
         composer.message?.let { msg ->
             val color = when (composer.outcome) {
+                is WriteOutcome.Accepted -> palette.statusFg(AgentStatus.DONE)
                 is WriteOutcome.Rejected -> palette.statusFg(AgentStatus.BLOCKED)
                 is WriteOutcome.Unknown -> palette.statusFg(AgentStatus.UNKNOWN)
                 else -> palette.textSecondary
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(msg, style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1f))
-                TextButton(onClick = onDismissOutcome) { Text("知道了") }
+                TextButton(onClick = onDismissOutcome, modifier = Modifier.heightIn(min = 48.dp)) { Text("知道了") }
             }
         }
+
+        // Unknown：保留待确认文本，重发必须显式确认（会产生新的 Action ID）
+        composer.pendingText?.let { pending ->
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = Space.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "待确认：${pending.lineSequence().first().take(40)}…",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.statusFg(AgentStatus.UNKNOWN),
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = { confirmResend = true },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text("重新发送…") }
+            }
+        }
+
         Surface(color = palette.surfaceRaised, shape = RoundedCornerShape(Radius.card)) {
-            Row(Modifier.padding(start = Space.m, end = Space.s, top = Space.s, bottom = Space.s), verticalAlignment = Alignment.Bottom) {
+            Row(
+                Modifier.padding(start = Space.m, end = Space.xs, top = Space.xs, bottom = Space.xs),
+                verticalAlignment = Alignment.Bottom,
+            ) {
                 OutlinedTextField(
                     value = composer.text,
                     onValueChange = onTextChange,
-                    modifier = Modifier.weight(1f).heightIn(min = 44.dp, max = 120.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp, max = 140.dp)
+                        .semantics {
+                            contentDescription = "指令输入框"
+                            stateDescription = when {
+                                composer.sending -> "发送中"
+                                composer.text.isBlank() -> "空"
+                                else -> "${composer.text.length} 个字符"
+                            }
+                        },
                     placeholder = {
                         Text(
-                            if (pane.agent == null) "这个 pane 没有运行 agent" else "发送下一步指令…",
+                            if (!hasAgent) "这个 pane 没有运行 agent" else "发送下一步指令…",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     },
+                    // 1–2 行起步，最多约 5 行后内部滚动；Enter 插入换行（不自动发送）
+                    minLines = 1,
                     maxLines = 5,
-                    enabled = canSend,
+                    enabled = hasAgent && !composer.sending,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Text,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Default,
+                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
+                    ),
                 )
-                Spacer(Modifier.width(Space.s))
-                Surface(
-                    color = if (canSend && composer.text.isNotBlank()) palette.accent else palette.outline,
-                    shape = RoundedCornerShape(Radius.chip),
-                    modifier = Modifier.clickable(enabled = canSend && composer.text.isNotBlank(), onClick = onSend),
+                TextButton(
+                    onClick = { longEditor = true },
+                    modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp),
                 ) {
-                    Text(
-                        if (composer.sending) "发送中" else "发送",
-                        color = palette.accentOn,
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(horizontal = Space.l, vertical = Space.m),
-                    )
+                    Text("⤢", style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
+                }
+                Surface(
+                    color = if (canSend) palette.accent else palette.outline,
+                    shape = RoundedCornerShape(Radius.chip),
+                    modifier = Modifier
+                        .padding(Space.xs)
+                        .heightIn(min = 48.dp)
+                        .widthIn(min = 64.dp)
+                        .clickable(enabled = canSend, onClick = onSend)
+                        .semantics { contentDescription = if (composer.sending) "发送中，请稍候" else "发送" },
+                ) {
+                    Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (composer.sending) "发送中" else "发送",
+                            color = palette.accentOn,
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.padding(horizontal = Space.m),
+                        )
+                    }
                 }
             }
         }
         Text(
-            "已接受（Accepted）只代表远端收到，不代表执行完成；超时=结果未知，不会自动重发。",
+            "已接受（Accepted）只代表远端收到，不代表执行完成；结果未知（Unknown）不会自动重发。",
             style = MaterialTheme.typography.labelSmall,
             color = palette.textSecondary,
             modifier = Modifier.padding(top = Space.xs),
         )
+    }
+
+    if (longEditor) {
+        LongPromptEditor(
+            text = composer.text,
+            onChange = onTextChange,
+            onDismiss = { longEditor = false },
+        )
+    }
+
+    if (confirmResend) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmResend = false },
+            title = { Text("重新发送待确认内容？") },
+            text = {
+                Text(
+                    "上一次发送结果未知，远端可能已经执行。重新发送会创建新的操作记录，并可能导致重复执行。",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmResend = false
+                    onSend()
+                }) { Text("确认重新发送") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmResend = false }) { Text("取消") }
+            },
+        )
+    }
+}
+
+/** 长 Prompt 编辑：全屏纯文本编辑，粘贴代码/堆栈不挤压列表。 */
+@Composable
+private fun LongPromptEditor(text: String, onChange: (String) -> Unit, onDismiss: () -> Unit) {
+    val palette = LocalHerdrPalette.current
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(color = palette.background, modifier = Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().imePadding()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = Space.page, vertical = Space.s),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("长 Prompt", style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("完成") }
+                }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onChange,
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = Space.page),
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    placeholder = { Text("粘贴代码、错误堆栈或长指令…") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Text,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Default,
+                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
+                    ),
+                )
+                Text(
+                    "${text.length} 字符（草稿会自动保存）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(Space.page),
+                )
+            }
+        }
     }
 }
 

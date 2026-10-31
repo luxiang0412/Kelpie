@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                HostsViewModel(container.manager, container.hosts) as T
+                HostsViewModel(container.manager, container.hosts, container.drafts) as T
         }
         setContent {
                 val vm: HostsViewModel = viewModel(factory = factory)

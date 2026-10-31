@@ -602,3 +602,25 @@
 
 - `startup_500` 在模拟器 median 2869.6 ms（debuggable + emulator，已显式 suppress）。
 - 禁止据此宣称性能改善；真机 FrameTimingMetric 仍缺（I-74 / I-78）。
+
+## I-84 草稿身份在无 agent_session 时依赖 pane 占用指纹
+
+- **现状**：`DraftKey` 退化为 `paneId+agent+title+cwd` 的哈希；同一 pane 上换 agent 且 title/cwd 完全相同时可能复用旧草稿。
+- **缓解**：`SendTargetCheck` 在占用指纹或 agent session 变化时返回 NeedsConfirm，用户必须重新确认。
+- **建议**：如果 Pi 能提供 pane creation epoch，加入 DraftKey。
+
+## I-85 MarkdownAstCache 无文本等值校验（仅哈希 + 长度）
+
+- 64 位 FNV-1a，碰撞概率 ~2⁻⁶⁴；不做全文等值校验是为了避免缓存持有全文的内存代价。
+- **结论**：接受，记录在案。
+
+## I-86 真实 Pi 会话端到端验收未执行（M2-C2 P0 §6）
+
+- **原因**：需要在本轮对远端测试 Session 实际写入，未取得该轮明确授权（按任务书要求先申请）。
+- **影响**：发送侧的语义/UI 变更只经 UI 测试与 JVM 测试验证，未经真实远端写操作确认。
+- **下一步**：授权后执行，并记录 APPEND/PATCH/FULL 命中与耗时。
+
+## I-87 草稿跨进程恢复未实测
+
+- Room 写入与加载路径已实现，未做「杀进程 → 重开 → 恢复」实测。
+- **建议**：与 I-86 一并验收。

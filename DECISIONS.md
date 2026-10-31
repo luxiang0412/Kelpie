@@ -617,3 +617,36 @@ SSH/指纹、多主机看板、断线恢复、给 agent 发消息、详情页最
 - 未删除 TalkBack 语义合并、未回退文案来“通过测试”。
 
 **状态**：`已定`。
+
+## D56. 草稿用独立 Room 库 + DraftKey(host|session|agentSession/占用指纹)
+
+- 不复用 `herdr.db`：它用 `fallbackToDestructiveMigration`，升级会清空缓存，草稿不能跟着丢；
+- `agent_session` 缺失时退化为 pane 占用指纹（paneId+agent+title+cwd），**只降低**串稿概率，
+  最终由发送前目标校验兜底（把不一致变成 NeedsConfirm，而不是静默发出）；
+- 单条上限 8000 字符，空文本即删除，删除主机时按 hostId 级联删除。
+
+**状态**：`已定`。
+
+## D57. 发送采用「快照 + 单飞 + 结果分级清空」
+
+- 发送时对文本取快照，`sending` 期间重复点击直接返回（防重复提交）；
+- Accepted 只代表远端收到：**仅当草稿自提交后未变化**才清空，用户新输入不被清掉；
+- Rejected 保留原文本；Unknown 保留 `pendingText + pendingActionId`，不自动重试；
+- Unknown 重发必须显式确认，并由 `WriteLedger.begin()` 生成新的 Action ID（旧记录保留）。
+
+**状态**：`已定`。
+
+## D58. 发送前做可检测的目标一致性校验，但不宣称消除 TOCTOU
+
+- 检查 pane 存在、agent 存在、连接可写、agent session / 占用指纹未变；
+- 不一致时返回 NeedsConfirm（提示用户重新确认），而不是自动发送或静默失败；
+- 读取与写入之间没有原子锁，这一点写进文档与代码注释。
+
+**状态**：`已定`。
+
+## D59. Composer 继续用 Material3 状态式 `OutlinedTextField`，不引入实验性 BasicTextField2
+
+- 现有版本（Compose BOM 2026.09.00）稳定支持 `minLines/maxLines`、`imeAction`、`stateDescription`；
+- 需求（1–5 行、内部滚动、Enter 换行）全部满足，无需为换 API 而重写稳定代码。
+
+**状态**：`已定`。

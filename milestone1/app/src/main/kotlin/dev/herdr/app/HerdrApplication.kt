@@ -23,6 +23,10 @@ class AppContainer(app: Application) {
     val boards = BoardRepository(database.boardDao())
     val transcripts = dev.herdr.core.data.TranscriptStore(database.transcriptDao())
 
+    /** 草稿独立库：herdr.db 会在升级时被销毁重建，草稿不能跟着丢。 */
+    private val draftDatabase = dev.herdr.core.data.drafts.DraftDatabase.build(app)
+    val drafts = dev.herdr.core.data.drafts.DraftStore(draftDatabase.dao())
+
     /** 每台主机独立信任库（指纹互不影响）。 */
     fun connectorFor(hostId: String): SshConnector =
         SshConnector(File(app.filesDir, "trust/$hostId.known_hosts"))

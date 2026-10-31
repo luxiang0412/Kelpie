@@ -95,6 +95,13 @@ class HostConnectionManager(
         val sending: Boolean = false,
         val outcome: WriteOutcome? = null,
         val message: String? = null,
+        /** 本次提交对应的 Action Journal id（Unknown 时用于重新检查/确认）。 */
+        val pendingActionId: String? = null,
+        /** 已提交但结果未知的文本快照（不会被自动重发）。 */
+        val pendingText: String? = null,
+        /** 编辑时的目标身份（用于发送前校验）。 */
+        val editedAgentSession: String? = null,
+        val editedOccupancy: String? = null,
     )
 
     private class Runtime(
@@ -259,13 +266,50 @@ class HostConnectionManager(
         )
     }
 
+    /** 打开某个 pane 的对话时记录目标身份（发送前校验用）。 */
+    fun setComposerTarget(hostId: String?, pane: dev.herdr.core.herdr.Pane?) {
+        _composer.value = _composer.value.copy(
+            hostId = hostId,
+            editedAgentSession = pane?.agentSessionPath?.takeIf { it.isNotBlank() },
+            editedOccupancy = pane?.let { dev.herdr.core.data.drafts.DraftKey.occupancyFingerprint(it) },
+        )
+    }
+
     fun clearComposerOutcome() {
         _composer.value = _composer.value.copy(outcome = null, message = null)
     }
 
-    fun sendPrompt(hostId: String, pane: Pane) {
-        val text = _composer.value.text.trim()
+    fun sendPrompt(hostId: String, pane: Pane, writable: Boolean = true) {
+        val raw = _composer.value.text
+        val text = raw.trim()
         if (text.isEmpty() || _composer.value.sending) return
+
+        // 发送前目标校验（离线只允许存草稿，不排队）
+        when (val check = dev.herdr.core.data.drafts.SendTargetCheck.check(
+            pane = pane,
+            writable = writable,
+            editedAgentSession = _composer.value.editedAgentSession,
+            editedOccupancy = _composer.value.editedOccupancy,
+        )) {
+            is dev.herdr.core.data.drafts.SendTargetCheck.Result.Ok -> Unit
+            is dev.herdr.core.data.drafts.SendTargetCheck.Result.Blocked -> {
+                _composer.value = _composer.value.copy(
+                    sending = false,
+                    outcome = WriteOutcome.Rejected(check.code, check.reason),
+                    message = check.reason,
+                )
+                return
+            }
+            is dev.herdr.core.data.drafts.SendTargetCheck.Result.NeedsConfirm -> {
+                _composer.value = _composer.value.copy(
+                    sending = false,
+                    outcome = WriteOutcome.Rejected("target_changed", check.reason),
+                    message = "${check.reason}；请确认后重新点击发送",
+                )
+                return
+            }
+        }
+
         val conn = currentConnection(hostId)
         val cfg = hosts.get(hostId)
         if (conn == null || cfg == null) {
@@ -275,8 +319,11 @@ class HostConnectionManager(
             )
             return
         }
+        val snapshot = raw
         val rec = writeLedger.begin("agent.prompt", pane.paneId, text.toByteArray())
-        _composer.value = _composer.value.copy(text = "", sending = true, outcome = null, message = "发送中…")
+        _composer.value = _composer.value.copy(
+            sending = true, outcome = null, message = "发送中…", pendingActionId = rec.clientRequestId,
+        )
         scope.launch {
             val api = HerdrApi(conn, cfg.herdrBin, cfg.session)
             val result = runCatching { api.prompt(pane.paneId, text) }
@@ -307,10 +354,14 @@ class HostConnectionManager(
             _composer.value = _composer.value.copy(
                 sending = false,
                 outcome = outcome,
+                // Accepted 只在「草稿自提交后没变」时清空；用户已经继续输入则保留新内容
+                text = if (outcome is WriteOutcome.Accepted && _composer.value.text == snapshot) "" else _composer.value.text,
+                pendingActionId = if (outcome is WriteOutcome.Unknown) rec.clientRequestId else null,
+                pendingText = if (outcome is WriteOutcome.Unknown) snapshot else null,
                 message = when (outcome) {
-                    is WriteOutcome.Accepted -> "已发送"
-                    is WriteOutcome.Rejected -> "被拒绝：${outcome.code}"
-                    is WriteOutcome.Unknown -> "结果未知（不会自动重发，请刷新确认）"
+                    is WriteOutcome.Accepted -> "已接受（Accepted）：远端已收到，未代表执行完成"
+                    is WriteOutcome.Rejected -> "被拒绝：${outcome.code}（内容已保留，可修改后重发）"
+                    is WriteOutcome.Unknown -> "结果未知（Unknown）：不会自动重发，请稍后在会话里确认"
                     else -> null
                 },
             )
