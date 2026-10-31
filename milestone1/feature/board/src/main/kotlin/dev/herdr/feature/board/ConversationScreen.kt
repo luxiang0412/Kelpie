@@ -29,6 +29,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -52,6 +55,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -377,10 +381,13 @@ private fun AssistantMessage(text: String) {
     val collapsible = text.length > 2500 || lineCount > 40
     var expanded by remember(text) { mutableStateOf(!collapsible) }
     Column(Modifier.fillMaxWidth()) {
-        MarkdownText(
-            source = if (expanded || !collapsible) text else cutAtLine(text, 1200),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // CONV-ACTIONS-001：正文支持系统长按选择（选区不被父级手势拦截）
+        androidx.compose.foundation.text.selection.SelectionContainer {
+            MarkdownText(
+                source = if (expanded || !collapsible) text else cutAtLine(text, 1200),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         if (collapsible && !expanded) {
             Text(
                 "展开全文（${text.length} 字符）",
@@ -392,6 +399,57 @@ private fun AssistantMessage(text: String) {
                     .padding(top = Space.s)
                     .semantics { contentDescription = "展开这条消息的全文" },
             )
+        }
+        MessageActions(text)
+    }
+}
+
+/**
+ * CONV-ACTIONS-001（已批准）：Agent 消息末尾常显低强调「复制 + 更多」。
+ * - 复制只取可阅读正文（源的 Markdown 原文），不含 Agent 名/时间/按钮字样；
+ * - 更多菜单只放**真正实现**的动作，不放 Quote/Share 占位。
+ */
+@Composable
+private fun MessageActions(text: String) {
+    val palette = LocalHerdrPalette.current
+    val clipboard = LocalClipboardManager.current
+    var menu by remember { mutableStateOf(false) }
+    var copied by remember { mutableStateOf(false) }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(
+            onClick = {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            },
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .semantics { contentDescription = "复制这条回复" },
+        ) {
+            Text(
+                if (copied) "已复制" else "复制",
+                style = MaterialTheme.typography.labelMedium,
+                color = palette.textSecondary,
+            )
+        }
+        Box {
+            TextButton(
+                onClick = { menu = true },
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .semantics { contentDescription = "更多操作" },
+            ) {
+                Text("更多", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("复制原文（Markdown）", style = MaterialTheme.typography.bodyMedium) },
+                    onClick = {
+                        clipboard.setText(AnnotatedString(text))
+                        menu = false
+                    },
+                )
+            }
         }
     }
 }
