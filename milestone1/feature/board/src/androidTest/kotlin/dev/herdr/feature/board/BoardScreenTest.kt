@@ -30,22 +30,22 @@ class BoardScreenTest {
     private fun pane(id: String, st: AgentStatus, agent: String? = "pi") =
         Pane(id, "term-$id", "w1", "w1:t1", agent, st, "title-$id", "/repo", 0)
 
-    private fun hostState(kind: HostsViewModel.ConnKind) = HostsViewModel.HostState(
+    private fun hostState(kind: dev.herdr.core.data.HostConnectionManager.ConnKind) = HostsViewModel.HostState(
         cfg = HostRepository.HostConfig(
             id = "default", label = "开发机", host = "192.168.5.8", user = "luxiang", session = "test",
         ),
         hasKey = true,
         connKind = kind,
         connText = when (kind) {
-            HostsViewModel.ConnKind.CONNECTED -> "已连接 · herdr 0.9.5 · protocol 22"
-            HostsViewModel.ConnKind.STALE -> "数据可能过期"
+            dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED -> "已连接 · herdr 0.9.5 · protocol 22"
+            dev.herdr.core.data.HostConnectionManager.ConnKind.STALE -> "数据可能过期"
             else -> "未连接"
         },
     )
 
     private fun state(
         panes: List<Pane>,
-        kind: HostsViewModel.ConnKind,
+        kind: dev.herdr.core.data.HostConnectionManager.ConnKind,
         stale: Boolean,
         hosts: List<HostsViewModel.HostState> = listOf(hostState(kind)),
     ) = HostsViewModel.UiState(
@@ -71,7 +71,7 @@ class BoardScreenTest {
             pane("w4:pA", AgentStatus.UNKNOWN, agent = null),
         )
         rule.setContent {
-            HerdrTheme { BoardScreen(state(panes, HostsViewModel.ConnKind.CONNECTED, false), {}, {}, {}, {}, {}) }
+            HerdrTheme { BoardScreen(state(panes, dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED, false), {}, {}, {}, {}, {}) }
         }
         rule.onNodeWithText("Herdr 看板").assertIsDisplayed()
         rule.onNodeWithText("等你处理").assertIsDisplayed()
@@ -88,7 +88,7 @@ class BoardScreenTest {
         rule.setContent {
             HerdrTheme {
                 BoardScreen(
-                    state(listOf(pane("w1:p1", AgentStatus.IDLE)), HostsViewModel.ConnKind.STALE, true),
+                    state(listOf(pane("w1:p1", AgentStatus.IDLE)), dev.herdr.core.data.HostConnectionManager.ConnKind.STALE, true),
                     onSelectHost = {}, onRefresh = {}, onReconnect = { reconnected = true },
                     onOpenHosts = {}, onSelectPane = {},
                 )
@@ -104,7 +104,7 @@ class BoardScreenTest {
         rule.setContent {
             HerdrTheme {
                 BoardScreen(
-                    state(emptyList(), HostsViewModel.ConnKind.IDLE, true),
+                    state(emptyList(), dev.herdr.core.data.HostConnectionManager.ConnKind.IDLE, true),
                     onSelectHost = {}, onRefresh = {}, onReconnect = {},
                     onOpenHosts = { opened = true }, onSelectPane = {},
                 )
@@ -118,17 +118,17 @@ class BoardScreenTest {
 
     @Test
     fun multiHost_showsChipsAndSwitches() {
-        val a = hostState(HostsViewModel.ConnKind.CONNECTED)
+        val a = hostState(dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED)
         val b = a.copy(
             cfg = a.cfg.copy(id = "dead", label = "不可达测试机"),
-            connKind = HostsViewModel.ConnKind.FAILED,
+            connKind = dev.herdr.core.data.HostConnectionManager.ConnKind.FAILED,
             connText = "连接失败",
         )
         var selected: String? = null
         rule.setContent {
             HerdrTheme {
                 BoardScreen(
-                    state(listOf(pane("w1:p1", AgentStatus.IDLE)), HostsViewModel.ConnKind.CONNECTED, false, listOf(a, b)),
+                    state(listOf(pane("w1:p1", AgentStatus.IDLE)), dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED, false, listOf(a, b)),
                     onSelectHost = { selected = it }, onRefresh = {}, onReconnect = {}, onOpenHosts = {}, onSelectPane = {},
                 )
             }

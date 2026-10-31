@@ -27,6 +27,9 @@ data class Pane(
     val revision: Long,
     /** herdr 上报的 agent 会话文件路径（`agent_session.kind == "path"` 时），用于只读 transcript。 */
     val agentSessionPath: String? = null,
+    /** herdr 的单调序号：完成一次 turn 就 +1（用于“完成”提醒，避免采样漏掉 done→working→done）。 */
+    val completionSeq: Long? = null,
+    val stateChangeSeq: Long? = null,
 )
 
 data class SessionSnapshot(

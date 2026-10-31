@@ -38,7 +38,7 @@ import dev.herdr.core.herdr.ChatMessage
 @Composable
 fun TranscriptScreen(
     state: HostsViewModel.TranscriptState,
-    composer: HostsViewModel.ComposerState,
+    composer: dev.herdr.core.data.HostConnectionManager.ComposerState,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onDismissOutcome: () -> Unit,

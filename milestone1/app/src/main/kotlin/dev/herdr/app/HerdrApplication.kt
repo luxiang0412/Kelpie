@@ -4,11 +4,18 @@ import android.app.Application
 import androidx.room.Room
 import dev.herdr.core.data.BoardDatabase
 import dev.herdr.core.data.BoardRepository
+import dev.herdr.core.data.AppPrefs
+import dev.herdr.core.data.HostConnectionManager
 import dev.herdr.core.data.HostRepository
 import dev.herdr.core.ssh.SshConnector
 import java.io.File
 
 class AppContainer(app: Application) {
+
+    val appScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default,
+    )
+    val prefs = AppPrefs(app)
     val hosts = HostRepository(app)
     val database: BoardDatabase = Room.databaseBuilder(app, BoardDatabase::class.java, "herdr.db")
         .fallbackToDestructiveMigration(dropAllTables = true)
@@ -20,6 +27,15 @@ class AppContainer(app: Application) {
     fun connectorFor(hostId: String): SshConnector =
         SshConnector(File(app.filesDir, "trust/$hostId.known_hosts"))
 
+    /** 进程级连接管理：前台服务与 UI 共用同一份连接。 */
+    val manager = HostConnectionManager(
+        hosts = hosts,
+        boards = boards,
+        transcripts = transcripts,
+        connectorFor = ::connectorFor,
+        scope = appScope,
+    )
+
     private val app: Application = app
 }
 
@@ -30,5 +46,9 @@ class HerdrApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.manager.startAll()
+        if (container.prefs.monitoringEnabled) {
+            runCatching { MonitorService.start(this) }
+        }
     }
 }

@@ -90,9 +90,12 @@ class StrictHostKeyTrust(private val store: TrustStore) {
     fun verify(id: HostKeyId, encodedKey: ByteArray, onUnknown: (HostKeyUnknownException) -> Boolean): Boolean {
         val presented = Fingerprint.sha256(encodedKey)
         val pinned = store.get(id)
+        android.util.Log.i("HostKeyTrust", "verify $id presented=$presented pinned=$pinned")
         if (pinned == null) {
             val ex = HostKeyUnknownException(id, presented)
-            if (!onUnknown(ex)) throw ex
+            val accepted = onUnknown(ex)
+            android.util.Log.i("HostKeyTrust", "unknown host -> user accepted=$accepted")
+            if (!accepted) throw ex
             store.pin(id, presented)
             return true
         }

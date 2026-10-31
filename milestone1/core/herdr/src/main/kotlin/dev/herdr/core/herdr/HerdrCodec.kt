@@ -58,6 +58,22 @@ object HerdrCodec {
         val snap = result["snapshot"]?.jsonObject ?: result
 
         // agent_session 在 agents[] 里（不是 panes[]）——按 pane_id 合并
+        data class AgentMeta(val sessionPath: String?, val completionSeq: Long?, val stateSeq: Long?)
+
+        val agentMeta: Map<String, AgentMeta> = (snap["agents"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { el -> runCatching { el.jsonObject }.getOrNull() }
+            ?.mapNotNull { a ->
+                val pid = a["pane_id"]?.jsonPrimitive?.contentOrNullSafe() ?: return@mapNotNull null
+                val sess = a["agent_session"]?.jsonObject
+                val kind = sess?.get("kind")?.jsonPrimitive?.contentOrNullSafe()
+                val value = sess?.get("value")?.jsonPrimitive?.contentOrNullSafe()
+                pid to AgentMeta(
+                    sessionPath = if (kind == "path") value else null,
+                    completionSeq = a["completion_seq"]?.jsonPrimitive?.longOrNull,
+                    stateSeq = a["state_change_seq"]?.jsonPrimitive?.longOrNull,
+                )
+            }?.toMap() ?: emptyMap()
+
         val sessionByPane: Map<String, String> = (snap["agents"] as? kotlinx.serialization.json.JsonArray)
             ?.mapNotNull { el -> runCatching { el.jsonObject }.getOrNull() }
             ?.mapNotNull { a ->
@@ -82,6 +98,8 @@ object HerdrCodec {
                 cwd = p["foreground_cwd"]?.jsonPrimitive?.contentOrNullSafe()
                     ?: p["cwd"]?.jsonPrimitive?.contentOrNullSafe(),
                 revision = p["revision"]?.jsonPrimitive?.longOrNull ?: 0L,
+                completionSeq = agentMeta[paneId]?.completionSeq,
+                stateChangeSeq = agentMeta[paneId]?.stateSeq,
                 agentSessionPath = sessionByPane[paneId]
                     ?: p["agent_session"]?.jsonObject?.let { sess ->
                         val kind = sess["kind"]?.jsonPrimitive?.contentOrNullSafe()

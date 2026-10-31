@@ -141,9 +141,9 @@ private fun ConnectionBanner(
     onReconnect: () -> Unit,
 ) {
     val color = when (host.connKind) {
-        HostsViewModel.ConnKind.CONNECTED -> MaterialTheme.colorScheme.secondaryContainer
-        HostsViewModel.ConnKind.STALE, HostsViewModel.ConnKind.RECONNECTING -> MaterialTheme.colorScheme.tertiaryContainer
-        HostsViewModel.ConnKind.FAILED -> MaterialTheme.colorScheme.errorContainer
+        dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED -> MaterialTheme.colorScheme.secondaryContainer
+        dev.herdr.core.data.HostConnectionManager.ConnKind.STALE, dev.herdr.core.data.HostConnectionManager.ConnKind.RECONNECTING -> MaterialTheme.colorScheme.tertiaryContainer
+        dev.herdr.core.data.HostConnectionManager.ConnKind.FAILED -> MaterialTheme.colorScheme.errorContainer
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
     Surface(color = color, modifier = Modifier.fillMaxWidth()) {
@@ -166,7 +166,7 @@ private fun ConnectionBanner(
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
-            if (host.connKind == HostsViewModel.ConnKind.CONNECTED || host.connKind == HostsViewModel.ConnKind.STALE) {
+            if (host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED || host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.STALE) {
                 OutlinedButton(onClick = onReconnect) { Text("重连") }
             }
         }
@@ -250,7 +250,7 @@ private fun EmptyState(
             when {
                 host == null -> "先添加一台主机"
                 !host.hasKey -> "导入这台主机的私钥后再连接"
-                host.connKind == HostsViewModel.ConnKind.FAILED -> host.lastError ?: "连接失败"
+                host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.FAILED -> host.lastError ?: "连接失败"
                 else -> "正在连接，请稍候…"
             },
             style = MaterialTheme.typography.bodyMedium,
@@ -278,11 +278,11 @@ private fun MetaFooter(board: HostsViewModel.BoardView) {
     }
 }
 
-internal fun connColor(kind: HostsViewModel.ConnKind): Color = when (kind) {
-    HostsViewModel.ConnKind.CONNECTED -> Color(0xFF2F9E44)
-    HostsViewModel.ConnKind.STALE -> Color(0xFFF08C00)
-    HostsViewModel.ConnKind.RECONNECTING, HostsViewModel.ConnKind.CONNECTING -> Color(0xFF1C7ED6)
-    HostsViewModel.ConnKind.FAILED -> Color(0xFFC92A2A)
+internal fun connColor(kind: dev.herdr.core.data.HostConnectionManager.ConnKind): Color = when (kind) {
+    dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED -> Color(0xFF2F9E44)
+    dev.herdr.core.data.HostConnectionManager.ConnKind.STALE -> Color(0xFFF08C00)
+    dev.herdr.core.data.HostConnectionManager.ConnKind.RECONNECTING, dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTING -> Color(0xFF1C7ED6)
+    dev.herdr.core.data.HostConnectionManager.ConnKind.FAILED -> Color(0xFFC92A2A)
     else -> Color(0xFF868E96)
 }
 

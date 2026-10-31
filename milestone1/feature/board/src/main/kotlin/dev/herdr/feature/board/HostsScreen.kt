@@ -54,6 +54,10 @@ fun HostsScreen(
     onDisconnect: (String) -> Unit,
     onBack: () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { dev.herdr.core.data.AppPrefs(context.applicationContext) }
+    var monitoring by remember { mutableStateOf(prefs.monitoringEnabled) }
+    val monitor = LocalMonitorController.current
     var editing by remember { mutableStateOf<HostRepository.HostConfig?>(null) }
     var isNew by remember { mutableStateOf(false) }
     var keyTarget by remember { mutableStateOf<HostsViewModel.HostState?>(null) }
@@ -81,7 +85,42 @@ fun HostsScreen(
                 Button(onClick = { isNew = true; editing = null }) { Text("添加主机") }
             }
         } else {
-            LazyColumn(
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("后台监控（常驻通知）", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "切到后台也保持连接；agent 需要你处理或完成时发本地通知。受 Android 15 配额限制。",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = monitoring,
+                        onCheckedChange = { on ->
+                            monitoring = on
+                            prefs.monitoringEnabled = on
+                            if (on) {
+                                if (android.os.Build.VERSION.SDK_INT >= 33 &&
+                                    context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                                    android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                                    context is android.app.Activity
+                                ) {
+                                    context.requestPermissions(
+                                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 42,
+                                    )
+                                }
+                                monitor?.start()
+                            } else {
+                                monitor?.stop()
+                            }
+                        },
+                    )
+                }
+                LazyColumn(
                 Modifier.padding(padding).fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -97,6 +136,7 @@ fun HostsScreen(
                         onKey = { keyTarget = h },
                     )
                 }
+            }
             }
         }
     }
@@ -159,7 +199,7 @@ private fun HostCard(
                 fontFamily = FontFamily.Monospace,
             )
             Text(host.connText, style = MaterialTheme.typography.labelSmall)
-            if (host.lastError != null && host.connKind == HostsViewModel.ConnKind.FAILED) {
+            if (host.lastError != null && host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.FAILED) {
                 Text(host.lastError, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
             }
             Text(
@@ -169,7 +209,7 @@ private fun HostCard(
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (host.connKind == HostsViewModel.ConnKind.IDLE || host.connKind == HostsViewModel.ConnKind.FAILED) {
+                if (host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.IDLE || host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.FAILED) {
                     Button(onClick = onSelect) { Text("连接") }
                 } else {
                     OutlinedButton(onClick = onDisconnect) { Text("断开") }

@@ -939,3 +939,40 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 
 键盘弹出时输入栏被遮挡（真实用户必然遇到）：给底部输入栏加 `imePadding()` + `navigationBarsPadding()`，
 修后发送按钮在键盘上方，可直接点击（I-65）。
+
+---
+
+# 18. M4-2：前台服务 + 本地通知（“出门被提醒”打通）
+
+## 18.1 架构改动（为后台生存而做）
+
+| 变更 | 原因 |
+| --- | --- |
+| 连接管理从 `ViewModel` 提升到进程级 `HostConnectionManager`（`:core:data`，appScope） | App 切后台后连接不能断；前台服务与 UI 共用同一份连接，避免双连接/双写 |
+| `MonitorService`（`dataSync` 前台服务） | 常驻通知 + 保持连接；`onTimeout` 处理 Android 15 的配额 |
+| 通知两条通道 | `herdr-monitor`（常驻，低优先级）、`herdr-alerts`（需要处理/完成，高优先级） |
+| 监控模式 5 s 兜底对账 | 事件驱动在对账间隙会漏掉 `done→working→done`（实测），通知必须不漏 |
+
+## 18.2 完成检测的修正（关键）
+
+最初用“状态 diff”判断完成，实测**会漏**：两次采样都落在 `done` 上，中间 `working` 没被看到。
+改为用 herdr 的 **`completion_seq`（单调递增）**：只要 seq 增加就说明又完成了一轮，
+与采样时机无关。`blocked` 因为会一直等待，仍可用状态变化判断。
+
+## 18.3 真机验证（VERIFIED）
+
+| 场景 | 结果 | 证据 |
+| --- | --- | --- |
+| 前台服务启动 | ✅ `isForeground=true`，通道 `herdr-monitor`，常驻通知 | `m4-05-monitor-on.png` |
+| 前台时完成一轮 | ✅ 日志 `completion seq=72→74` → `WORKING -> DONE` → `notifyAlert enabled=true` | logcat |
+| **App 切后台（HOME）** | ✅ 同样收到通知（`seq 74→76`），说明服务确实在后台保持连接与对账 | logcat |
+| 通知展示 | ✅ 通知栏出现「已完成 · 开发机 .5.8 / pi · π - spike-sandbox」+「Herdr 监控中」常驻条 | `m4-06-notification.png` |
+| 通知权限 | ✅ API 33+ 运行时申请（`POST_NOTIFICATIONS`），未授予时 `areNotificationsEnabled=false` 会被记录 | logcat |
+
+## 18.4 限制（必须写进产品说明）
+
+- Android 15 `dataSync` 前台服务**每 24h 最多 6h**；超时后 `onTimeout` 会让服务停止（用户切回前台会重置计时）。
+- 5 s 对账是有成本的（每主机 0.2 req/s）；电量/流量需要在真实使用中观察（本轮未测耗电）。
+- 厂商后台策略：本机 MIUI **放行了**前台服务（实测后台可用），但不保证其他机型；
+  必要时要引导用户关闭电池优化。
+- **`blocked`（需要你处理）的提醒尚未验证**：pi 默认不产生 blocked，需要 pi 扩展（下一步）。

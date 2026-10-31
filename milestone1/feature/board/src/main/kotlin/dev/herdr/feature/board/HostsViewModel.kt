@@ -2,44 +2,32 @@ package dev.herdr.feature.board
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.herdr.core.data.BoardRepository
+import dev.herdr.core.data.HostConnectionManager
 import dev.herdr.core.data.HostRepository
 import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.BoardGrouper
-import dev.herdr.core.herdr.ConnectionSupervisor
+import dev.herdr.core.herdr.ChatMessage
 import dev.herdr.core.herdr.Pane
-import dev.herdr.core.herdr.SessionReconciler
-import dev.herdr.core.ssh.HostKeyUnknownException
-import dev.herdr.core.ssh.SshConnector
-import kotlinx.coroutines.CompletableDeferred
+import dev.herdr.core.herdr.WriteOutcome
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 多主机 / 多会话（M2-1）。
- *
- * - 每台主机独立一个 [ConnectionSupervisor]（连接代次、退避、订阅、Stale 完全隔离）；
- * - 所有主机都会连接（配置了私钥的），看板只展示“当前选中主机”的数据；
- * - Room 以 (hostId, session) 为主键，天然隔离多主机缓存。
+ * UI 层（M4）：只做“选中主机 / 选中 pane / 对话页 / 写操作转发”。
+ * 连接与状态同步已经移到进程级的 [HostConnectionManager]，所以 App 切后台（前台服务）也不会断。
  */
 class HostsViewModel(
+    private val manager: HostConnectionManager,
     private val hosts: HostRepository,
-    private val boards: BoardRepository,
-    private val transcriptStore: dev.herdr.core.data.TranscriptStore,
-    private val connectorFor: (String) -> SshConnector,
 ) : ViewModel() {
-
-    enum class ConnKind { IDLE, CONNECTING, AWAITING_HOST_KEY, CONNECTED, STALE, RECONNECTING, FAILED }
 
     data class HostState(
         val cfg: HostRepository.HostConfig,
         val hasKey: Boolean,
-        val connKind: ConnKind = ConnKind.IDLE,
+        val connKind: HostConnectionManager.ConnKind = HostConnectionManager.ConnKind.IDLE,
         val connText: String = "未连接",
         val lastError: String? = null,
         val paneCount: Int = 0,
@@ -58,19 +46,10 @@ class HostsViewModel(
         val selectedPane: Pane? = null,
     )
 
-    data class HostKeyPrompt(val hostId: String, val label: String, val fingerprint: String)
-
-    data class ComposerState(
-        val text: String = "",
-        val sending: Boolean = false,
-        val outcome: dev.herdr.core.herdr.WriteOutcome? = null,
-        val message: String? = null,
-    )
-
     data class TranscriptState(
         val path: String? = null,
         val loading: Boolean = false,
-        val messages: List<dev.herdr.core.herdr.ChatMessage> = emptyList(),
+        val messages: List<ChatMessage> = emptyList(),
         val error: String? = null,
     )
 
@@ -78,82 +57,59 @@ class HostsViewModel(
         val hosts: List<HostState> = emptyList(),
         val activeId: String? = null,
         val board: BoardView = BoardView(),
-        val hostKeyPrompt: HostKeyPrompt? = null,
+        val hostKeyPrompt: HostConnectionManager.HostKeyPrompt? = null,
     )
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    private val _composer = MutableStateFlow(ComposerState())
-    val composer: StateFlow<ComposerState> = _composer.asStateFlow()
-    private val writeLedger = dev.herdr.core.herdr.WriteLedger()
-
     private val _transcript = MutableStateFlow(TranscriptState())
     val transcript: StateFlow<TranscriptState> = _transcript.asStateFlow()
+
+    val composer: StateFlow<HostConnectionManager.ComposerState> = manager.composer
+
+    private var boardJob: Job? = null
     private var transcriptTailer: dev.herdr.core.data.TranscriptTailer? = null
     private var transcriptPoll: Job? = null
     private var transcriptObserve: Job? = null
 
-    private class Runtime(
-        val cfg: HostRepository.HostConfig,
-        val connector: SshConnector,
-        var supervisor: ConnectionSupervisor? = null,
-        var persistJob: Job? = null,
-        var pendingKey: CompletableDeferred<Boolean>? = null,
-    )
-
-    private val runtimes = LinkedHashMap<String, Runtime>()
-    private var boardJob: Job? = null
-
     init {
-        reloadHosts(startConnections = true)
+        viewModelScope.launch { manager.hostsState.collect { list -> syncHosts(list) } }
+        viewModelScope.launch { manager.hostKeyPrompt.collect { p -> _state.value = _state.value.copy(hostKeyPrompt = p) } }
+        val active = hosts.activeId() ?: hosts.list().firstOrNull()?.id
+        if (active != null) {
+            hosts.setActive(active)
+            _state.value = _state.value.copy(activeId = active)
+            switchBoard(active)
+        }
+    }
+
+    private fun syncHosts(list: List<HostConnectionManager.HostState>) {
+        _state.value = _state.value.copy(
+            hosts = list.map {
+                HostState(it.cfg, it.hasKey, it.connKind, it.connText, it.lastError, it.paneCount)
+            },
+        )
     }
 
     // ---------------- 主机管理 ----------------
 
-    fun reloadHosts(startConnections: Boolean = false) {
-        val list = hosts.list()
-        val active = hosts.activeId() ?: list.firstOrNull()?.id
-        if (active != null) hosts.setActive(active)
-        val next = LinkedHashMap<String, Runtime>()
-        list.forEach { cfg ->
-            val old = runtimes[cfg.id]
-            next[cfg.id] = if (old != null && old.cfg == cfg) old
-            else Runtime(cfg, connectorFor(cfg.id))
-        }
-        // 停掉被删除主机的运行时
-        runtimes.filterKeys { it !in next.keys }.values.forEach { stopRuntime(it) }
-        runtimes.clear()
-        runtimes.putAll(next)
-        _state.value = _state.value.copy(
-            hosts = list.map { cfg ->
-                HostState(
-                    cfg = cfg,
-                    hasKey = hosts.hasKey(cfg.id),
-                    connKind = runtimes[cfg.id]?.supervisor?.let { kindOf(it) } ?: ConnKind.IDLE,
-                )
-            },
-            activeId = active,
-        )
-        if (startConnections) runtimes.values.forEach { ensureStarted(it) }
-        switchBoard(active)
+    fun reloadHosts() {
+        manager.reload()
+        val active = hosts.activeId() ?: hosts.list().firstOrNull()?.id
+        if (active != null && active != _state.value.activeId) selectHost(active)
     }
 
     fun addHost(cfg: HostRepository.HostConfig) {
         hosts.upsert(cfg)
+        manager.reload(startConnections = true)
         reloadHosts()
-    }
-
-    fun updateHost(cfg: HostRepository.HostConfig) {
-        hosts.upsert(cfg)
-        reloadHosts()
-        ensureStarted(runtimes[cfg.id] ?: return)
     }
 
     fun removeHost(id: String) {
-        runtimes[id]?.let { stopRuntime(it) }
-        runtimes.remove(id)
+        manager.disconnect(id)
         hosts.remove(id)
+        manager.reload(startConnections = true)
         reloadHosts()
     }
 
@@ -163,284 +119,39 @@ class HostsViewModel(
         switchBoard(id)
     }
 
+    fun connect(id: String) = manager.connect(id)
+
+    fun disconnect(id: String) = manager.disconnect(id)
+
+    fun reconnect(id: String) = manager.reconnect(id)
+
+    fun refreshActive() {
+        _state.value.activeId?.let { manager.refresh(it) }
+    }
+
     fun importKey(hostId: String, text: String): Result<Unit> {
         val r = hosts.importKey(hostId, text).map { }
-        reloadHosts()
-        if (r.isSuccess) runtimes[hostId]?.let { ensureStarted(it) }
+        manager.reload()
+        if (r.isSuccess) manager.connect(hostId)
         return r
     }
 
     fun deleteKey(hostId: String) {
+        manager.disconnect(hostId)
         hosts.deleteKey(hostId)
-        runtimes[hostId]?.let { stopRuntime(it) }
-        reloadHosts()
+        manager.reload()
     }
 
-    // ---------------- 连接控制 ----------------
+    fun answerHostKey(accept: Boolean) = manager.answerHostKey(accept)
 
-    fun connect(id: String) = runtimes[id]?.let { ensureStarted(it) } ?: Unit
+    // ---------------- 看板 ----------------
 
-    fun disconnect(id: String) = runtimes[id]?.let { stopRuntime(it) } ?: Unit
-
-    fun reconnect(id: String) = runtimes[id]?.supervisor?.reconnectNow() ?: Unit
-
-    fun refreshActive() {
-        val id = _state.value.activeId ?: return
-        runtimes[id]?.supervisor?.reconciler?.markDirty()
-    }
-
-    // ---------------- transcript（只读，增量 + Room 缓存） ----------------
-
-    fun openTranscript(pane: Pane) {
-        val path = pane.agentSessionPath
-        if (path == null) {
-            _transcript.value = TranscriptState(error = "这台 pane 没有上报 transcript 路径（agent_session=null）")
-            return
-        }
-        val hostId = _state.value.activeId ?: run {
-            _transcript.value = TranscriptState(error = "没有活动主机")
-            return
-        }
-        val conn = runtimes[hostId]?.supervisor?.currentConnection()
-        if (conn == null) {
-            _transcript.value = TranscriptState(path = path, error = "主机未连接")
-            return
-        }
-        closeTranscriptInternal()
-        _transcript.value = TranscriptState(path = path, loading = true)
-
-        // 1) 先订阅本地缓存（离线也能看到历史）
-        transcriptObserve = viewModelScope.launch {
-            transcriptStore.observe(hostId, path).collect { msgs ->
-                if (_transcript.value.path != path) return@collect
-                _transcript.value = _transcript.value.copy(messages = msgs)
-            }
-        }
-
-        // 2) 增量同步：先跑一次（首次会回填尾部），之后每 1.5s 增量
-        val tailer = dev.herdr.core.data.TranscriptTailer(conn, transcriptStore, hostId, path)
-        transcriptTailer = tailer
-        transcriptPoll = viewModelScope.launch {
-            var first = true
-            while (true) {
-                val r = runCatching { tailer.sync() }
-                if (first) {
-                    _transcript.value = _transcript.value.copy(
-                        loading = false,
-                        error = r.exceptionOrNull()?.message,
-                    )
-                    first = false
-                }
-                kotlinx.coroutines.delay(1_500)
-            }
-        }
-    }
-
-    fun reloadTranscript() {
-        val path = _transcript.value.path ?: return
-        val tailer = transcriptTailer ?: return
-        viewModelScope.launch {
-            _transcript.value = _transcript.value.copy(loading = true)
-            val r = runCatching { tailer.sync() }
-            _transcript.value = _transcript.value.copy(
-                loading = false,
-                error = r.exceptionOrNull()?.message,
-            )
-        }
-    }
-
-    fun closeTranscript() {
-        closeTranscriptInternal()
-        _transcript.value = TranscriptState()
-    }
-
-    private fun closeTranscriptInternal() {
-        transcriptPoll?.cancel(); transcriptPoll = null
-        transcriptObserve?.cancel(); transcriptObserve = null
-        transcriptTailer?.close(); transcriptTailer = null
-    }
-
-    // ---------------- 写操作（M4：给 agent 发消息） ----------------
-
-    fun updateComposerText(text: String) {
-        _composer.value = _composer.value.copy(text = text)
-    }
-
-    fun clearComposerOutcome() {
-        _composer.value = _composer.value.copy(outcome = null, message = null)
-    }
-
-    /**
-     * 发送一条 prompt。三态语义（D2/D21）：
-     * - 成功 → Accepted
-     * - 服务端明确报错（如 agent_blocked）→ Rejected
-     * - 超时 / 连接断 → Unknown，**不自动重试**
-     */
-    fun sendPrompt(pane: Pane) {
-        val text = _composer.value.text.trim()
-        if (text.isEmpty() || _composer.value.sending) return
-        val hostId = _state.value.activeId ?: return
-        val conn = runtimes[hostId]?.supervisor?.currentConnection()
-        val cfg = hosts.get(hostId)
-        if (conn == null || cfg == null) {
-            _composer.value = _composer.value.copy(
-                outcome = dev.herdr.core.herdr.WriteOutcome.Rejected("not_connected", "主机未连接"),
-                message = "主机未连接",
-            )
-            return
-        }
-        val rec = writeLedger.begin("agent.prompt", pane.paneId, text.toByteArray())
-        _composer.value = _composer.value.copy(text = "", sending = true, outcome = null, message = "发送中…")
-        viewModelScope.launch {
-            val api = dev.herdr.core.herdr.HerdrApi(conn, cfg.herdrBin, cfg.session)
-            val result = runCatching { api.prompt(pane.paneId, text) }
-            val outcome = result.fold(
-                onSuccess = {
-                    writeLedger.accept(rec.clientRequestId, "agent_prompted")
-                    dev.herdr.core.herdr.WriteOutcome.Accepted
-                },
-                onFailure = { e ->
-                    when (e) {
-                        is dev.herdr.core.ssh.SshFailure.Timeout,
-                        is dev.herdr.core.ssh.SshFailure.Network,
-                        -> {
-                            // 关键：结果未知，绝不自动重发
-                            writeLedger.markUnknown(rec.clientRequestId, e.message ?: "timeout/network")
-                            dev.herdr.core.herdr.WriteOutcome.Unknown(e.message ?: "timeout/network")
-                        }
-                        is dev.herdr.core.ssh.SshFailure.Protocol -> {
-                            val msg = e.message ?: "protocol error"
-                            val code = msg.substringBefore(":").ifBlank { "error" }
-                            writeLedger.reject(rec.clientRequestId, code, msg)
-                            dev.herdr.core.herdr.WriteOutcome.Rejected(code, msg)
-                        }
-                        else -> {
-                            writeLedger.markUnknown(rec.clientRequestId, e.message ?: "unknown")
-                            dev.herdr.core.herdr.WriteOutcome.Unknown(e.message ?: "unknown")
-                        }
-                    }
-                },
-            )
-            _composer.value = _composer.value.copy(
-                sending = false,
-                outcome = outcome,
-                message = when (outcome) {
-                    is dev.herdr.core.herdr.WriteOutcome.Accepted -> "已发送"
-                    is dev.herdr.core.herdr.WriteOutcome.Rejected -> "被拒绝：${outcome.code}"
-                    is dev.herdr.core.herdr.WriteOutcome.Unknown -> "结果未知（不会自动重发，请刷新确认）"
-                    else -> null
-                },
-            )
-        }
-    }
-
-    fun selectPane(pane: Pane?) {
-        _state.value = _state.value.copy(board = _state.value.board.copy(selectedPane = pane))
-    }
-
-    fun answerHostKey(accept: Boolean) {
-        val prompt = _state.value.hostKeyPrompt ?: return
-        runtimes[prompt.hostId]?.pendingKey?.complete(accept)
-        _state.value = _state.value.copy(hostKeyPrompt = null)
-    }
-
-    // ---------------- 内部 ----------------
-
-    private fun ensureStarted(rt: Runtime) {
-        if (rt.supervisor != null) {
-            rt.supervisor?.reconnectNow()
-            return
-        }
-        if (!hosts.hasKey(rt.cfg.id)) {
-            updateHostState(rt.cfg.id, ConnKind.IDLE, "未导入私钥", null)
-            return
-        }
-        val sup = ConnectionSupervisor(
-            scope = viewModelScope,
-            connector = rt.connector,
-            configProvider = { hosts.sshConfig(rt.cfg.id) },
-            onUnknownHostKey = { ex -> awaitHostKey(rt, ex) },
-        )
-        rt.supervisor = sup
-        sup.start()   // 必须先 start：reconciler 在 start() 里初始化
-        rt.persistJob = viewModelScope.launch { persistLoop(rt, sup.reconciler) }
-        viewModelScope.launch { collectSupervisor(rt, sup) }
-    }
-
-    private fun stopRuntime(rt: Runtime) {
-        rt.persistJob?.cancel()
-        rt.persistJob = null
-        rt.supervisor?.stop()
-        rt.supervisor = null
-        updateHostState(rt.cfg.id, ConnKind.IDLE, "已断开", null)
-    }
-
-    private fun awaitHostKey(rt: Runtime, ex: HostKeyUnknownException): Boolean {
-        val deferred = CompletableDeferred<Boolean>()
-        rt.pendingKey = deferred
-        _state.value = _state.value.copy(
-            hostKeyPrompt = HostKeyPrompt(rt.cfg.id, rt.cfg.label, ex.fingerprint),
-        )
-        updateHostState(rt.cfg.id, ConnKind.AWAITING_HOST_KEY, "等待确认主机指纹", null)
-        return runBlocking { withTimeoutOrNull(90_000) { deferred.await() } ?: false }
-    }
-
-    private suspend fun collectSupervisor(rt: Runtime, sup: ConnectionSupervisor) {
-        sup.state.collect { st ->
-            val (kind, text, err) = when (st) {
-                is ConnectionSupervisor.State.Idle -> Triple(ConnKind.IDLE, "未连接", null)
-                is ConnectionSupervisor.State.Connecting -> Triple(ConnKind.CONNECTING, "连接中…（第 ${st.attempt} 次）", null)
-                is ConnectionSupervisor.State.AwaitingHostKey -> Triple(ConnKind.AWAITING_HOST_KEY, "等待确认主机指纹", null)
-                is ConnectionSupervisor.State.Connected -> Triple(
-                    ConnKind.CONNECTED, "已连接 · herdr ${st.version} · protocol ${st.protocol}", null,
-                )
-                is ConnectionSupervisor.State.Stale -> Triple(ConnKind.STALE, "数据可能过期：${st.reason}", st.reason)
-                is ConnectionSupervisor.State.Reconnecting -> Triple(
-                    ConnKind.RECONNECTING, "重连中（第 ${st.attempt} 次，${st.delayMs / 1000}s 后）", st.lastError,
-                )
-                is ConnectionSupervisor.State.Failed -> Triple(ConnKind.FAILED, st.message, st.message)
-            }
-            updateHostState(rt.cfg.id, kind, text, err)
-        }
-    }
-
-    /** 把每台主机的快照写进 Room（凭 hostId+session 隔离）。 */
-    private suspend fun persistLoop(rt: Runtime, reconciler: SessionReconciler) {
-        reconciler.state.collect { rs ->
-            if (rs.fetchedAtMs <= 0 && rs.panes.isEmpty()) return@collect
-            runCatching {
-                boards.replace(
-                    hostId = rt.cfg.id,
-                    session = rt.cfg.session,
-                    panes = rs.panes,
-                    version = rs.version,
-                    protocol = rs.protocol,
-                    fetchedAtMs = rs.fetchedAtMs,
-                    stale = rs.stale,
-                    lastError = rs.lastError,
-                )
-            }
-            if (_state.value.activeId == rt.cfg.id) {
-                _state.value = _state.value.copy(
-                    board = _state.value.board.copy(
-                        refreshing = rs.refreshing,
-                        stale = rs.stale || rs.fetchedAtMs == 0L,
-                    ),
-                )
-            }
-            updateHostState(rt.cfg.id, panes = rs.panes.size)
-        }
-    }
-
-    private fun switchBoard(hostId: String?) {
+    private fun switchBoard(hostId: String) {
         boardJob?.cancel()
-        _state.value = _state.value.copy(
-            board = BoardView(hostId = hostId, stale = true),
-        )
-        if (hostId == null) return
+        _state.value = _state.value.copy(board = BoardView(hostId = hostId, stale = true))
         val cfg = hosts.get(hostId) ?: return
         boardJob = viewModelScope.launch {
-            boards.observe(hostId, cfg.session).collect { cached ->
+            manager.board(hostId, cfg.session).collect { cached ->
                 if (_state.value.activeId != hostId) return@collect
                 val sel = _state.value.board.selectedPane
                 _state.value = _state.value.copy(
@@ -461,41 +172,80 @@ class HostsViewModel(
         }
     }
 
-    private fun updateHostState(
-        id: String,
-        kind: ConnKind? = null,
-        text: String? = null,
-        error: String? = null,
-        panes: Int? = null,
-    ) {
-        _state.value = _state.value.copy(
-            hosts = _state.value.hosts.map { hs ->
-                if (hs.cfg.id != id) hs else hs.copy(
-                    connKind = kind ?: hs.connKind,
-                    connText = text ?: hs.connText,
-                    lastError = error ?: hs.lastError,
-                    paneCount = panes ?: hs.paneCount,
-                )
-            },
-        )
+    fun selectPane(pane: Pane?) {
+        _state.value = _state.value.copy(board = _state.value.board.copy(selectedPane = pane))
     }
 
-    private fun kindOf(sup: ConnectionSupervisor): ConnKind = when (sup.state.value) {
-        is ConnectionSupervisor.State.Idle -> ConnKind.IDLE
-        is ConnectionSupervisor.State.Connecting -> ConnKind.CONNECTING
-        is ConnectionSupervisor.State.AwaitingHostKey -> ConnKind.AWAITING_HOST_KEY
-        is ConnectionSupervisor.State.Connected -> ConnKind.CONNECTED
-        is ConnectionSupervisor.State.Stale -> ConnKind.STALE
-        is ConnectionSupervisor.State.Reconnecting -> ConnKind.RECONNECTING
-        is ConnectionSupervisor.State.Failed -> ConnKind.FAILED
+    // ---------------- 写操作 ----------------
+
+    fun updateComposerText(text: String) = manager.updateComposer(_state.value.activeId, text)
+
+    fun clearComposerOutcome() = manager.clearComposerOutcome()
+
+    fun sendPrompt(pane: Pane) {
+        val hostId = _state.value.activeId ?: return
+        manager.sendPrompt(hostId, pane)
+    }
+
+    // ---------------- 对话（只读） ----------------
+
+    fun openTranscript(pane: Pane) {
+        val path = pane.agentSessionPath
+        val hostId = _state.value.activeId
+        if (path == null || hostId == null) {
+            _transcript.value = TranscriptState(error = "这台 pane 没有上报 transcript 路径（agent_session=null）")
+            return
+        }
+        val tailer = manager.openTranscript(hostId, path)
+        if (tailer == null) {
+            _transcript.value = TranscriptState(path = path, error = "主机未连接")
+            return
+        }
+        closeTranscriptInternal()
+        _transcript.value = TranscriptState(path = path, loading = true)
+        transcriptTailer = tailer
+
+        transcriptObserve = viewModelScope.launch {
+            manager.transcripts().observe(hostId, path).collect { msgs ->
+                if (_transcript.value.path != path) return@collect
+                _transcript.value = _transcript.value.copy(messages = msgs)
+            }
+        }
+        transcriptPoll = viewModelScope.launch {
+            var first = true
+            while (true) {
+                val r = runCatching { tailer.sync() }
+                if (first) {
+                    _transcript.value = _transcript.value.copy(loading = false, error = r.exceptionOrNull()?.message)
+                    first = false
+                }
+                kotlinx.coroutines.delay(1_500)
+            }
+        }
+    }
+
+    fun reloadTranscript() {
+        val tailer = transcriptTailer ?: return
+        viewModelScope.launch {
+            _transcript.value = _transcript.value.copy(loading = true)
+            val r = runCatching { tailer.sync() }
+            _transcript.value = _transcript.value.copy(loading = false, error = r.exceptionOrNull()?.message)
+        }
+    }
+
+    fun closeTranscript() {
+        closeTranscriptInternal()
+        _transcript.value = TranscriptState()
+    }
+
+    private fun closeTranscriptInternal() {
+        transcriptPoll?.cancel(); transcriptPoll = null
+        transcriptObserve?.cancel(); transcriptObserve = null
+        transcriptTailer?.close(); transcriptTailer = null
     }
 
     override fun onCleared() {
-        runtimes.values.forEach { rt ->
-            rt.persistJob?.cancel()
-            rt.supervisor?.stop()
-        }
-        runtimes.clear()
+        closeTranscriptInternal()
         super.onCleared()
     }
 }
