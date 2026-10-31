@@ -27,6 +27,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.Pane
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.Space
@@ -42,6 +43,7 @@ fun TechnicalInfoSheet(
     pane: Pane,
     hostLabel: String,
     lastSyncMs: Long,
+    pendingWrites: List<dev.herdr.core.herdr.WriteRecord> = emptyList(),
     onDismiss: () -> Unit,
 ) {
     val palette = LocalHerdrPalette.current
@@ -53,6 +55,36 @@ fun TechnicalInfoSheet(
                 style = MaterialTheme.typography.titleMedium,
                 color = palette.textPrimary,
             )
+            if (pendingWrites.isNotEmpty()) {
+                Spacer(Modifier.height(Space.m))
+                Text(
+                    "待确认写操作（${pendingWrites.size}）",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = palette.statusFg(AgentStatus.UNKNOWN),
+                )
+                Text(
+                    "这些操作结果未知，不会自动重发；确认前请先在会话里核对。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.textSecondary,
+                )
+                pendingWrites.forEach { rec ->
+                    Column(Modifier.padding(top = Space.s)) {
+                        Text(
+                            "${rec.method} → ${rec.target}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = palette.textPrimary,
+                        )
+                        Text(
+                            "action ${rec.clientRequestId.take(8)} · ${timeAgoShort(rec.sentAtMs)} · " +
+                                "payload ${rec.payloadSha256.take(12)}… · ${
+                                    (rec.outcome as? dev.herdr.core.herdr.WriteOutcome.Unknown)?.reason ?: "pending"
+                                }",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.textSecondary,
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(Space.s))
             Text("状态：${StatusText.label(pane.status)}", style = MaterialTheme.typography.bodyMedium, color = palette.textSecondary)
             Text("主机：$hostLabel", style = MaterialTheme.typography.bodyMedium, color = palette.textSecondary)

@@ -70,8 +70,19 @@ class HostsViewModel(
     val composer: StateFlow<HostConnectionManager.ComposerState> = manager.composer
     val approvals: StateFlow<List<HostConnectionManager.ApprovalItem>> = manager.approvals
 
+    /** 待确认（Pending/Unknown）写操作：进程重建后也能在这里看到（I-92）。 */
+    private val _pendingWrites = MutableStateFlow<List<dev.herdr.core.herdr.WriteRecord>>(emptyList())
+    val pendingWrites: StateFlow<List<dev.herdr.core.herdr.WriteRecord>> = _pendingWrites.asStateFlow()
+
+    private fun refreshPendingWrites() {
+        _pendingWrites.value = manager.recentWrites().filter {
+            it.outcome is WriteOutcome.Pending || it.outcome is WriteOutcome.Unknown
+        }
+    }
+
     init {
         viewModelScope.launch { manager.composer.collect { onComposerChanged(it) } }
+        refreshPendingWrites()
     }
 
     private val _paneOutput = MutableStateFlow("")
@@ -276,6 +287,7 @@ class HostsViewModel(
 
     /** Accepted 后若输入已清空，说明这份草稿已被消费。 */
     private fun onComposerChanged(state: HostConnectionManager.ComposerState) {
+        refreshPendingWrites()
         if (state.outcome !is WriteOutcome.Accepted) return
         if (state.text.isNotEmpty()) return
         val key = draftKey ?: return

@@ -42,6 +42,16 @@ class MarkdownAstCacheTest {
     }
 
     @Test
+    fun sameLengthDifferentContent_neverReusesAst() {
+        // 长度相同、内容不同：哈希/长度都可能撞，抽样必须拦住
+        val a = "## 标题 A"
+        val b = "## 标题 B"
+        MarkdownAstCache.getOrParse(a)
+        val blocks = MarkdownAstCache.getOrParse(b)
+        assertEquals(MdSpan.Text("标题 B"), (blocks.single() as MdBlock.Heading).spans.single())
+    }
+
+    @Test
     fun parserVersionBump_invalidates() {
         MarkdownAstCache.getOrParse("# x")
         assertTrue(MarkdownAstCache.PARSER_VERSION >= 2)

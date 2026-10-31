@@ -609,7 +609,7 @@
 - **缓解**：`SendTargetCheck` 在占用指纹或 agent session 变化时返回 NeedsConfirm，用户必须重新确认。
 - **建议**：如果 Pi 能提供 pane creation epoch，加入 DraftKey。
 
-## I-85 MarkdownAstCache 无文本等值校验（仅哈希 + 长度）
+## I-85 ✅ 已修（key 增加首尾 48 字符抽样）— MarkdownAstCache 无文本等值校验
 
 - 64 位 FNV-1a，碰撞概率 ~2⁻⁶⁴；不做全文等值校验是为了避免缓存持有全文的内存代价。
 - **结论**：接受，记录在案。
@@ -632,12 +632,12 @@
   重发生成新 Action ID，旧记录保留；`autoRetryAllowed` 恒 false。
 - **验证**：`WriteLedgerPersistTest` 5 个用例。
 
-## I-89 草稿库缺少 Room Migration 的 instrumentation 测试
+## I-89 ✅ 已补（DraftMigrationTest，AVD 通过）— 草稿库缺少 Room Migration 的 instrumentation 测试
 
 - **现状**：`MIGRATION_1_2` 已实现并可编译，但没有 `MigrationTestHelper` 用例证明旧库可升级。
 - **建议**：`:core:data` androidTest 增加迁移测试（1 → 2 保留草稿行）。
 
-## I-90 防抖窗口内进程被杀可能丢最后一次输入
+## I-90 ✅ 已修复（ON_STOP 强制 flush）— 防抖窗口内进程被杀可能丢最后一次输入
 
 - **现状**：草稿保存 400ms 防抖；此窗口内被杀 → 最后一次编辑可能未落盘。
 - **建议**：`onStop` / `DisposableEffect` 强制 flush（当前仅在离开对话时 flush），或把防抖降到 150ms。
@@ -647,7 +647,7 @@
 - 自动化与截图覆盖不到真实输入法组合输入、光标选区手感、TalkBack 朗读顺序。
 - **建议**：人工走查并录屏（本轮无人工环节）。
 
-## I-92 恢复后的 Unknown 在 UI 上缺少统一入口
+## I-92 ✅ 已补（技术信息 Sheet「待确认写操作」）— 恢复后的 Unknown 在 UI 上缺少统一入口
 
 - 持久化已具备，但 UI 只在 composer 显示最近一次 Unknown；进程重建后需重进对话才可见。
 - **建议**：技术信息 Sheet 增加「待确认写操作」列表（含时间、目标、payload 指纹前 8 位）。

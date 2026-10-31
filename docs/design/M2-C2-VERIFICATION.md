@@ -149,3 +149,32 @@ JVM:         全部通过         ← 新增 WriteLedgerPersistTest 5 个
 2. 真机人工走查中文 IME、光标/选区、粘贴堆栈、TalkBack、最大字号、旋转（I-91）；
 3. 补 Room 迁移测试（I-89）；防抖落盘加固（I-90）；
 4. 技术信息 Sheet 增加「待确认写操作」列表（承接 I-88 的 UI 呈现）。
+
+---
+
+# 补充：不需授权即可完成的 4 项修复（同日）
+
+用户指出「还有很多问题」后，先把**不需要远端写入、也不需要人工配合**的 4 条债清掉：
+
+| Issue | 修复 | 验证 |
+| --- | --- | --- |
+| I-90 防抖窗口被杀丢最后输入 | `AppRoot` 里挂 `ON_STOP` → `vm.flushDraft()`，不等 400ms 防抖 | 编译 + 现有 UI 测试无回归 |
+| I-92 恢复后的 Unknown 无统一入口 | 技术信息 Sheet 顶部新增「待确认写操作（N）」区块：method→target、action 前缀、时间、payload 指纹前 12 位、Unknown 原因 | 编译 + 16/16 UI 测试 |
+| I-89 缺迁移测试 | `DraftMigrationTest`（`:core:data` androidTest）：手写 v1 库 → 执行 `MIGRATION_1_2` → 断言草稿保留 + `pending_writes` 创建 | **AVD 上 OK (1 test)** |
+| I-85 缓存只靠哈希 | 缓存 key 增加**首尾各 48 字符抽样**；抽样不同即视为未命中 | 新增 `sameLengthDifferentContent_neverReusesAst`，JVM 全绿 |
+
+## 仍然缺（必须有你参与）
+
+1. **真实 Pi E2E**：需要你批准 §2 的写入计划；
+2. **真机人工走查**（I-91）：中文 IME 组合输入、光标/选区、粘贴堆栈、TalkBack、最大字号、旋转、断网 —— 需要你在手机上操作，我给清单与记录模板；
+3. **真机 FrameTimingMetric**：需要非 MIUI 设备或 CI。
+
+## 当前诚实的完成度
+
+| 层 | 状态 |
+| --- | --- |
+| 逻辑正确性 | 较强：增量/配对/草稿/账本都有单测与一致性测试 |
+| 自动化 | 较强：UI 16/16 + JVM 40+ + 迁移 1/1（AVD） |
+| 真实链路 | **弱**：真实 Pi 会话从未跑通过一次发送→回复→增量显示 |
+| 真机手感 | **未知**：IME/TalkBack/旋转/字号全未人工验收 |
+| 性能 | **无数据**：没有一次可信的真机 FrameTimingMetric |

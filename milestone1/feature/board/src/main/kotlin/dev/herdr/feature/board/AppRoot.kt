@@ -44,6 +44,17 @@ private fun AppContent(vm: HostsViewModel) {
     val transcript by vm.transcript.collectAsStateWithLifecycle()
     val composer by vm.composer.collectAsStateWithLifecycle()
     val approvals by vm.approvals.collectAsStateWithLifecycle()
+    val pendingWrites by vm.pendingWrites.collectAsStateWithLifecycle()
+
+    // I-90：进程可能随时被杀，ON_STOP 时立刻落盘，不等 400ms 防抖
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) vm.flushDraft()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val paneOutput by vm.paneOutput.collectAsStateWithLifecycle()
     val palette = LocalHerdrPalette.current
 
@@ -133,6 +144,7 @@ private fun AppContent(vm: HostsViewModel) {
             pane = pane,
             hostLabel = activeHost?.cfg?.label?.ifBlank { activeHost.cfg.host } ?: "-",
             lastSyncMs = state.board.updatedAtMs,
+            pendingWrites = pendingWrites,
             onDismiss = { techSheet = false },
         )
     }

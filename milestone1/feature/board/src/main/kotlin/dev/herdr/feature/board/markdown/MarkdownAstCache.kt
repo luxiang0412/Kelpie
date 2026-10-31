@@ -18,8 +18,19 @@ object MarkdownAstCache {
     const val PARSER_VERSION = 2
     const val MAX_ENTRIES = 256
     const val MAX_SOURCE_LENGTH = 120_000
+    private const val SAMPLE = 48
 
-    private data class Key(val hash: Long, val length: Int, val parserVersion: Int)
+    /**
+     * key 里额外带文本抽样（首尾各 48 字符）：即使 64 位哈希碰撞，
+     * 抽样不同也会直接判定为未命中，避免把 A 的内容渲染给 B（I-85）。
+     */
+    private data class Key(
+        val hash: Long,
+        val length: Int,
+        val parserVersion: Int,
+        val head: String,
+        val tail: String,
+    )
 
     private val lru = object : LinkedHashMap<Key, List<MdBlock>>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, List<MdBlock>>?): Boolean =
@@ -32,7 +43,13 @@ object MarkdownAstCache {
     @Synchronized
     fun getOrParse(source: String): List<MdBlock> {
         if (source.length > MAX_SOURCE_LENGTH) return MarkdownParser.parse(source)
-        val key = Key(hash(source), source.length, PARSER_VERSION)
+        val key = Key(
+            hash = hash(source),
+            length = source.length,
+            parserVersion = PARSER_VERSION,
+            head = source.take(SAMPLE),
+            tail = source.takeLast(SAMPLE),
+        )
         val cached = lru[key]
         if (cached != null) {
             hits++
