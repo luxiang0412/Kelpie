@@ -86,6 +86,10 @@ fun HostsScreen(
             }
         } else {
             Column(Modifier.padding(padding).fillMaxSize()) {
+                // UX-05b：App 语言（跟随系统 / 简体中文 / English）。
+                // 仅 Android 13+ 用系统级 per-app locale；旧版本不引入 AppCompat 架构迁移，明确说明不可用。
+                LanguageSection(context)
+
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -317,4 +321,54 @@ private fun KeyDialog(
             }
         },
     )
+}
+
+/**
+ * UX-05b：语言选择。
+ * 只改 UI 语言，不翻译代码/命令/Agent transcript。
+ * Android 13+ 走官方 `LocaleManager`（系统设置里也能看到本 App 的语言项）；
+ * 13 以下不做 AppCompat 迁移（会牵动整个 Activity 基类），如实提示"跟随系统"。
+ */
+@Composable
+private fun LanguageSection(context: android.content.Context) {
+    val isAtLeast33 = android.os.Build.VERSION.SDK_INT >= 33
+    var current by remember { mutableStateOf(currentAppLanguage(context)) }
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text("语言 / Language", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            if (isAtLeast33) "只影响界面文案，不翻译代码、命令与 Agent 回复。"
+            else "当前系统版本不支持应用内切换语言（需 Android 13+），将跟随系统。",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            listOf("" to "跟随系统", "zh-CN" to "简体中文", "en" to "English").forEach { (tag, label) ->
+                androidx.compose.material3.FilterChip(
+                    selected = current == tag,
+                    enabled = isAtLeast33,
+                    onClick = {
+                        applyAppLanguage(context, tag)
+                        current = tag
+                    },
+                    label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                )
+            }
+        }
+    }
+}
+
+private fun currentAppLanguage(context: android.content.Context): String {
+    if (android.os.Build.VERSION.SDK_INT < 33) return ""
+    val lm = context.getSystemService(android.app.LocaleManager::class.java) ?: return ""
+    val locales = lm.applicationLocales
+    return if (locales.isEmpty) "" else locales[0].toLanguageTag()
+}
+
+private fun applyAppLanguage(context: android.content.Context, tag: String) {
+    if (android.os.Build.VERSION.SDK_INT < 33) return
+    val lm = context.getSystemService(android.app.LocaleManager::class.java) ?: return
+    lm.applicationLocales = if (tag.isEmpty()) android.os.LocaleList.getEmptyLocaleList()
+    else android.os.LocaleList.forLanguageTags(tag)
 }
