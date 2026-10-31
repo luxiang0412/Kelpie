@@ -1144,3 +1144,15 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - **目标校验**：pane/agent/可写性/agent session/占用指纹；离线只存草稿不排队。
 - **测试**：Compose UI **16/16**（看板 9 + Composer 7，AVD）；JVM 新增 15（`:core:data` DraftTest）。
 - **未执行**：真实 Pi 会话 E2E（未取得本轮写入授权，I-86）；草稿跨进程恢复未实测（I-87）。
+
+## M2-C2-V（2026-10-31，验收轮）
+
+- **远端只读确认**：`test` 仍为专用实验 Session；`w7:p1` / `w8:p1` 两个 pi pane 均 idle；未触碰其他 Session。
+- **真实 Pi E2E：未执行**（需先获批，计划已列在 `docs/design/M2-C2-VERIFICATION.md` §2）。
+- **发现并修复真实缺陷 I-88**：`WriteLedger` 仅内存保存 → 进程重建后 Unknown 操作丢失。
+  现增加 `PendingWriteSink`（只落 Pending/Unknown）+ Room `pending_writes` 表 + 启动 `restore()`，
+  重发仍生成新 Action ID、旧记录保留、`autoRetryAllowed` 恒 false。新增 5 个回归测试。
+- **草稿库安全**：`allowBackup=false`（草稿/密钥不进云备份）；`herdr-drafts.db` 无破坏性迁移，
+  新增显式 `MIGRATION_1_2`（升级不清空草稿）。
+- **回归**：Compose UI 16/16 通过；JVM 全部通过。
+- **未验证**：真机 IME/TalkBack/旋转/最大字号；真实 E2E；Room 迁移测试（I-89）；防抖窗口丢稿风险（I-90）。

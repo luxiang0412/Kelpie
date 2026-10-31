@@ -45,13 +45,34 @@ interface DraftDao {
     suspend fun count(): Int
 }
 
-@Database(entities = [DraftEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [DraftEntity::class, PendingWriteEntity::class],
+    version = 2,
+    exportSchema = false,
+)
 abstract class DraftDatabase : RoomDatabase() {
     abstract fun dao(): DraftDao
+    abstract fun pendingWrites(): PendingWriteDao
 
     companion object {
+        /**
+         * 1 → 2：新增 pending_writes（未确认写操作）。**显式迁移**，绝不清库——
+         * 否则用户草稿会随版本升级丢失。
+         */
+        val MIGRATION_1_2 = androidx.room.migration.Migration(1, 2) { db ->
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS `pending_writes` (" +
+                    "`clientRequestId` TEXT NOT NULL, `method` TEXT NOT NULL, `target` TEXT NOT NULL, " +
+                    "`payloadSha256` TEXT NOT NULL, `sentAtMs` INTEGER NOT NULL, `attempts` INTEGER NOT NULL, " +
+                    "`outcomeKind` TEXT NOT NULL, `reason` TEXT, `evidence` TEXT, " +
+                    "PRIMARY KEY(`clientRequestId`))",
+            )
+        }
+
         fun build(context: Context): DraftDatabase =
-            Room.databaseBuilder(context, DraftDatabase::class.java, "herdr-drafts.db").build()
+            Room.databaseBuilder(context, DraftDatabase::class.java, "herdr-drafts.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
     }
 }
 

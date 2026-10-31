@@ -624,3 +624,30 @@
 
 - Room 写入与加载路径已实现，未做「杀进程 → 重开 → 恢复」实测。
 - **建议**：与 I-86 一并验收。
+
+## I-88 ✅ 已修复 — Unknown 写操作跨进程丢失
+
+- **现象**：`WriteLedger` 记录只在内存；进程被杀后「结果未知」的操作消失，用户无法确认。
+- **修复**：`PendingWriteSink` + Room `pending_writes`（仅 Pending/Unknown）+ 启动 `restore()`；
+  重发生成新 Action ID，旧记录保留；`autoRetryAllowed` 恒 false。
+- **验证**：`WriteLedgerPersistTest` 5 个用例。
+
+## I-89 草稿库缺少 Room Migration 的 instrumentation 测试
+
+- **现状**：`MIGRATION_1_2` 已实现并可编译，但没有 `MigrationTestHelper` 用例证明旧库可升级。
+- **建议**：`:core:data` androidTest 增加迁移测试（1 → 2 保留草稿行）。
+
+## I-90 防抖窗口内进程被杀可能丢最后一次输入
+
+- **现状**：草稿保存 400ms 防抖；此窗口内被杀 → 最后一次编辑可能未落盘。
+- **建议**：`onStop` / `DisposableEffect` 强制 flush（当前仅在离开对话时 flush），或把防抖降到 150ms。
+
+## I-91 真机中文 IME / TalkBack / 旋转 / 最大字号未人工验收
+
+- 自动化与截图覆盖不到真实输入法组合输入、光标选区手感、TalkBack 朗读顺序。
+- **建议**：人工走查并录屏（本轮无人工环节）。
+
+## I-92 恢复后的 Unknown 在 UI 上缺少统一入口
+
+- 持久化已具备，但 UI 只在 composer 显示最近一次 Unknown；进程重建后需重进对话才可见。
+- **建议**：技术信息 Sheet 增加「待确认写操作」列表（含时间、目标、payload 指纹前 8 位）。

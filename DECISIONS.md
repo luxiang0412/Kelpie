@@ -650,3 +650,27 @@ SSH/指纹、多主机看板、断线恢复、给 agent 发消息、详情页最
 - 需求（1–5 行、内部滚动、Enter 换行）全部满足，无需为换 API 而重写稳定代码。
 
 **状态**：`已定`。
+
+## D60. 只持久化「未确认」的写操作（Pending/Unknown），不持久化已完结记录
+
+- 进程重建后用户必须还能看到「结果未知」的操作，因此 Pending/Unknown 落盘；
+- Accepted/Rejected 已完结，落盘只会扩大敏感数据面，**不落盘**；
+- 存储只保留审计字段（method/target/payload sha256/时间/次数/结果），不复制 prompt 全文；
+- 恢复（`restore`）不触发任何发送，`autoRetryAllowed` 恒为 false —— 语义上杜绝自动重放。
+
+**状态**：`已定`。
+
+## D61. 草稿库做显式迁移，不做破坏性降级
+
+- `herdr-drafts.db` 承载用户输入（可能含敏感代码），任何升级都必须可用；
+- 新增表走 `Migration(1,2)`；`herdr.db`（纯缓存）继续用 `fallbackToDestructiveMigration`；
+- 全应用 `allowBackup="false"`：草稿与 SSH 密钥都不进云备份/设备迁移（按本地敏感数据处理）。
+
+**状态**：`已定`。
+
+## D62. 远端写入必须先获批，未获批就只做只读验收
+
+- 本轮对 `test` Session 只执行 `session list` / `api snapshot`（只读）；
+- E2E 计划（prompt、写入范围、回滚方式）先写入文档待批准，**不先斩后奏**。
+
+**状态**：`已定`（延续 D43 的授权原则）。

@@ -37,6 +37,7 @@ class HostConnectionManager(
     private val transcripts: TranscriptStore,
     private val connectorFor: (String) -> SshConnector,
     private val scope: CoroutineScope,
+    pendingWriteSink: dev.herdr.core.herdr.PendingWriteSink? = null,
 ) {
 
     enum class ConnKind { IDLE, CONNECTING, AWAITING_HOST_KEY, CONNECTED, STALE, RECONNECTING, FAILED }
@@ -115,7 +116,7 @@ class HostConnectionManager(
     )
 
     private val runtimes = LinkedHashMap<String, Runtime>()
-    private val writeLedger = WriteLedger()
+    private val writeLedger = WriteLedger(sink = pendingWriteSink)
     private var started = false
     private var ticker: Job? = null
 
@@ -369,6 +370,9 @@ class HostConnectionManager(
     }
 
     fun recentWrites() = writeLedger.recent()
+
+    /** 进程重建后恢复未确认（Pending/Unknown）写操作；不会自动重放。 */
+    fun restorePendingWrites(records: List<dev.herdr.core.herdr.WriteRecord>) = writeLedger.restore(records)
 
     // ---------------- 内部 ----------------
 

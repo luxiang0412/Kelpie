@@ -28,9 +28,40 @@ data class WriteRecord(
     val evidence: String? = null,
 )
 
-class WriteLedger(private val clock: () -> Long = System::currentTimeMillis) {
+/**
+ * 写账本持久化出口（M2-C2-V / I-88）。
+ *
+ * 只有【未被确认】的记录（Pending/Unknown）需要落盘：进程被杀后用户仍必须能看到
+ * 「结果未知」的操作并自行确认，不能因为进程重建而消失。Accepted/Rejected 不落盘。
+ */
+interface PendingWriteSink {
+    fun onChanged(pending: List<WriteRecord>)
+}
+
+class WriteLedger(
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val sink: PendingWriteSink? = null,
+) {
 
     private val records = LinkedHashMap<String, WriteRecord>()
+
+    /** 进程重建后恢复未确认的写操作（不会被自动重放）。 */
+    fun restore(pending: List<WriteRecord>) {
+        pending.forEach { rec ->
+            if (rec.outcome is WriteOutcome.Pending || rec.outcome is WriteOutcome.Unknown) {
+                records[rec.clientRequestId] = rec
+            }
+        }
+        notifySink()
+    }
+
+    private fun notifySink() {
+        sink?.onChanged(
+            records.values.filter {
+                it.outcome is WriteOutcome.Pending || it.outcome is WriteOutcome.Unknown
+            },
+        )
+    }
 
     fun begin(method: String, target: String, payload: ByteArray): WriteRecord {
         val id = UUID.randomUUID().toString()
@@ -44,6 +75,7 @@ class WriteLedger(private val clock: () -> Long = System::currentTimeMillis) {
             outcome = WriteOutcome.Pending,
         )
         records[id] = rec
+        notifySink()
         return rec
     }
 
@@ -53,18 +85,21 @@ class WriteLedger(private val clock: () -> Long = System::currentTimeMillis) {
             "cannot accept from ${r.outcome}"
         }
         records[id] = r.copy(outcome = WriteOutcome.Accepted, evidence = evidence)
+        notifySink()
     }
 
     fun reject(id: String, code: String, message: String) {
         val r = require(id)
         require(r.outcome is WriteOutcome.Pending) { "cannot reject from ${r.outcome}" }
         records[id] = r.copy(outcome = WriteOutcome.Rejected(code, message))
+        notifySink()
     }
 
     fun markUnknown(id: String, reason: String) {
         val r = require(id)
         require(r.outcome is WriteOutcome.Pending) { "cannot mark unknown from ${r.outcome}" }
         records[id] = r.copy(outcome = WriteOutcome.Unknown(reason))
+        notifySink()
     }
 
     /** 权威读取的结论：只有 delivered=true 才升级为 Accepted。 */
@@ -76,6 +111,7 @@ class WriteLedger(private val clock: () -> Long = System::currentTimeMillis) {
         } else {
             r.copy(evidence = evidence) // 仍是 Unknown
         }
+        notifySink()
     }
 
     /** 网络层是否允许自动重试：永远 false（契约，不是策略）。 */
