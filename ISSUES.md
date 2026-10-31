@@ -533,3 +533,28 @@
 - **影响**：多一次连接（≈0.5–1 s）、状态条闪一下"重连中"、通知的 completion 基线被重置（可能漏一次完成提醒）。
 - **修复建议**：`startAll()` 幂等——已连接的主机不调用 `reconnectNow()`；只有显式"重连"按钮才重连。
 - **状态**：待修（记录在 `DESIGN-REVIEW-BRIEF.md` 问题 1）。
+
+## I-74 MIUI 禁止 instrumentation 启动 Activity（BAL），导致 UI 测试与 Macrobenchmark 无法执行
+
+- **现象**：`am instrument` 启动后卡住；logcat：
+  `MIULOG- Permission Denied Activity : Intent { ... cmp=dev.herdr.app/.TestHostActivity } ... result code=102`，
+  随后 `BLASTSyncEngine: ... never received commit callback. Application ANR likely to follow.`
+- **影响**：Compose UI 测试（9 个）与 Macrobenchmark 均无法在真机执行；换到 app 包内的 TestHostActivity 也不行。
+- **建议**：使用非 MIUI 设备或 CI emulator；或在 MIUI 上手动授予“后台弹出界面”权限后再试（未验证）。
+
+## I-75 模拟器 emulator-5554 的 package 服务缺失
+
+- **现象**：`adb -s emulator-5554 shell pm list packages` → `cmd: Can't find service: package`；`sys.boot_completed=1` 但 `reboot` 后仍复现。
+- **影响**：无法用模拟器替代 MIUI 设备跑 instrumented 测试。
+- **建议**：重建 AVD / 换 system image。
+
+## I-76 `CompilationMode.Partial()` 需要目标 APK 集成 profileinstaller
+
+- **现象**：benchmark 报 `The baseline profile install broadcast was not received. This most likely means that the profileinstaller library is missing from the target apk.`
+- **建议**：app 增加 `implementation("androidx.profileinstaller:profileinstaller")`（M2-B），或继续用 `CompilationMode.None()`（结果偏悲观）。
+
+## I-77 内容变化后 `gfxinfo` 滚动数据不可比（再次印证 I-63）
+
+- **现象**：长文本折叠后，同样 10 次 swipe 的渲染帧数从 344 → 252（总内容高度变小）。
+- **影响**：不能把“jank 百分比上升/下降”归因于代码改动。
+- **建议**：前后对比必须固定内容高度；否则只比较首帧/启动耗时。

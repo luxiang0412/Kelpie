@@ -196,9 +196,16 @@ private fun UserMessage(text: String) {
     }
 }
 
+/**
+ * assistant 正文。长内容默认折叠（性能 + 可读性，报告 §11「渲染分级」）：
+ * Compose 对超长 CJK 文本的 measure/layout 是长列表主要成本，先限制初始渲染量。
+ */
 @Composable
 private fun AssistantMessage(text: String) {
     val palette = LocalHerdrPalette.current
+    val lineCount = remember(text) { text.count { it == '\n' } + 1 }
+    val collapsible = text.length > 600 || lineCount > 14
+    var expanded by remember(text) { mutableStateOf(!collapsible) }
     Column(Modifier.fillMaxWidth()) {
         Text(
             "Pi",
@@ -207,7 +214,24 @@ private fun AssistantMessage(text: String) {
             fontWeight = FontWeight.Medium,
         )
         Spacer(Modifier.height(2.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = palette.textPrimary)
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = palette.textPrimary,
+            maxLines = if (expanded) Int.MAX_VALUE else 14,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (collapsible && !expanded) {
+            Text(
+                "展开全文（${text.length} 字符）",
+                style = MaterialTheme.typography.labelMedium,
+                color = palette.statusFg(AgentStatus.WORKING),
+                modifier = Modifier
+                    .padding(top = Space.xs)
+                    .clickable { expanded = true }
+                    .semantics { contentDescription = "展开这条消息的全文" },
+            )
+        }
     }
 }
 

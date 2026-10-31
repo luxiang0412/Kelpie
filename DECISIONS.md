@@ -550,3 +550,13 @@ SSH/指纹、多主机看板、断线恢复、给 agent 发消息、详情页最
 - 文档里的“已装/未装”必须带**主机与路径**（远端 `/home/...` vs 本机 `C:\Users\...`），本轮就因此误判过一次。
 
 **状态**：`已定`（后续 UI 文案按此改）。
+
+## D48. 设备不允许 instrumentation 时，用“Fixture 页面 + adb am start + 固定脚本”做基线
+
+- MIUI 禁止后台启动 Activity（I-74），导致 Macrobenchmark 与 Compose UI 测试无法执行；
+- 备用协议：debug 专用 `FixtureActivity`（确定性数据，不写 Room）→ `adb shell am start -W` 测首帧，`dumpsys gfxinfo`（固定 swipe 次数/时长）测帧统计；
+- **可比较范围**：首帧（内容不变时可比）、同一脚本同一内容下的帧统计；
+- **不可比较范围**：内容变化后的滚动帧数（I-77）——不得据此宣称滚动优化成功。
+- `:benchmark` 模块仍然保留，供非 MIUI 设备/CI 使用；`suppressErrors=DEBUGGABLE` 只用于“能跑起来看链路”，**不得当作 release 结论**。
+
+**状态**：`已定`。

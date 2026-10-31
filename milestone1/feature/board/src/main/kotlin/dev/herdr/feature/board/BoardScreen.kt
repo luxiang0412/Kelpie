@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -333,23 +334,34 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
         Modifier
             .fillMaxWidth()
             .clickable { onSelectAgent(pane) }
+            .heightIn(min = 56.dp)
             .padding(horizontal = Space.s, vertical = Space.m)
-            .semantics {
+            .semantics(mergeDescendants = true) {
                 contentDescription =
-                    "${StatusText.label(pane.status)}，agent ${pane.agent ?: ""}，${pane.title ?: pane.paneId}"
+                    "${StatusText.label(pane.status)}，agent ${pane.agent ?: ""}，${pane.title ?: pane.paneId}，${projectLine(pane)}"
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StatusDot(pane.status)
         Spacer(Modifier.width(Space.m))
         Column(Modifier.weight(1f)) {
-            Text(
-                displayTitle(pane),
-                style = MaterialTheme.typography.bodyLarge,
-                color = palette.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 状态必须同时有文字（不能只靠颜色点，色弱/强光下也能读）
+                Text(
+                    StatusText.label(pane.status),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.statusFg(pane.status),
+                    modifier = Modifier.padding(end = Space.s),
+                )
+                Text(
+                    displayTitle(pane),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = palette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
             Text(
                 projectLine(pane),
                 style = MaterialTheme.typography.labelSmall,
