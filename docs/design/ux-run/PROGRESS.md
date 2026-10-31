@@ -13,3 +13,5 @@
 | UX-02b Attention First 列表 | PASS | done 默认收起（BOARD-DONE-001）、blocked 前2条卡片、idle/unknown 分区、行内单一语义色；UI 18/18 |
 | 其余 Task Packets | TODO | 待前序完成后按序执行 |
 | UX-03a 对话正文/身份头/用户气泡 | PARTIAL | 同上；UI 回归未重跑 |
+
+> 本轮结束状态见 `FINAL-REVIEW.md`：`FUNCTIONAL_PARTIAL`。`UX-03b…UX-09` 未实施（会话预算，非设备阻断）。
