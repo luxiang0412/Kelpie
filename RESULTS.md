@@ -590,3 +590,49 @@ App：`spike/android`（最小 Activity，非 Compose；源码见该目录 READM
 影响：所有“按数字解析 pane id / 按数字排序”的实现都是错的；`pane_id` 必须当作**不透明字符串**处理（已在 D30 固化）。
 
 收尾核对：`pane list` = `w1:p1`、`w1:p2`、`w2:p1`、`w3:p1`、`w4:p1` —— 用户 4 个 pane 未变，phase2 创建的临时 pane 已关闭。
+
+---
+
+# 10. Milestone 1（只读看板）与 Spike A（2026-10-31 晚）
+
+## 10.1 Milestone 1 工程
+
+| 项 | 结果 |
+| --- | --- |
+| 模块 | `:app` / `:core:ssh` / `:core:herdr` / `:core:data` / `:feature:board` |
+| 构建 | `:app:assembleDebug` **BUILD SUCCESSFUL**（AGP 9.2.1 + Kotlin 内置 + Compose + Room/KSP） |
+| JVM 单测 | **12/12 通过**（BoardGrouper 5 + HerdrCodec 7） |
+| 真机安装 | **BLOCKED**：手机锁屏时 MIUI 拒绝 `adb install`（`INSTALL_FAILED_USER_RESTRICTED`） |
+| 真机运行/截图 | **NOT TESTED**（等解锁） |
+
+已实现（照 D1–D30 基线）：
+
+- 指纹 fail-closed + 显式确认对话框；私钥导入（粘贴，落 app 私有目录 0600）
+- 单连接复用 + exec 并发 4 + 订阅独占 1 通道
+- `ping`（校验 protocol=22）→ `snapshot` → 双层订阅（全局 + 逐 pane）
+- `SessionReconciler`：事件只当失效信号、串行刷新、整体替换
+- `ConnectionSupervisor`：连接代次、退避重连（1/2/4/8/15s）、Stale 判定、`pane.created/closed` 重订阅
+- Room 缓存 + 离线展示（stale 标记 + 最后更新时间）
+- 看板分组：等你处理 / 工作中 / 已完成 / 空闲 / 未知；Pane 详情只读
+- 连接状态：未连接 / 连接中 / 等待确认指纹 / 已连接 / 过期 / 重连中 / 失败
+
+## 10.2 Spike A（Android SSH Crypto）—— JVM 侧已完成，Android 侧待跑
+
+**关键纠正**：之前 I-23 说“sshj RSA 认证失败”，第一轮测试用的 `id_rsa`（`SHA256:LiY1T1l9...`）
+**根本不在远端 `authorized_keys` 里**（远端只有 GoeT...、qInW...、herdr-spike 三把）。
+用**已授权**的 `luxiang_rsa`（PKCS#1, `SHA256:GoeTIpSw...`）重测：
+
+| 客户端 | 密钥 | 结果 | exec P50 | SFTP | Provider 变化 |
+| --- | --- | --- | --- | --- | --- |
+| **JSch 0.2.20** | Ed25519（已授权） | ✅ 认证成功，connect 1022 ms | **108 ms** | ✅ stat 224 ms / read 257 ms | **无** |
+| **JSch 0.2.20** | RSA PKCS#1（已授权） | ✅ 认证成功，connect 1212 ms | 108 ms | — | 无 |
+| **sshj 0.41.2** | Ed25519（已授权） | ✅ 认证成功 | 201 ms | ✅（SftpTail 已验证） | 需 BC（Android 上） |
+| **sshj 0.41.2** | RSA PKCS#1（已授权） | ❌ `Exhausted available authentication methods` | — | — | — |
+
+结论：
+
+1. **JSch 的 exec 通道比 sshj 快约一倍**（108 vs 201 ms；对应整请求 248 ms → 预计 ~150 ms 量级）。
+2. JSch 在 JVM 上**不需要任何 Provider 改动**；sshj 在 Android 上必须处理 BouncyCastle 冲突。
+3. sshj 的 RSA 认证失败是**真实存在**的（同一把已授权密钥 JSch 能过），不是“密钥未授权”导致的。
+4. 因此 Spike A 的核心结论仍待 Android 侧数据：需要对比 `BCAPP 委托`（不删系统 BC）与 `removeProvider` 两种方案，以及 JSch 在 Android 14 上的 Ed25519/SFTP 表现。
+   → Android 侧探针已写好（`spike/android` 的 `CryptoSpikeActivity`：A1 BCAPP / A2 removeProvider / A3 JSch），等设备解锁后运行。

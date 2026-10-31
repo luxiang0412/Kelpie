@@ -7,6 +7,7 @@ repositories { mavenCentral() }
 
 dependencies {
     implementation("com.hierynomus:sshj:0.41.2")
+    implementation("com.github.mwiede:jsch:0.2.20")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     runtimeOnly("org.slf4j:slf4j-simple:2.0.13")
     testImplementation(kotlin("test"))

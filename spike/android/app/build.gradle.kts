@@ -32,5 +32,6 @@ android {
 dependencies {
     implementation("com.hierynomus:sshj:0.41.2")
     implementation("org.bouncycastle:bcprov-jdk18on:1.84")
+    implementation("com.github.mwiede:jsch:0.2.20")
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
 }

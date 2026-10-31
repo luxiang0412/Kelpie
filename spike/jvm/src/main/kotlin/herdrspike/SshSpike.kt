@@ -38,6 +38,7 @@ fun main(args: Array<String>) {
         "bridge" -> bridge(a)
         "pingloop" -> pingLoop(a)
         "sftp" -> sftpTail(a)
+        "jsch" -> JschProbe.run(a.s("host"), a.i("port", 22), a.s("user"), a.s("key"), a.s("pin", ""), a.s("path", ""))
         "keyinfo" -> {
             val ssh = SSHClient()
             val kp = loadKey(ssh, a.s("key")).first()

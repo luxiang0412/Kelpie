@@ -375,3 +375,30 @@
 **依据**：`RESULTS.md` §9.16（I-50）。
 
 **状态**：`已定`。
+
+## D31. Milestone 1 的模块与数据流边界
+
+- `:core:ssh` 只负责“连接 + 指纹 + 通道限流”，不认识 herdr 语义；
+- `:core:herdr` 负责 NDJSON、订阅、对账（Reconciler）与连接代次（Supervisor）；
+- `:core:data` 只做缓存与设置（Room + SharedPreferences），不发起网络请求；
+- `:feature:board` 只依赖 `:core:*`，通过单一 `BoardViewModel` 暴露 `StateFlow<UiState>`；UI 只发 Action。
+- 事件流：SSH → `HerdrApi.subscribe` → `SessionReconciler.onEvent`（仅置脏）→ 串行 `snapshot` → Room → UI。
+- 连接代次：每次成功连接 `generation+1`；旧代次的回调一律丢弃（避免重连期间的状态串台）。
+
+**状态**：`已定`（M1 实现已按此落地）。
+
+## D32. Android 上的 BouncyCastle：优先“委托 provider”，不删系统 BC
+
+- 方案：把 APK 内的 `BouncyCastleProvider` 包成名为 `BCAPP` 的委托 Provider（`getService` 转发），
+  `SecurityUtils.registerSecurityProvider("BCAPP")`；**不动系统 `BC`**，避免影响同进程 TLS。
+- 备选：`removeProvider("BC")` 后注册新版（已证明可行，但有全局副作用）。
+- 采用哪个，取决于 `CryptoSpikeActivity` 的 A1/A2 结果（设备解锁后跑）。
+
+**状态**：`待实测确认`（A1 通过则采用委托方案）。
+
+## D33. SSH 库选型：M1 继续 sshj，Spike A 完成后重新评估
+
+- 事实：JSch 的 exec 通道约快一倍；JSch 支持已授权 RSA，sshj 不支持；Android 上 JSch 还可能省掉 BC 处理。
+- 决策：**M1 不换库**（已实现并测试），但在 Phase 2 之前用 Android 侧数据做一次正式对比；若差距稳定且 JSch 在 Android 14 上 Ed25519/SFTP 均通过，则考虑切换。
+
+**状态**：`待实测确认`。

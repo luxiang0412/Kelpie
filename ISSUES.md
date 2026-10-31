@@ -388,3 +388,22 @@
 - **现象**：同一实现，PC 稳态 poll 195 ms，真机 353 ms；替换后读 100 行 564 ms。
 - **影响**：手机上 250 ms 轮询会持续排队。
 - **建议**：移动端轮询间隔 ≥ 1 s；或在“活跃”时 500 ms、空闲 2–5 s；优先事件驱动 + snapshot 批量刷新（D29）。
+
+## I-52 【纠正 I-23】第一轮 RSA 测试用的密钥并未授权
+
+- **现象**：`~/.ssh/id_rsa`（`SHA256:LiY1T1l9...`）不在远端 `authorized_keys` 中；远端只有 GoeT...（`luxiang_rsa`）、qInW...（同事 Mac）、herdr-spike（Ed25519）。
+- **影响**：`I-23` 把“认证失败”归因于 sshj，证据不成立。
+- **修订**：用**已授权**的 `luxiang_rsa` 重测 —— JSch 成功，**sshj 仍失败**（见 I-53），所以“sshj 对 RSA/rsa-sha2 有问题”这个结论**依然成立**，只是第一次的证据无效。
+- **教训**：任何“认证失败”的结论，必须先用 `ssh-keygen -lf authorized_keys` 确认密钥授权状态。
+
+## I-53 sshj 用已授权 RSA 密钥仍无法认证（JSch 可以）
+
+- **现象**：`luxiang_rsa`（4096, PKCS#1，已授权）：JSch 0.2.20 认证成功；sshj 0.41.2 仍 `Exhausted available authentication methods`。服务端只允许 `rsa-sha2-512/256`（无 `ssh-rsa`）。
+- **影响**：如果将来要支持“用户已有 RSA 密钥”，sshj 是硬伤；Ed25519 不受影响。
+- **建议**：M1 继续只支持 Ed25519（已在 UI 与代码里限制）；Spike A 的 Android 对比完成后决定是否换 JSch。
+
+## I-54 JSch 的 exec 通道比 sshj 快约一倍（JVM 实测）
+
+- **数据**：同一主机、同一密钥：JSch exec P50 **108 ms**（min 106 / max 208）；sshj **201 ms**。
+- **影响**：若换成 JSch，单请求 248 ms 有望降到 ~150 ms，直接改善审批窗口与 UI 手感。
+- **注意**：这是 JVM 数据；Android 上需要用 `CryptoSpikeActivity` 复测（BC 依赖更少是 JSch 的优势）。
