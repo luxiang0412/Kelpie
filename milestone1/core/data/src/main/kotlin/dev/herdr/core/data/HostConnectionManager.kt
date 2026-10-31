@@ -211,6 +211,15 @@ class HostConnectionManager(
 
     fun board(hostId: String, session: String) = boards.observe(hostId, session)
 
+    /** 只读：读 pane 的终端输出（用于详情页“最近输出”）。 */
+    suspend fun readPane(hostId: String, paneId: String, lines: Int = 80): String? {
+        val conn = currentConnection(hostId) ?: return null
+        val cfg = hosts.get(hostId) ?: return null
+        return runCatching {
+            HerdrApi(conn, cfg.herdrBin, cfg.session).readPane(paneId, "recent", lines)
+        }.getOrNull()
+    }
+
     /** 暴露只读缓存给 UI 订阅（对话页）。 */
     fun transcripts(): TranscriptStore = transcripts
 

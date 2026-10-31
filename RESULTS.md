@@ -1043,3 +1043,18 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 | 普通 pi pane（`w1:p1`，`agent_session=null`） | ✅ 详情页出现「给 pi 发消息…」输入框 + 发送 | `m5-02-reply-entry.png` |
 | 真实发送（沙箱 `w4:p1`） | ✅ 输入 `reply with just DETAIL` → 详情页显示「已发送」→ pi 回复 `DETAIL` | `m5-03-reply-detail.png` + pane 内容 |
 | 无 agent 的 shell pane | ✅ 输入框禁用 + 提示 | 代码 |
+
+## 20.1 补充：详情页加“最近输出”（解决“发了看不到回复”）
+
+用户反馈"发送了但看不到返回的消息"——因为详情页只有字段 + 输入框，**没有输出区域**；
+结构化回复只在「查看对话」页，而那个页面需要 `agent_session`（真实 pi pane 为 null）。
+
+修复：`PaneDetailScreen` 增加 **最近输出** 区块（`HerdrApi.readPane(source=recent)`，2 s 轮询 + 发送后立即刷新）：
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 普通 pi pane（`w1:p1`） | ✅ 详情页显示终端尾部内容（能看到 pi 的 TUI 输出） | `m5-05-detail-with-output.png` |
+| 发送后 | ✅ 立即刷新输出，不需要切页面 | 同上 |
+| 无 agent / 未连接 | ✅ 显示“（还没有输出，或主机未连接）” | 代码 |
+
+说明：这是**终端尾部**（去掉 ANSI 的文本），不是结构化对话；结构化对话仍需 `agent_session`（装 herdr pi 集成后可看）。

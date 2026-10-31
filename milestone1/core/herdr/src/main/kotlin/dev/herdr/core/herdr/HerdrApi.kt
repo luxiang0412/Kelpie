@@ -10,6 +10,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -64,6 +66,17 @@ class HerdrApi(
             put("keys", JsonArray(keys.map { JsonPrimitive(it) }))
         }
         requireResult(request("pane.send_keys", params, timeoutMs))
+    }
+
+    /** 读终端输出（只读）。source: visible / recent / recent_unwrapped / detection */
+    suspend fun readPane(paneId: String, source: String = "recent", lines: Int = 80, timeoutMs: Long = 15_000): String {
+        val params = buildJsonObject {
+            put("pane_id", paneId)
+            put("source", source)
+            put("lines", JsonPrimitive(lines))
+        }
+        val result = requireResult(request("pane.read", params, timeoutMs))
+        return result["read"]?.jsonObject?.get("text")?.jsonPrimitive?.content ?: ""
     }
 
     /** 订阅事件。流被取消或连接断开时关闭通道。 */

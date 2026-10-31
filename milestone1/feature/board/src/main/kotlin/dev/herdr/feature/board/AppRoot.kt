@@ -29,6 +29,7 @@ fun AppRoot(vm: HostsViewModel) {
     val transcript by vm.transcript.collectAsStateWithLifecycle()
     val composer by vm.composer.collectAsStateWithLifecycle()
     val approvals by vm.approvals.collectAsStateWithLifecycle()
+    val paneOutput by vm.paneOutput.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
 
     BackHandler(enabled = screen != SCREEN_BOARD) {
@@ -56,6 +57,7 @@ fun AppRoot(vm: HostsViewModel) {
                 screen = SCREEN_BOARD
             },
             composer = composer,
+            output = paneOutput,
             onTextChange = vm::updateComposerText,
             onSend = { state.board.selectedPane?.let { vm.sendPrompt(it) } },
             onDismissOutcome = vm::clearComposerOutcome,

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
@@ -33,6 +34,7 @@ fun PaneDetailScreen(
     onBack: () -> Unit,
     onOpenTranscript: (() -> Unit)? = null,
     composer: dev.herdr.core.data.HostConnectionManager.ComposerState? = null,
+    output: String = "",
     onTextChange: (String) -> Unit = {},
     onSend: () -> Unit = {},
     onDismissOutcome: () -> Unit = {},
@@ -124,14 +126,41 @@ fun PaneDetailScreen(
             }
 
             Spacer(Modifier.height(12.dp))
-            Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
+            Spacer(Modifier.height(12.dp))
+            Text("最近输出", style = MaterialTheme.typography.titleSmall)
+            if (output.isBlank()) {
                 Text(
-                    "只读视图。Milestone 1 不提供发送输入、审批或终端接管；\n" +
-                        "`revision` 只作参考，不代表屏幕内容版本（RESULTS §9.10）。",
+                    "（还没有输出，或主机未连接）",
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(12.dp),
+                    color = MaterialTheme.colorScheme.outline,
                 )
+            } else {
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            output.takeLast(4000),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
+                }
             }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "可发送消息（agent.prompt）。审批与终端接管仍未提供；revision 只作参考。",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
         }
     }
 }

@@ -69,6 +69,10 @@ class HostsViewModel(
     val composer: StateFlow<HostConnectionManager.ComposerState> = manager.composer
     val approvals: StateFlow<List<HostConnectionManager.ApprovalItem>> = manager.approvals
 
+    private val _paneOutput = MutableStateFlow("")
+    val paneOutput: StateFlow<String> = _paneOutput.asStateFlow()
+    private var outputJob: Job? = null
+
     private var boardJob: Job? = null
     private var transcriptTailer: dev.herdr.core.data.TranscriptTailer? = null
     private var transcriptPoll: Job? = null
@@ -178,6 +182,16 @@ class HostsViewModel(
 
     fun selectPane(pane: Pane?) {
         _state.value = _state.value.copy(board = _state.value.board.copy(selectedPane = pane))
+        outputJob?.cancel()
+        _paneOutput.value = ""
+        if (pane == null) return
+        val hostId = _state.value.activeId ?: return
+        outputJob = viewModelScope.launch {
+            while (true) {
+                manager.readPane(hostId, pane.paneId)?.let { _paneOutput.value = it }
+                kotlinx.coroutines.delay(2_000)
+            }
+        }
     }
 
     // ---------------- 写操作 ----------------
@@ -189,6 +203,10 @@ class HostsViewModel(
     fun sendPrompt(pane: Pane) {
         val hostId = _state.value.activeId ?: return
         manager.sendPrompt(hostId, pane)
+        // 发送后立刻刷一次输出，别等 2s 轮询
+        viewModelScope.launch {
+            manager.readPane(hostId, pane.paneId)?.let { _paneOutput.value = it }
+        }
     }
 
     // ---------------- 对话（只读） ----------------
