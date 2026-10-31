@@ -779,3 +779,38 @@ HOME=~/spike-sandbox/pihome herdr integration install pi
 
 下一步（M3）：引入 `:benchmark` + Macrobenchmark（StartupTiming / FrameTiming）、Baseline Profile，
 并把“流式输出时的滚动”纳入测量（现在没有流式数据源）。
+
+---
+
+# 14. M2-2B：transcript 只读视图（2026-10-31 晚，VERIFIED）
+
+## 14.1 数据链路
+
+```text
+herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
+      →  PaneDetail「查看对话（只读）」→ TranscriptLoader
+      →  SFTP 读文件末尾 256 KiB → 丢弃半行 → PiTranscriptParser
+      →  ChatMessage(user / assistant / thinking / toolCall / toolResult)
+```
+
+## 14.2 真机结果
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| `agent_session` 合并 | ✅ snapshot 的 `agents[]` 里有、`panes[]` 里没有 → 按 `pane_id` 合并（见 I-62） | 单测 + 真机 |
+| Pane 详情显示 | ✅ 新增 `agent_session` 字段；有路径时出现「查看对话（只读）」按钮 | `m2-06-transcript.png` |
+| 对话渲染 | ✅ 一条 pi 会话被正确渲染为 5 条：`你 #1` → `thinking #2` → `tool · bash #3` → `tool result #4`（目录列表）→ `assistant #5` | 同上 |
+| 读取性能 | 256 KiB 尾部读取 + 解析在 **<1 s** 内完成（真机，含 SFTP 打开） | 交互实测 |
+| 只读性 | 只做 SFTP `stat` + `read`，不写远端；退出即释放 SFTP | 代码 |
+
+## 14.3 测试
+
+- JVM 单测：`BoardGrouper` 5 + `HerdrCodec` **9**（新增 2 个 `agent_session` 合并用例）+ `PiTranscriptParser` **3** = **17/17 通过**。
+- 解析器覆盖：user / assistant(text) / thinking / toolCall / toolResult、坏行、未知类型、纯字符串 content。
+
+## 14.4 已知限制（M2 有意为之）
+
+- **快照式**读取（最近 256 KiB），不是增量 tail；长会话只能看到尾部（M3 接 `SftpTail` 做增量 + Room 缓存）。
+- 只支持 **pi** 的 JSONL 结构；Claude/Codex 需要各自的 parser（D19 的 Provider 化留到 M3）。
+- 没有 Markdown 渲染、代码高亮、折叠；纯文本块（避免在没做性能基线前引入重渲染）。
+- 依赖主机侧 `agent_session`（真实环境需装 herdr pi 集成，D35）。

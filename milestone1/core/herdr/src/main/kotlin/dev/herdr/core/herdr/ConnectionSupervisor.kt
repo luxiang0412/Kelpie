@@ -59,6 +59,9 @@ class ConnectionSupervisor(
     private var loopJob: Job? = null
     private var resubscribe = Channel<Unit>(Channel.CONFLATED)
 
+    /** 当前活动连接（供 transcript 读取等一次性操作使用）；不可用时返回 null。 */
+    fun currentConnection(): dev.herdr.core.ssh.SshConnection? = currentConnection
+
     val isConnected: Boolean
         get() = _state.value is State.Connected || _state.value is State.Stale
 

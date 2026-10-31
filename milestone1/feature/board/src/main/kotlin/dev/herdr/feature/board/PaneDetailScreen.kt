@@ -26,7 +26,7 @@ import dev.herdr.core.herdr.Pane
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PaneDetailScreen(pane: Pane?, onBack: () -> Unit) {
+fun PaneDetailScreen(pane: Pane?, onBack: () -> Unit, onOpenTranscript: (() -> Unit)? = null) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -60,6 +60,11 @@ fun PaneDetailScreen(pane: Pane?, onBack: () -> Unit) {
             Field("revision", pane.revision.toString())
             Field("cwd", pane.cwd ?: "-")
             Field("title", pane.title ?: "-")
+            Field("agent_session", pane.agentSessionPath ?: "null（未安装/未上报集成）")
+            if (onOpenTranscript != null) {
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.material3.Button(onClick = onOpenTranscript) { Text("查看对话（只读）") }
+            }
 
             Spacer(Modifier.height(12.dp))
             Surface(color = MaterialTheme.colorScheme.surfaceVariant) {

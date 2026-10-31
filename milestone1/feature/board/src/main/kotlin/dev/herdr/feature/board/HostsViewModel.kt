@@ -59,6 +59,13 @@ class HostsViewModel(
 
     data class HostKeyPrompt(val hostId: String, val label: String, val fingerprint: String)
 
+    data class TranscriptState(
+        val path: String? = null,
+        val loading: Boolean = false,
+        val messages: List<dev.herdr.core.herdr.ChatMessage> = emptyList(),
+        val error: String? = null,
+    )
+
     data class UiState(
         val hosts: List<HostState> = emptyList(),
         val activeId: String? = null,
@@ -68,6 +75,10 @@ class HostsViewModel(
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    private val _transcript = MutableStateFlow(TranscriptState())
+    val transcript: StateFlow<TranscriptState> = _transcript.asStateFlow()
+    private val loader = dev.herdr.core.herdr.TranscriptLoader()
 
     private class Runtime(
         val cfg: HostRepository.HostConfig,
@@ -162,6 +173,48 @@ class HostsViewModel(
     fun refreshActive() {
         val id = _state.value.activeId ?: return
         runtimes[id]?.supervisor?.reconciler?.markDirty()
+    }
+
+    // ---------------- transcript（只读） ----------------
+
+    fun openTranscript(pane: Pane) {
+        val path = pane.agentSessionPath
+        if (path == null) {
+            _transcript.value = TranscriptState(error = "这台 pane 没有上报 transcript 路径（agent_session=null）")
+            return
+        }
+        _transcript.value = TranscriptState(path = path, loading = true)
+        loadTranscript(path)
+    }
+
+    fun reloadTranscript() {
+        val path = _transcript.value.path ?: return
+        _transcript.value = _transcript.value.copy(loading = true, error = null)
+        loadTranscript(path)
+    }
+
+    fun closeTranscript() {
+        _transcript.value = TranscriptState()
+    }
+
+    private fun loadTranscript(path: String) {
+        val hostId = _state.value.activeId ?: run {
+            _transcript.value = _transcript.value.copy(loading = false, error = "没有活动主机")
+            return
+        }
+        val conn = runtimes[hostId]?.supervisor?.currentConnection()
+        if (conn == null) {
+            _transcript.value = _transcript.value.copy(loading = false, error = "主机未连接")
+            return
+        }
+        viewModelScope.launch {
+            val r = runCatching { loader.load(conn, path) }
+            _transcript.value = _transcript.value.copy(
+                loading = false,
+                messages = r.getOrDefault(emptyList()),
+                error = r.exceptionOrNull()?.message,
+            )
+        }
     }
 
     fun selectPane(pane: Pane?) {

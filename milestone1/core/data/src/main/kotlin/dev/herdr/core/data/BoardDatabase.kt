@@ -27,6 +27,7 @@ data class PaneEntity(
     val title: String?,
     val cwd: String?,
     val revision: Long,
+    val agentSessionPath: String? = null,
     val updatedAtMs: Long,
 )
 
@@ -74,7 +75,7 @@ interface BoardDao {
     }
 }
 
-@Database(entities = [PaneEntity::class, SessionMetaEntity::class], version = 1, exportSchema = false)
+@Database(entities = [PaneEntity::class, SessionMetaEntity::class], version = 2, exportSchema = false)
 abstract class BoardDatabase : RoomDatabase() {
     abstract fun boardDao(): BoardDao
 }

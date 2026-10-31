@@ -56,6 +56,17 @@ object HerdrCodec {
 
     fun parseSnapshot(result: JsonObject, nowMs: Long): SessionSnapshot {
         val snap = result["snapshot"]?.jsonObject ?: result
+
+        // agent_session 在 agents[] 里（不是 panes[]）——按 pane_id 合并
+        val sessionByPane: Map<String, String> = (snap["agents"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { el -> runCatching { el.jsonObject }.getOrNull() }
+            ?.mapNotNull { a ->
+                val pid = a["pane_id"]?.jsonPrimitive?.contentOrNullSafe() ?: return@mapNotNull null
+                val sess = a["agent_session"]?.jsonObject ?: return@mapNotNull null
+                val kind = sess["kind"]?.jsonPrimitive?.contentOrNullSafe()
+                val value = sess["value"]?.jsonPrimitive?.contentOrNullSafe()
+                if (kind == "path" && value != null) pid to value else null
+            }?.toMap() ?: emptyMap()
         val panes = snap["panes"]?.let { it as? kotlinx.serialization.json.JsonArray }?.mapNotNull { el ->
             val p = el.jsonObject
             val paneId = p["pane_id"]?.jsonPrimitive?.content ?: return@mapNotNull null
@@ -71,6 +82,12 @@ object HerdrCodec {
                 cwd = p["foreground_cwd"]?.jsonPrimitive?.contentOrNullSafe()
                     ?: p["cwd"]?.jsonPrimitive?.contentOrNullSafe(),
                 revision = p["revision"]?.jsonPrimitive?.longOrNull ?: 0L,
+                agentSessionPath = sessionByPane[paneId]
+                    ?: p["agent_session"]?.jsonObject?.let { sess ->
+                        val kind = sess["kind"]?.jsonPrimitive?.contentOrNullSafe()
+                        val value = sess["value"]?.jsonPrimitive?.contentOrNullSafe()
+                        if (kind == "path") value else null
+                    },
             )
         } ?: emptyList()
 

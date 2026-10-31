@@ -21,14 +21,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 private const val SCREEN_BOARD = "board"
 private const val SCREEN_HOSTS = "hosts"
 private const val SCREEN_DETAIL = "detail"
+private const val SCREEN_TRANSCRIPT = "transcript"
 
 @Composable
 fun AppRoot(vm: HostsViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val transcript by vm.transcript.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
 
     BackHandler(enabled = screen != SCREEN_BOARD) {
         if (screen == SCREEN_DETAIL) vm.selectPane(null)
+        if (screen == SCREEN_TRANSCRIPT) vm.closeTranscript()
         screen = SCREEN_BOARD
     }
 
@@ -44,10 +47,25 @@ fun AppRoot(vm: HostsViewModel) {
             onBack = { screen = SCREEN_BOARD },
         )
 
-        SCREEN_DETAIL -> PaneDetailScreen(state.board.selectedPane) {
-            vm.selectPane(null)
-            screen = SCREEN_BOARD
-        }
+        SCREEN_DETAIL -> PaneDetailScreen(
+            pane = state.board.selectedPane,
+            onBack = {
+                vm.selectPane(null)
+                screen = SCREEN_BOARD
+            },
+            onOpenTranscript = state.board.selectedPane?.agentSessionPath?.let {
+                {
+                    state.board.selectedPane?.let { p -> vm.openTranscript(p) }
+                    screen = SCREEN_TRANSCRIPT
+                }
+            },
+        )
+
+        SCREEN_TRANSCRIPT -> TranscriptScreen(
+            state = transcript,
+            onRefresh = vm::reloadTranscript,
+            onBack = { screen = SCREEN_DETAIL },
+        )
 
         else -> BoardScreen(
             state = state,

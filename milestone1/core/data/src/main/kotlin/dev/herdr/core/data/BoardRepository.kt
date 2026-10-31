@@ -69,6 +69,7 @@ class BoardRepository(private val dao: BoardDao) {
         title = title,
         cwd = cwd,
         revision = revision,
+        agentSessionPath = agentSessionPath,
     )
 
     private fun Pane.toEntity(hostId: String, session: String, now: Long) = PaneEntity(
@@ -83,6 +84,7 @@ class BoardRepository(private val dao: BoardDao) {
         title = title,
         cwd = cwd,
         revision = revision,
+        agentSessionPath = agentSessionPath,
         updatedAtMs = now,
     )
 }

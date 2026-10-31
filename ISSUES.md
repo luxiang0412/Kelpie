@@ -452,3 +452,10 @@
 - **修复**：先 `start()`，再 `persistLoop(sup.reconciler)`。
 - **建议**：把 `reconciler` 改成构造期创建（`val reconciler = SessionReconciler(...)`），彻底消除顺序依赖；已记入 M3 清理项。
 - **状态**：已修复。
+
+## I-62 `agent_session` 在 snapshot 的 `agents[]` 里，不在 `panes[]` 里
+
+- **现象**：M2 首版从 `snapshot.panes[].agent_session` 取路径，永远是 null；Pane 详情不出现「查看对话」。
+- **原因**：herdr `session.snapshot` 的 `panes[]` 不带 `agent_session`，它只在 `agents[]`（和 `agent.get`）里。
+- **修复**：`HerdrCodec.parseSnapshot` 先解析 `agents[]` 建立 `paneId → path` 映射，再合并进 `Pane.agentSessionPath`；补了 2 个单测。
+- **状态**：已修复（真机验证）。

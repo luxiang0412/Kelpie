@@ -64,6 +64,16 @@ class SshConnection(
         }
     }
 
+    /** 打开一个 SFTP 通道（只读用途）。调用方负责 close。 */
+    suspend fun openSftp(): net.schmizz.sshj.sftp.SFTPClient = withContext(Dispatchers.IO) {
+        if (closed) throw SshFailure.Network("connection closed")
+        try {
+            ssh.newSFTPClient()
+        } catch (e: Exception) {
+            throw SshFailure.Network("open sftp failed: ${e.message}", e)
+        }
+    }
+
     /**
      * 打开一个长连接 exec（用于订阅）。调用方负责 close。
      * 不走 permits：订阅是长连接，单独占 1 个通道（D15 的预算里已留 1 个）。

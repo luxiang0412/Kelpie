@@ -25,6 +25,8 @@ data class Pane(
     val title: String?,
     val cwd: String?,
     val revision: Long,
+    /** herdr 上报的 agent 会话文件路径（`agent_session.kind == "path"` 时），用于只读 transcript。 */
+    val agentSessionPath: String? = null,
 )
 
 data class SessionSnapshot(

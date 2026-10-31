@@ -436,3 +436,13 @@
 - 决策：Phase 2 优先用 `agent_session.path` 定位 JSONL；`--session-dir` 扁平目录作为可控补充。
 
 **状态**：`已定`（本阶段）。
+
+## D36. transcript 视图：先做“尾部快照”，M3 再做增量
+
+- M2 只读视图用 **SFTP 读文件末尾 256 KiB + 丢弃半行 + pi JSONL 解析**，不做增量 tail、不写 Room。
+- 理由：先用最小成本验证“`agent_session.path` → 可读对话”这条链路（已真机验证），
+  避免在性能基线没做完时引入增量缓冲、缓存一致性和 Markdown 渲染的复杂度。
+- M3 计划：移植 `SftpTail`（D25 的三条硬约束）做增量 + Room 缓存 + 虚拟列表 + 代码高亮。
+- `agent_session` 必须从 snapshot 的 **agents[]** 合并（I-62）。
+
+**状态**：`已定`（M2 范围）。

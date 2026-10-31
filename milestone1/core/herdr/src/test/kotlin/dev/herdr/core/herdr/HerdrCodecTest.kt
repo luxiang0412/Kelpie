@@ -66,6 +66,29 @@ class HerdrCodecTest {
     }
 
     @Test
+    fun `agent_session path is merged from agents array into pane`() {
+        val json = """
+            {"snapshot":{"version":"0.9.5","protocol":22,
+              "panes":[{"pane_id":"w4:p1","terminal_id":"t1","workspace_id":"w4","tab_id":"w4:t1","agent":"pi","agent_status":"done","revision":1}],
+              "agents":[{"pane_id":"w4:p1","agent":"pi","agent_status":"done","agent_session":{"source":"herdr:pi","agent":"pi","kind":"path","value":"/tmp/x.jsonl"}}]}}
+        """.trimIndent()
+        val r = HerdrCodec.parseResponse("""{"id":"1","result":$json}""") as HerdrCodec.Response.Ok
+        val snap = HerdrCodec.parseSnapshot(r.result, 1L)
+        assertEquals("/tmp/x.jsonl", snap.panes[0].agentSessionPath)
+    }
+
+    @Test
+    fun `agent_session with kind id is not treated as path`() {
+        val json = """
+            {"snapshot":{"version":"0.9.5","protocol":22,
+              "panes":[{"pane_id":"w1:p1","terminal_id":"t1","workspace_id":"w1","tab_id":"w1:t1","agent":"claude","agent_status":"idle","revision":1}],
+              "agents":[{"pane_id":"w1:p1","agent":"claude","agent_status":"idle","agent_session":{"source":"herdr:claude","agent":"claude","kind":"id","value":"sess-123"}}]}}
+        """.trimIndent()
+        val r = HerdrCodec.parseResponse("""{"id":"1","result":$json}""") as HerdrCodec.Response.Ok
+        assertNull(HerdrCodec.parseSnapshot(r.result, 1L).panes[0].agentSessionPath)
+    }
+
+    @Test
     fun `ping capabilities are string map and protocol parsed`() {
         val r = HerdrCodec.parseResponse(
             """{"id":"1","result":{"type":"pong","version":"0.9.5","protocol":22,"capabilities":{"live_handoff":true,"endpoint_protocol_generation":1}}}""",
