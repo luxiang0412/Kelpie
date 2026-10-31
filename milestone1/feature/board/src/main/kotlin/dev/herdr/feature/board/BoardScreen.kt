@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +24,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -36,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -47,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import dev.herdr.core.data.HostConnectionManager
 import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.Pane
+import dev.herdr.feature.board.design.DisclosureIndicator
 import dev.herdr.feature.board.design.ChevronAffordance
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.Motion
@@ -87,45 +91,84 @@ fun BoardScreen(
     Scaffold(
         containerColor = palette.background,
         topBar = {
-            TopAppBar(
-                title = { Text("Agent 工作台", style = MaterialTheme.typography.titleLarge) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = palette.background,
-                    titleContentColor = palette.textPrimary,
-                ),
-                actions = {
-                    TextButton(onClick = onRefresh, enabled = !state.board.refreshing) {
-                        Text(if (state.board.refreshing) "刷新中" else "刷新", style = MaterialTheme.typography.labelLarge)
+            // UX-02a（BOARD-HOST-001）：主机选择器放到主标题**下方**，不再与标题抢横向空间；
+            // 高度由内容决定，320dp / fontScale 1.6 自动换行，不用固定高度 TopAppBar。
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(palette.background)
+                    .statusBarsPadding()
+                    .padding(start = Space.page, end = Space.s, top = Space.s),
+            ) {
+                // 窄屏/大字体下标题换行（而不是被省略成「Agent …」），高度由内容决定
+                val compactWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 360
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Agent 工作台",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = palette.textPrimary,
+                        maxLines = if (compactWidth) 2 else 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(
+                        onClick = onRefresh,
+                        enabled = !state.board.refreshing,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(
+                            if (state.board.refreshing) "刷新中" else "刷新",
+                            style = MaterialTheme.typography.labelLarge,
+                        )
                     }
-                    Box {
-                        TextButton(onClick = { hostMenu = true }) {
-                            Text(
-                                active?.cfg?.label?.ifBlank { active.cfg.host } ?: "主机",
-                                style = MaterialTheme.typography.labelLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        DropdownMenu(expanded = hostMenu, onDismissRequest = { hostMenu = false }) {
-                            state.hosts.forEach { h ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            "${h.cfg.label.ifBlank { h.cfg.host }}  ·  ${connLabel(h.connKind)}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    onClick = { hostMenu = false; onSelectHost(h.cfg.id) },
-                                )
+                }
+                // 主机选择器：显示真实主机名（单主机也不伪装成“全部主机”）
+                Box {
+                    Row(
+                        Modifier
+                            .heightIn(min = 48.dp)
+                            .clip(RoundedCornerShape(Radius.chip))
+                            .clickable { hostMenu = true }
+                            .semantics {
+                                contentDescription =
+                                    "当前主机 ${active?.cfg?.label?.ifBlank { active.cfg.host } ?: "未选择"}，点击切换"
                             }
+                            .padding(horizontal = Space.s, vertical = Space.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            active?.cfg?.label?.ifBlank { active.cfg.host } ?: "选择主机",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.width(Space.xs))
+                        DisclosureIndicator(expanded = false, tint = palette.textSecondary)
+                    }
+                    DropdownMenu(expanded = hostMenu, onDismissRequest = { hostMenu = false }) {
+                        state.hosts.forEach { h ->
                             DropdownMenuItem(
-                                text = { Text("主机管理…", style = MaterialTheme.typography.bodyMedium) },
-                                onClick = { hostMenu = false; onOpenHosts() },
+                                text = {
+                                    Text(
+                                        "${h.cfg.label.ifBlank { h.cfg.host }}  ·  ${connLabel(h.connKind)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                },
+                                onClick = { hostMenu = false; onSelectHost(h.cfg.id) },
                             )
                         }
+                        DropdownMenuItem(
+                            text = { Text("主机管理…", style = MaterialTheme.typography.bodyMedium) },
+                            onClick = { hostMenu = false; onOpenHosts() },
+                        )
                     }
-                },
-            )
+                }
+                Spacer(Modifier.height(Space.xs))
+                HorizontalDivider(color = palette.borderSubtle)
+            }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {

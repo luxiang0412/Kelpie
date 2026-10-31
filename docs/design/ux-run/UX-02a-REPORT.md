@@ -1,0 +1,27 @@
+# UX-02a report — 工作台顶栏 / 主机选择器 / 底部导航
+
+- baseline commit / branch：`3b9ad18` / `ux/graphite-editorial`
+- inspected real files：`feature/board/.../BoardScreen.kt`（原 `Scaffold.topBar` 用 Material3 `TopAppBar`，标题与 `刷新`+主机 `TextButton` 挤一行；`hostMenu` DropdownMenu）、`AppRoot.kt`（底部导航两项）
+- exact goal（BOARD-HOST-001）：主机选择器置于主标题**下方**；320dp/fontScale1.6 可换行、高度由内容决定；不新增假入口
+- changed files：`BoardScreen.kt`
+  - 固定高度 `TopAppBar` → 内容自适应 `Column`（`statusBarsPadding` + `heightIn(min=56dp)`）
+  - 第一行：标题 + `刷新`（`heightIn(min=48.dp)`）；第二行：主机选择器（真实主机名 + `DisclosureIndicator` + 48dp 触达 + `contentDescription`「当前主机 X，点击切换」）
+  - 标题在 `screenWidthDp < 360` 时允许 2 行（不再截成「Agent …」）
+  - 标题区下加 `HorizontalDivider(color = borderSubtle)`，深色获得层次
+  - 底部导航未改动：仍只有已实现的「看板 / 主机」
+- why matches UX-D0：§2.2 触达 48dp、borderSubtle 不作焦点线；`BOARD-HOST-001` 主机选择器在标题下方；§2.3「连接正常不常驻成功横幅」保持原有 StatusLine 逻辑未动
+- tests：
+  - `:app:assembleDebug` BUILD SUCCESSFUL
+  - AVD `herdr_m2c1` 全量 UI：**OK (18 tests)**（P1/P5/P6 截图会话前后各跑一次，均通过）
+- screenshots（来源已标注）：
+  - **真机** Redmi 1080×2400：`ux02a-p1-board-light.png`（Light，zh-CN，1.0）、`ux02a-p2-board-dark.png`（Dark，同条件；状态为「连接中…（第 3 次）」，因 app 重启后正在重连）
+  - **AVD**（393dp）：`ux02a-avd-board-p1.png`、`ux02a-avd-board-p2.png`
+  - **AVD**（320dp / fontScale 1.6）：`ux02a-p5-320-dark-1.6.png`（标题两行「Agent / 工作台」，刷新可见）、`ux02a-p6-320-light-1.6.png`
+- 安全回归：未改发送/草稿/账本/配对/连接逻辑；仅顶栏结构与图标
+- 四类结论：
+  - **已实现并验证**：主机选择器下移且显示真实主机名；320dp/1.6 换行不裁剪；刷新与切换 ≥48dp；18 项 UI 测试无回归；真机 P1/P2 + AVD P5/P6 截图
+  - **已实现但未验证**：TalkBack 对主机选择器的朗读顺序（未人工走查）；en 语言 P3/P4 未截图
+  - **未实现**：跨主机聚合（仍未做，选择器只列已有主机）；`PageGutter` 尚未接入（页面仍用 `Space.page=16dp`，目标 20dp）
+  - **已知问题**：真机截图时恰逢重启后重连，P1 展示的是「未连接」/「连接中」状态而非已连接态；不影响布局结论，但连接态的 P1 待补；`BOARD-HOST-001` 与 `CMP-STYLE-001` 一样标 `PROVISIONAL / 待用户视觉终审`
+- commit：见本条提交
+- rollback：`git revert <commit>`
