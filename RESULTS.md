@@ -903,3 +903,39 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - Baseline Profile 生成与验证
 - 长列表优化：文本 measure 缓存、消息分页（只保留最近 N 条 + 向上加载）、`TextLayoutResult` 复用
 - 流式输出 + 滚动叠加负载（需要可控的流式数据源）
+
+---
+
+# 17. M4-1（pi 路线）：写操作打通——手机上给 agent 发消息（VERIFIED）
+
+## 17.1 实现
+
+| 组件 | 说明 |
+| --- | --- |
+| `HerdrApi.prompt / sendText / sendKeys` | 写操作封装（无幂等键，见 D2） |
+| `WriteLedger`（`:core:herdr`） | 三态账本：`Accepted` / `Rejected(code,msg)` / `Unknown(reason)`；**永不自动重试**；只有正向证据才能把 Unknown 升级为 Accepted |
+| `HostsViewModel.sendPrompt` | 发送前 `begin()` 记账；成功 → Accepted；超时/断网 → **Unknown（不重发）**；服务端明确报错（如 `agent_blocked`）→ Rejected |
+| 对话页输入栏 | 文本框 + 发送按钮 + 结果提示（已发送 / 被拒绝 / 结果未知） |
+
+## 17.2 真机验证
+
+| 步骤 | 结果 | 证据 |
+| --- | --- | --- |
+| 在对话页输入 `say the word MANGO` 并发送 | ✅ 提示“已发送” | `m4-02-sent.png` |
+| pi 收到并回复 | ✅ 对话自动刷新出 `#3 你: say the word MANGO` → `#4 assistant: MANGO` | 同上 |
+| 键盘弹出时发送 | ✅ 修掉“输入栏被键盘挡住”后，输入框与发送按钮随键盘上移，可直接点发送（`#5 → #6 APPLE`） | `m4-03-ime.png`、`m4-04-ime-sent.png` |
+| 结果三态语义 | ✅ 代码路径 + 单测（`WriteLedger`）；真实断线注入仍为 NOT TESTED | — |
+
+## 17.3 与目标的距离
+
+- ✅ **“看得见”**：看板 + 多主机 + 断线恢复（此前已完成）
+- ✅ **“读得懂”**：pi 对话增量读取（此前已完成）
+- ✅ **“答得上”（pi）**：本文档 —— 手机上发指令，agent 执行，结果回来
+- ⛔ **“等你确认”**：pi 默认不弹确认；要用 pi 验证审批，需要写一个 pi 扩展（隔离 HOME）
+- ⛔ **“出门被提醒”**：还没有前台服务/通知
+- ⛔ Claude Code 全链路（按你的决定，暂不做）
+
+## 17.4 顺手修掉的 UX 问题
+
+键盘弹出时输入栏被遮挡（真实用户必然遇到）：给底部输入栏加 `imePadding()` + `navigationBarsPadding()`，
+修后发送按钮在键盘上方，可直接点击（I-65）。

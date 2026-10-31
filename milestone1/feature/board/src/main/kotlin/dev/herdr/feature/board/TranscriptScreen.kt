@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -36,6 +38,10 @@ import dev.herdr.core.herdr.ChatMessage
 @Composable
 fun TranscriptScreen(
     state: HostsViewModel.TranscriptState,
+    composer: HostsViewModel.ComposerState,
+    onTextChange: (String) -> Unit,
+    onSend: () -> Unit,
+    onDismissOutcome: () -> Unit,
     onRefresh: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -57,6 +63,47 @@ fun TranscriptScreen(
                 navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
                 actions = { TextButton(onClick = onRefresh, enabled = !state.loading) { Text("刷新") } },
             )
+        },
+        bottomBar = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .imePadding()               // 键盘弹出时把输入栏顶上去
+                    .navigationBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                composer.message?.let { msg ->
+                    val color = when (composer.outcome) {
+                        is dev.herdr.core.herdr.WriteOutcome.Rejected -> MaterialTheme.colorScheme.error
+                        is dev.herdr.core.herdr.WriteOutcome.Unknown -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.outline
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(msg, style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1f))
+                        TextButton(onClick = onDismissOutcome) { Text("知道了") }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = composer.text,
+                        onValueChange = onTextChange,
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text("给 agent 发消息…") },
+                        maxLines = 4,
+                        enabled = !composer.sending,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    androidx.compose.material3.Button(
+                        onClick = onSend,
+                        enabled = composer.text.isNotBlank() && !composer.sending,
+                    ) { Text(if (composer.sending) "发送中" else "发送") }
+                }
+                Text(
+                    "写操作超时会标记为“未知”，不会自动重发（D2/D21）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {

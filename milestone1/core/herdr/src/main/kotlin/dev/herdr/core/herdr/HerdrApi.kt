@@ -10,6 +10,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -36,6 +37,33 @@ class HerdrApi(
     suspend fun snapshot(timeoutMs: Long = 20_000): SessionSnapshot {
         val line = request("session.snapshot", buildJsonObject { }, timeoutMs)
         return HerdrCodec.parseSnapshot(requireResult(line), System.currentTimeMillis())
+    }
+
+    /** 给 agent 发一条消息（写操作，无幂等键）。 */
+    suspend fun prompt(target: String, text: String, timeoutMs: Long = 20_000) {
+        val params = buildJsonObject {
+            put("target", target)
+            put("text", text)
+        }
+        requireResult(request("agent.prompt", params, timeoutMs))
+    }
+
+    /** 往 pane 发文本（写操作）。 */
+    suspend fun sendText(paneId: String, text: String, timeoutMs: Long = 20_000) {
+        val params = buildJsonObject {
+            put("pane_id", paneId)
+            put("text", text)
+        }
+        requireResult(request("pane.send_text", params, timeoutMs))
+    }
+
+    /** 往 pane 发按键（写操作）。 */
+    suspend fun sendKeys(paneId: String, keys: List<String>, timeoutMs: Long = 20_000) {
+        val params = buildJsonObject {
+            put("pane_id", paneId)
+            put("keys", JsonArray(keys.map { JsonPrimitive(it) }))
+        }
+        requireResult(request("pane.send_keys", params, timeoutMs))
     }
 
     /** 订阅事件。流被取消或连接断开时关闭通道。 */

@@ -27,6 +27,7 @@ private const val SCREEN_TRANSCRIPT = "transcript"
 fun AppRoot(vm: HostsViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val transcript by vm.transcript.collectAsStateWithLifecycle()
+    val composer by vm.composer.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
 
     BackHandler(enabled = screen != SCREEN_BOARD) {
@@ -63,6 +64,10 @@ fun AppRoot(vm: HostsViewModel) {
 
         SCREEN_TRANSCRIPT -> TranscriptScreen(
             state = transcript,
+            composer = composer,
+            onTextChange = vm::updateComposerText,
+            onSend = { state.board.selectedPane?.let { vm.sendPrompt(it) } },
+            onDismissOutcome = vm::clearComposerOutcome,
             onRefresh = vm::reloadTranscript,
             onBack = { screen = SCREEN_DETAIL },
         )

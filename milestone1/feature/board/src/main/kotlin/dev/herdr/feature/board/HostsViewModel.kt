@@ -60,6 +60,13 @@ class HostsViewModel(
 
     data class HostKeyPrompt(val hostId: String, val label: String, val fingerprint: String)
 
+    data class ComposerState(
+        val text: String = "",
+        val sending: Boolean = false,
+        val outcome: dev.herdr.core.herdr.WriteOutcome? = null,
+        val message: String? = null,
+    )
+
     data class TranscriptState(
         val path: String? = null,
         val loading: Boolean = false,
@@ -76,6 +83,10 @@ class HostsViewModel(
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    private val _composer = MutableStateFlow(ComposerState())
+    val composer: StateFlow<ComposerState> = _composer.asStateFlow()
+    private val writeLedger = dev.herdr.core.herdr.WriteLedger()
 
     private val _transcript = MutableStateFlow(TranscriptState())
     val transcript: StateFlow<TranscriptState> = _transcript.asStateFlow()
@@ -247,6 +258,80 @@ class HostsViewModel(
         transcriptPoll?.cancel(); transcriptPoll = null
         transcriptObserve?.cancel(); transcriptObserve = null
         transcriptTailer?.close(); transcriptTailer = null
+    }
+
+    // ---------------- 写操作（M4：给 agent 发消息） ----------------
+
+    fun updateComposerText(text: String) {
+        _composer.value = _composer.value.copy(text = text)
+    }
+
+    fun clearComposerOutcome() {
+        _composer.value = _composer.value.copy(outcome = null, message = null)
+    }
+
+    /**
+     * 发送一条 prompt。三态语义（D2/D21）：
+     * - 成功 → Accepted
+     * - 服务端明确报错（如 agent_blocked）→ Rejected
+     * - 超时 / 连接断 → Unknown，**不自动重试**
+     */
+    fun sendPrompt(pane: Pane) {
+        val text = _composer.value.text.trim()
+        if (text.isEmpty() || _composer.value.sending) return
+        val hostId = _state.value.activeId ?: return
+        val conn = runtimes[hostId]?.supervisor?.currentConnection()
+        val cfg = hosts.get(hostId)
+        if (conn == null || cfg == null) {
+            _composer.value = _composer.value.copy(
+                outcome = dev.herdr.core.herdr.WriteOutcome.Rejected("not_connected", "主机未连接"),
+                message = "主机未连接",
+            )
+            return
+        }
+        val rec = writeLedger.begin("agent.prompt", pane.paneId, text.toByteArray())
+        _composer.value = _composer.value.copy(text = "", sending = true, outcome = null, message = "发送中…")
+        viewModelScope.launch {
+            val api = dev.herdr.core.herdr.HerdrApi(conn, cfg.herdrBin, cfg.session)
+            val result = runCatching { api.prompt(pane.paneId, text) }
+            val outcome = result.fold(
+                onSuccess = {
+                    writeLedger.accept(rec.clientRequestId, "agent_prompted")
+                    dev.herdr.core.herdr.WriteOutcome.Accepted
+                },
+                onFailure = { e ->
+                    when (e) {
+                        is dev.herdr.core.ssh.SshFailure.Timeout,
+                        is dev.herdr.core.ssh.SshFailure.Network,
+                        -> {
+                            // 关键：结果未知，绝不自动重发
+                            writeLedger.markUnknown(rec.clientRequestId, e.message ?: "timeout/network")
+                            dev.herdr.core.herdr.WriteOutcome.Unknown(e.message ?: "timeout/network")
+                        }
+                        is dev.herdr.core.ssh.SshFailure.Protocol -> {
+                            val msg = e.message ?: "protocol error"
+                            val code = msg.substringBefore(":").ifBlank { "error" }
+                            writeLedger.reject(rec.clientRequestId, code, msg)
+                            dev.herdr.core.herdr.WriteOutcome.Rejected(code, msg)
+                        }
+                        else -> {
+                            writeLedger.markUnknown(rec.clientRequestId, e.message ?: "unknown")
+                            dev.herdr.core.herdr.WriteOutcome.Unknown(e.message ?: "unknown")
+                        }
+                    }
+                },
+            )
+            _composer.value = _composer.value.copy(
+                sending = false,
+                outcome = outcome,
+                message = when (outcome) {
+                    is dev.herdr.core.herdr.WriteOutcome.Accepted -> "已发送"
+                    is dev.herdr.core.herdr.WriteOutcome.Rejected -> "被拒绝：${outcome.code}"
+                    is dev.herdr.core.herdr.WriteOutcome.Unknown -> "结果未知（不会自动重发，请刷新确认）"
+                    else -> null
+                },
+            )
+        }
     }
 
     fun selectPane(pane: Pane?) {

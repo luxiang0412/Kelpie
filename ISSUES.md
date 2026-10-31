@@ -474,3 +474,9 @@
 - **原因假设**：每屏多条富文本的 measure/layout 成本 + 可能的 debug 构建开销。
 - **已知无效**：去 Card/阴影、合并为单 Text（甚至更差）。
 - **建议**：M4 用 Macrobenchmark 量化后，再考虑：文本 measure 缓存、消息分页/窗口化、release+R8+Baseline Profile。
+
+## I-65 键盘弹出时对话页的输入栏被遮挡（已修）
+
+- **现象**：点输入框后键盘弹出，发送按钮落在键盘下方，点不到。
+- **修复**：底部输入栏加 `Modifier.imePadding().navigationBarsPadding()`；实测键盘弹出时输入框与发送按钮上移到 y≈1180–1335，可正常点击（`m4-03-ime.png` / `m4-04-ime-sent.png`）。
+- **状态**：已修复。
