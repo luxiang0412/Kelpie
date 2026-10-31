@@ -11,6 +11,9 @@ import net.schmizz.sshj.sftp.SFTPClient
  */
 class SftpByteSource(private val sftp: SFTPClient) : ByteSource {
 
+    /** 句柄缓存：避免每次 readAt 都 open+close（各占 1 个往返）。 */
+    private val handles = HashMap<String, net.schmizz.sshj.sftp.RemoteFile>()
+
     /** 最近一次 stat 的原始属性，便于记录平台差异。 */
     var lastAttributes: FileAttributes? = null
         private set
@@ -26,10 +29,16 @@ class SftpByteSource(private val sftp: SFTPClient) : ByteSource {
         null
     }
 
-    override fun readAt(path: String, offset: Long, buf: ByteArray, off: Int, len: Int): Int =
-        sftp.open(path, java.util.EnumSet.of(net.schmizz.sshj.sftp.OpenMode.READ)).use { f ->
-            f.read(offset, buf, off, len)
+    override fun readAt(path: String, offset: Long, buf: ByteArray, off: Int, len: Int): Int {
+        val f = handles.getOrPut(path) {
+            sftp.open(path, java.util.EnumSet.of(net.schmizz.sshj.sftp.OpenMode.READ))
         }
+        return f.read(offset, buf, off, len)
+    }
+
+    override fun invalidate(path: String) {
+        handles.remove(path)?.let { runCatching { it.close() } }
+    }
 
     override fun headBytes(path: String, maxBytes: Int): ByteArray =
         sftp.open(path, java.util.EnumSet.of(net.schmizz.sshj.sftp.OpenMode.READ)).use { f ->

@@ -55,16 +55,44 @@ class SftpTailTest {
     }
 
     @Test
-    fun `replacement by a larger file yields Reset (size alone would miss it)`(@TempDir dir: Path) {
+    fun `replacement by a larger file is detected within prefixRecheckPolls polls`(@TempDir dir: Path) {
         val f = dir.resolve("d.jsonl")
         writeFile(f, "aaa\n".toByteArray())
-        val tail = SftpTail(LocalFileByteSource(), f.toString())
+        val cfg = TailConfig(prefixRecheckPolls = 5)
+        val tail = SftpTail(LocalFileByteSource(), f.toString(), cfg)
         assertEquals(listOf("aaa"), linesOf(tail.poll()))
 
         Files.delete(f)
-        writeFile(f, "zzz-old-content\n".repeat(20).toByteArray())   // 更大，但内容/身份变了
-        val r = tail.poll()
-        assertTrue(r is TailResult.Reset, "expected Reset on identity change, got $r")
+        writeFile(f, "zzz-old-content\n".repeat(20).toByteArray())   // 更大、mtime 更新 → size/mtime 无法立刻发现
+
+        // 设计取舍：更大文件的替换采用「有界延迟」检测（≤ prefixRecheckPolls 次 poll）
+        var resetAt: Int? = null
+        for (i in 1..6) { if (tail.poll() is TailResult.Reset) { resetAt = i; break } }
+        assertTrue(resetAt != null && resetAt <= 5, "expected Reset within 5 polls, got $resetAt")
+    }
+
+    @Test
+    fun `steady-state polls do not re-read the head prefix`(@TempDir dir: Path) {
+        val f = dir.resolve("i.jsonl")
+        writeFile(f, "l1\n".toByteArray())
+        val base = LocalFileByteSource()
+        var headCalls = 0
+        val counting = object : ByteSource {
+            override fun stat(path: String) = base.stat(path)
+            override fun readAt(path: String, offset: Long, buf: ByteArray, off: Int, len: Int) =
+                base.readAt(path, offset, buf, off, len)
+            override fun headBytes(path: String, maxBytes: Int): ByteArray {
+                headCalls++; return base.headBytes(path, maxBytes)
+            }
+        }
+        val tail = SftpTail(counting, f.toString(), TailConfig(prefixRecheckPolls = 100))
+        tail.poll()
+        assertEquals(1, headCalls)
+        for (i in 2..5) {
+            writeFile(f, "l$i\n".toByteArray(), append = true)
+            tail.poll()
+        }
+        assertEquals(1, headCalls, "稳态 poll 不应重复读前缀，实际 $headCalls 次")
     }
 
     @Test

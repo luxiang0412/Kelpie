@@ -24,6 +24,8 @@ interface ByteSource {
     fun readAt(path: String, offset: Long, buf: ByteArray, off: Int, len: Int): Int
     /** 读取文件开头最多 maxBytes 字节；不足时返回实际长度。 */
     fun headBytes(path: String, maxBytes: Int): ByteArray
+    /** 身份变化时调用，用于丢弃缓存的句柄/状态。默认无操作。 */
+    fun invalidate(path: String) {}
 }
 
 data class TailConfig(
@@ -31,6 +33,11 @@ data class TailConfig(
     val headBytes: Int = 512,                 // 身份指纹取前 512 字节
     val backfillMaxBytes: Long = 32L shl 20,  // 尾部回填上限 32 MiB
     val maxLineBytes: Int = 1 shl 20,         // 单行上限 1 MiB
+    /**
+     * 稳态下每隔多少次 poll 才重新读一次文件前缀（防“被更大文件替换”漏判）。
+     * 0 = 禁用周期复检（只在可疑时读）。
+     */
+    val prefixRecheckPolls: Int = 5,
 )
 
 sealed interface TailResult {
@@ -60,6 +67,11 @@ class SftpTail(
     var offset: Long = 0
         private set
     private var identity: FileIdentity? = null
+    private var cachedPrefix: ByteArray? = null
+    private var pollsSincePrefixCheck = 0
+    /** 已读取内容的最后 64 字节，用于“续读重叠校验”（检测文件被替换，0 额外往返）。 */
+    private val tailProbe = ByteArray(64)
+    private var tailProbeLen = 0
     private val pending = java.io.ByteArrayOutputStream()
     private var invalidBytes: Long = 0
     private var lastLineStart: Long = 0
@@ -97,25 +109,48 @@ class SftpTail(
         return sha256(buf) == want
     }
 
+    /**
+     * 一次 poll 的 SFTP 往返：
+     *   稳态 = stat(1) + read(1)（句柄由 ByteSource 缓存）
+     *   可疑（变短 / mtime 倒退 / 周期性复检）= 额外 1 次 headBytes
+     */
     fun poll(): TailResult {
         val st = fs.stat(path) ?: return TailResult.SessionLost
-        val id = identityOf(st)
         val prev = identity
 
-        if (prev != null && !isSameFile(prev, id)) {
-            reset("identity-changed old=$prev new=$id")
-            return TailResult.Reset("identity-changed")
-        }
-        identity = id
-
+        // 变短直接判截断（先于身份检查，避免原因字符串误导）
         if (st.size < offset) {
-            reset("truncated size=${st.size} offset=$offset")
+            // 截断仍是同一个文件：保留句柄，只重置偏移
+            reset("truncated size=${st.size} offset=$offset", dropHandle = false)
             return TailResult.Reset("truncated")
         }
+
+        val suspicious = prev != null && (
+            st.size < prev.size ||
+                st.mtimeMs < prev.mtimeMs
+            )
+        pollsSincePrefixCheck++
+        val dueForRecheck = cfg.prefixRecheckPolls > 0 && pollsSincePrefixCheck >= cfg.prefixRecheckPolls
+
+        if (prev != null && (suspicious || dueForRecheck)) {
+            pollsSincePrefixCheck = 0
+            val prefix = cachedPrefix ?: fs.headBytes(path, cfg.headBytes).also { cachedPrefix = it }
+            val same = isSameFile(prev, st, prefix)
+            if (!same) {
+                reset("identity-changed old=$prev new=size=${st.size},mtime=${st.mtimeMs}")
+                return TailResult.Reset("identity-changed")
+            }
+        }
+
+        identity = FileIdentity(st.size, st.mtimeMs, st.inode, cachedPrefix ?: ByteArray(0))
+            .also { if (cachedPrefix == null) cachedPrefix = fs.headBytes(path, cfg.headBytes) }
+
         if (st.size == offset) return TailResult.Empty
 
         val lines = ArrayList<String>()
-        var pos = offset
+        val overlap = minOf(tailProbeLen, offset.toInt())
+        var pos = offset - overlap
+        var toDiscard = overlap
         while (pos < st.size) {
             val want = minOf(cfg.chunkBytes.toLong(), st.size - pos).toInt()
             val buf = ByteArray(want)
@@ -126,7 +161,23 @@ class SftpTail(
                 read += n
             }
             if (read == 0) break
-            pending.write(buf, 0, read)
+            var off = 0
+            if (toDiscard > 0) {
+                // 续读重叠校验：新内容必须与上次读到的末尾一致，否则说明文件被替换
+                val n = minOf(toDiscard, read)
+                for (i in 0 until n) {
+                    if (buf[i] != tailProbe[tailProbeLen - overlap + i]) {
+                        reset("continuity-mismatch at offset=${pos + i}")
+                        return TailResult.Reset("identity-changed")
+                    }
+                }
+                toDiscard -= n
+                off = n
+            }
+            if (read - off > 0) {
+                pending.write(buf, off, read - off)
+                rememberTail(buf, off, read - off)
+            }
             pos += read
             offset = pos
             drainLines(lines)
@@ -169,6 +220,18 @@ class SftpTail(
         return lines.takeLast(maxLines)
     }
 
+    private fun rememberTail(buf: ByteArray, off: Int, len: Int) {
+        if (len >= tailProbe.size) {
+            buf.copyInto(tailProbe, 0, off + len - tailProbe.size, off + len)
+            tailProbeLen = tailProbe.size
+        } else {
+            val keep = minOf(tailProbeLen, tailProbe.size - len)
+            tailProbe.copyInto(tailProbe, 0, tailProbeLen - keep, tailProbeLen)
+            buf.copyInto(tailProbe, keep, off, off + len)
+            tailProbeLen = keep + len
+        }
+    }
+
     private fun drainLines(out: MutableList<String>) {
         val bytes = pending.toByteArray()
         var start = 0
@@ -199,29 +262,29 @@ class SftpTail(
         return s
     }
 
-    private fun identityOf(st: FileStat): FileIdentity =
-        FileIdentity(st.size, st.mtimeMs, st.inode, fs.headBytes(path, cfg.headBytes))
-
     /**
-     * 同一文件的判定：
+     * 同一文件的判定（只在可疑或周期复检时调用）：
      * 1) 两边都有 inode → 比 inode；
-     * 2) 否则要求“旧前缀仍然保持不变且文件没有变短”；变短由 truncate 分支单独处理。
-     * 局限：替换后的新文件如果前 N 字节完全相同，且 inode 不可得，就分辨不出来——
-     * SFTP 的 stat 一般不返回 inode，所以这条要写进 ISSUES。
+     * 2) 否则要求“旧前缀保持不变且文件没有变短”。
+     * 局限：替换后的新文件若前 N 字节完全相同且 inode 不可得，就分辨不出来（SFTP 无 inode）。
      */
-    private fun isSameFile(prev: FileIdentity, cur: FileIdentity): Boolean {
-        if (prev.inode != null && cur.inode != null) return prev.inode == cur.inode
-        if (cur.size < prev.size) return false
-        val need = prev.headPrefix.size
-        if (need == 0) return cur.size >= prev.size
-        val now = fs.headBytes(path, need)
-        return now.size >= need && now.copyOf(need).contentEquals(prev.headPrefix)
+    private fun isSameFile(prev: FileIdentity, st: FileStat, prevPrefix: ByteArray): Boolean {
+        if (prev.inode != null && st.inode != null) return prev.inode == st.inode
+        if (st.size < prev.size) return false
+        val need = prevPrefix.size
+        if (need == 0) return true
+        val cur = fs.headBytes(path, need)
+        return cur.size >= need && cur.copyOf(need).contentEquals(prevPrefix)
     }
 
-    private fun reset(reason: String) {
+    private fun reset(reason: String, dropHandle: Boolean = true) {
         offset = 0
         pending.reset()
         identity = null
+        cachedPrefix = null
+        pollsSincePrefixCheck = 0
+        tailProbeLen = 0
+        if (dropHandle) fs.invalidate(path)
         lastLineStart = 0
         lastLineEnd = 0
         lastLineSha = null

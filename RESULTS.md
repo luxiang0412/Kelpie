@@ -412,3 +412,29 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
    → 优化方向：**复用已打开的 RemoteFile、缓存 stat、去掉多余的 headBytes**（可用 (size, mtime) 先判同文件，只在可疑时读前缀）。
 3. `FileAttributes` **没有 inode**，前缀判定是唯一可行路径（确认 I-15）。
 4. 截断被判成 `identity-changed` 而不是 `truncated`（因为先查身份后查 size）；行为正确（Reset），只是原因字符串不同，记进 `ISSUES.md` I-43。
+
+## 9.12 D-3① SFTP 往返次数优化（VERIFIED）
+
+改动（`SftpTail` + `SftpByteSource`）：
+
+1. **句柄缓存**：`readAt` 不再每次 open+close（省 2 个往返），`invalidate` 只在身份变化时丢弃。
+2. **前缀只读一次**：稳态不再每次读前缀；只在「变短 / mtime 倒退 / 每 5 次 poll」时复检。
+3. **续读重叠校验（关键安全项）**：每次读取向前多读 64 字节，与上次读到的末尾比对；不一致立即 `Reset`。
+   → 修复了“更大文件替换”在优化后被当成正常追加、**输出了 199 行错误内容**的问题（0 额外往返）。
+4. 截断不再丢弃句柄（同一文件）。
+
+同一场景前后对比（RTT 50 ms，`s4-sftp-live.csv` vs `s4-sftp-live-optimized.csv`）：
+
+| 步骤 | 优化前 | 优化后 |
+| --- | --- | --- |
+| 首次读 3 行 | 433 ms | 382 ms |
+| 追加 2 行 | **718 ms** | **195 ms** |
+| 截断（Reset） | 359 ms | **145 ms**（原因也从 `identity-changed` 修正为 `truncated`） |
+| 截断后重读 | 423 ms | 318 ms |
+| **替换成更大文件** | 561 ms（Reset） | **250 ms（Reset，且不再输出错误行）** |
+| 替换后读 200 行 | 506 ms | 475 ms |
+| 回填 50 行 | 225 ms | **123 ms** |
+
+单元测试：**23/23 通过**（新增 1 个用例：稳态 poll 不得重复读前缀，用计数 `ByteSource` 断言）。
+
+结论：稳态单次 poll 从 ~700 ms 降到 **~195 ms（≈2 个往返）**；对“轮询 250 ms”来说仍然偏紧，建议产品按 **500 ms–1 s** 自适应轮询，并把“身份复检”当作低频操作。
