@@ -61,14 +61,20 @@ import kotlinx.coroutines.withContext
  *  - 解析完成前先显示纯文本，避免出现空白闪烁。
  *  - 代码块默认最多渲染 [CodePreviewLines] 行，展开后才渲染全部（B4「长输出按需渲染」）。
  */
+private const val SYNC_PARSE_LIMIT = 2_000
+
 @Composable
 fun MarkdownText(
     source: String,
     modifier: Modifier = Modifier,
     color: androidx.compose.ui.graphics.Color? = null,
 ) {
-    val blocks by produceState<List<MdBlock>?>(initialValue = null, source) {
-        value = withContext(Dispatchers.Default) { MarkdownAstCache.getOrParse(source) }
+    // 短文本（绝大多数消息）同步解析：<2k 字符的解析是微秒级，
+    // 异步反而会在滚动时闪出「原始 Markdown」（``` 与 * 直接可见）。
+    // 长文本仍走后台线程，避免主线程做重活。
+    val syncBlocks = if (source.length <= SYNC_PARSE_LIMIT) MarkdownAstCache.getOrParse(source) else null
+    val blocks by produceState<List<MdBlock>?>(initialValue = syncBlocks, source) {
+        if (value == null) value = withContext(Dispatchers.Default) { MarkdownAstCache.getOrParse(source) }
     }
     val palette = LocalHerdrPalette.current
 

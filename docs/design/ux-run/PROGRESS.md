@@ -12,3 +12,4 @@
 | UX-02a 工作台顶栏/主机选择器/底部导航 | PASS | 主机选择器下移、窄屏换行、分隔线；修好真机后已补 P1/P2 截图；UI 18/18 |
 | UX-02b Attention First 列表 | PASS | done 默认收起（BOARD-DONE-001）、blocked 前2条卡片、idle/unknown 分区、行内单一语义色；UI 18/18 |
 | 其余 Task Packets | TODO | 待前序完成后按序执行 |
+| UX-03a 对话正文/身份头/用户气泡 | PARTIAL | 同上；UI 回归未重跑 |

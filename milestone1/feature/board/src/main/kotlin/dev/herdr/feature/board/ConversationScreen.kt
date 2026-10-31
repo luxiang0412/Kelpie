@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -221,14 +222,20 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane) {
             contentPadding = PaddingValues(horizontal = Space.page, vertical = Space.m),
             verticalArrangement = Arrangement.spacedBy(Space.m),
         ) {
-            items(
+            itemsIndexed(
                 items = items,
-                key = { "${pane.paneId}-${it.index}" },
-                contentType = { it.javaClass.simpleName },
-            ) { item ->
+                key = { _, it -> "${pane.paneId}-${it.index}" },
+                contentType = { _, it -> it.javaClass.simpleName },
+            ) { i, item ->
+                val prev = items.getOrNull(i - 1)
                 when (item) {
                     is ConversationItem.User -> UserMessage(item.text)
-                    is ConversationItem.Assistant -> AssistantMessage(item.text)
+                    is ConversationItem.Assistant -> {
+                        // UX-03a：一组连续 Agent 回复只出现一次中性 Agent 标识（不再每条重复 11sp 绿色 "Pi"）
+                        val startsGroup = prev !is ConversationItem.Assistant
+                        if (startsGroup) AgentGroupHeader(pane)
+                        AssistantMessage(item.text)
+                    }
                     is ConversationItem.Thinking -> CollapsibleRow("思考过程", item.text, muted = true)
                     is ConversationItem.Tool -> ToolRow(item)
                     is ConversationItem.Unknown -> CollapsibleRow("未知内容", item.text, muted = true)
@@ -349,7 +356,7 @@ private fun UserMessage(text: String) {
         Surface(
             color = palette.surfaceRaised,
             shape = RoundedCornerShape(Radius.card),
-            modifier = Modifier.widthIn(max = 300.dp),
+            modifier = Modifier.fillMaxWidth(0.86f),
         ) {
             Text(
                 text,
@@ -372,13 +379,6 @@ private fun AssistantMessage(text: String) {
     val collapsible = text.length > 2500 || lineCount > 40
     var expanded by remember(text) { mutableStateOf(!collapsible) }
     Column(Modifier.fillMaxWidth()) {
-        Text(
-            "Pi",
-            style = MaterialTheme.typography.labelSmall,
-            color = palette.statusFg(AgentStatus.DONE),
-            fontWeight = FontWeight.Medium,
-        )
-        Spacer(Modifier.height(Space.xs))
         MarkdownText(
             source = if (expanded || !collapsible) text else cutAtLine(text, 1200),
             modifier = Modifier.fillMaxWidth(),
@@ -398,11 +398,35 @@ private fun AssistantMessage(text: String) {
     }
 }
 
-/** 折叠预览在换行处截断，避免把代码围栏切成“未闭合”。 */
+/** 折叠预览在换行处截断；若截断在代码围栏内，补一个闭合 fence，避免被误报「未闭合」。 */
 private fun cutAtLine(text: String, max: Int): String {
     if (text.length <= max) return text
-    val cut = text.lastIndexOf('\n', max).takeIf { it > max / 2 } ?: max
-    return text.take(cut) + "\n\n…"
+    val nl = '\n'
+    val tick = '`'
+    val cut = text.lastIndexOf(nl, max).takeIf { it > max / 2 } ?: max
+    val head = text.take(cut)
+    val fences = head.count { it == tick } / 3
+    val suffix = if (fences % 2 == 1) "$nl$nl…$nl$tick$tick$tick" else "$nl$nl…"
+    return head + suffix
+}
+
+/**
+ * Agent 分组表头：连续多条 Agent 内容共享一个标识。
+ * 未知 agent 时用中性「Agent」，不编造产品名。
+ */
+@Composable
+private fun AgentGroupHeader(pane: Pane) {
+    val palette = LocalHerdrPalette.current
+    val name = pane.agent?.takeIf { it.isNotBlank() }?.let {
+        // 已知 agent 名保留原样（pi / claude），但使用中性色，不再用状态绿当装饰
+        it.replaceFirstChar { c -> c.uppercase() }
+    } ?: "Agent"
+    Text(
+        name,
+        style = MaterialTheme.typography.labelMedium,
+        color = palette.textSecondary,
+        modifier = Modifier.padding(top = Space.xs),
+    )
 }
 
 /** thinking / tool：默认折叠，一行摘要。 */

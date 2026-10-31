@@ -159,7 +159,7 @@ private fun typography(): Typography {
         titleLarge = base.titleLarge.copy(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold),
         titleMedium = base.titleMedium.copy(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
         titleSmall = base.titleSmall.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium),
-        bodyLarge = base.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp),
+        bodyLarge = base.bodyLarge.copy(fontSize = 16.sp, lineHeight = 25.sp),
         bodyMedium = base.bodyMedium.copy(fontSize = 14.sp, lineHeight = 22.sp),
         bodySmall = base.bodySmall.copy(fontSize = 13.sp, lineHeight = 20.sp),
         labelLarge = base.labelLarge.copy(fontSize = 13.sp, lineHeight = 18.sp),
