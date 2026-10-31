@@ -28,6 +28,7 @@ fun AppRoot(vm: HostsViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
     val transcript by vm.transcript.collectAsStateWithLifecycle()
     val composer by vm.composer.collectAsStateWithLifecycle()
+    val approvals by vm.approvals.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(SCREEN_BOARD) }
 
     BackHandler(enabled = screen != SCREEN_BOARD) {
@@ -74,6 +75,8 @@ fun AppRoot(vm: HostsViewModel) {
 
         else -> BoardScreen(
             state = state,
+            approvals = approvals,
+            onApproval = { item, allow -> vm.answerApproval(item, allow) },
             onSelectHost = vm::selectHost,
             onRefresh = vm::refreshActive,
             onReconnect = { vm.reconnect(state.activeId ?: return@BoardScreen) },

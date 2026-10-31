@@ -67,6 +67,7 @@ class HostsViewModel(
     val transcript: StateFlow<TranscriptState> = _transcript.asStateFlow()
 
     val composer: StateFlow<HostConnectionManager.ComposerState> = manager.composer
+    val approvals: StateFlow<List<HostConnectionManager.ApprovalItem>> = manager.approvals
 
     private var boardJob: Job? = null
     private var transcriptTailer: dev.herdr.core.data.TranscriptTailer? = null
@@ -143,6 +144,9 @@ class HostsViewModel(
     }
 
     fun answerHostKey(accept: Boolean) = manager.answerHostKey(accept)
+
+    fun answerApproval(item: HostConnectionManager.ApprovalItem, allow: Boolean) =
+        manager.answerApproval(item, allow)
 
     // ---------------- 看板 ----------------
 

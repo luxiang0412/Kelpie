@@ -67,6 +67,17 @@ class HostConnectionManager(
     private val _hostKeyPrompt = MutableStateFlow<HostKeyPrompt?>(null)
     val hostKeyPrompt: StateFlow<HostKeyPrompt?> = _hostKeyPrompt.asStateFlow()
 
+    data class ApprovalItem(
+        val hostId: String,
+        val hostLabel: String,
+        val request: Approvals.Request,
+    )
+
+    private val _approvals = MutableStateFlow<List<ApprovalItem>>(emptyList())
+    val approvals: StateFlow<List<ApprovalItem>> = _approvals.asStateFlow()
+
+    private val audit = ArrayList<String>()
+
     private val _statusChanges = MutableSharedFlow<StatusChange>(extraBufferCapacity = 64)
     val statusChanges: SharedFlow<StatusChange> = _statusChanges.asSharedFlow()
 
@@ -136,13 +147,44 @@ class HostConnectionManager(
     private fun startTickerIfNeeded() {
         if (ticker?.isActive == true) return
         if (!started) return
+        var tick = 0
         ticker = scope.launch {
             while (true) {
-                kotlinx.coroutines.delay(5_000)
-                runtimes.values.forEach { rt -> rt.supervisor?.reconciler?.markDirty() }
+                kotlinx.coroutines.delay(2_000)
+                tick++
+                runtimes.values.forEach { rt ->
+                    if (tick % 3 == 0) rt.supervisor?.reconciler?.markDirty()   // 6s 一次状态对账
+                    pollApprovals(rt)                                            // 2s 一次审批检查
+                }
             }
         }
     }
+
+    /** 轮询沙箱审批目录（L1 文件 IPC）。 */
+    private suspend fun pollApprovals(rt: Runtime) {
+        val conn = rt.supervisor?.currentConnection() ?: return
+        val dir = "/home/${rt.cfg.user}/spike-sandbox/approvals"
+        val list = runCatching { Approvals(conn, dir).poll() }.getOrNull() ?: return
+        val now = list.filter { !it.expired }.map {
+            ApprovalItem(rt.cfg.id, rt.cfg.label, it)
+        }
+        // 合并多主机结果（按 hostId 替换本主机的部分）
+        val others = _approvals.value.filter { it.hostId != rt.cfg.id }
+        _approvals.value = others + now
+    }
+
+    fun answerApproval(item: ApprovalItem, allow: Boolean) {
+        val conn = currentConnection(item.hostId) ?: return
+        val dir = "/home/${hosts.get(item.hostId)?.user ?: "luxiang"}/spike-sandbox/approvals"
+        scope.launch {
+            val ok = runCatching { Approvals(conn, dir).answer(item.request, allow) }.getOrDefault(false)
+            audit += "${System.currentTimeMillis()} ${item.hostId}/${item.request.requestId} " +
+                "decision=${if (allow) "allow" else "deny"} written=$ok nonce=${item.request.nonce.take(6)}"
+            _approvals.value = _approvals.value.filterNot { it.request.requestId == item.request.requestId }
+        }
+    }
+
+    fun approvalAudit(): List<String> = audit.toList()
 
     fun stopTicker() {
         ticker?.cancel(); ticker = null

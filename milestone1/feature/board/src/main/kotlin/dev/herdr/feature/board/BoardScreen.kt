@@ -51,6 +51,8 @@ import java.util.Locale
 @Composable
 fun BoardScreen(
     state: HostsViewModel.UiState,
+    approvals: List<dev.herdr.core.data.HostConnectionManager.ApprovalItem>,
+    onApproval: (dev.herdr.core.data.HostConnectionManager.ApprovalItem, Boolean) -> Unit,
     onSelectHost: (String) -> Unit,
     onRefresh: () -> Unit,
     onReconnect: () -> Unit,
@@ -77,6 +79,11 @@ fun BoardScreen(
             }
             if (active != null) {
                 ConnectionBanner(active, state.board, onReconnect)
+            }
+            if (approvals.isNotEmpty()) {
+                approvals.forEach { item ->
+                    ApprovalCard(item) { allow -> onApproval(item, allow) }
+                }
             }
             if (state.board.panes.isEmpty()) {
                 EmptyState(active, state.board, onReconnect, onOpenHosts)
@@ -168,6 +175,35 @@ private fun ConnectionBanner(
             }
             if (host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED || host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.STALE) {
                 OutlinedButton(onClick = onReconnect) { Text("重连") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApprovalCard(
+    item: dev.herdr.core.data.HostConnectionManager.ApprovalItem,
+    onDecision: (Boolean) -> Unit,
+) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text("需要你确认 · ${item.hostLabel}", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(6.dp))
+            Text(item.request.question, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "request ${item.request.requestId.take(8)} · " +
+                    if (item.request.expired) "已过期" else "有效",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { onDecision(true) }) { Text("允许") }
+                OutlinedButton(onClick = { onDecision(false) }) { Text("拒绝") }
             }
         }
     }

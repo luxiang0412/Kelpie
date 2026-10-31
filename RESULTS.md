@@ -976,3 +976,39 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - 厂商后台策略：本机 MIUI **放行了**前台服务（实测后台可用），但不保证其他机型；
   必要时要引导用户关闭电池优化。
 - **`blocked`（需要你处理）的提醒尚未验证**：pi 默认不产生 blocked，需要 pi 扩展（下一步）。
+
+---
+
+# 19. M4-3：L1 结构化审批客户端（PARTIAL：客户端验证通过，pi 侧接入未定型）
+
+## 19.1 做了什么
+
+| 层 | 内容 |
+| --- | --- |
+| 请求源（沙箱） | `~/spike-sandbox/approvals/ask.sh`：写 `<id>.req`（`request_id`/`nonce`/`question`/`expires_at` 120s），轮询 `<id>.answer`，校验 **nonce + request_id**，返回 `APPROVED/DENIED/EXPIRED/INVALID` |
+| 客户端 | `Approvals`（`:core:data`）：SFTP 列目录 → 读 `.req` → 过滤过期 → 暴露给 UI；回答走 **临时文件 + rename**，带 `nonce` |
+| 管理 | `HostConnectionManager` 每 2 s 轮询审批目录（仅在监控模式），回答后立即从列表移除并写审计行 |
+| UI | 看板顶部出现「需要你确认 · <主机>」卡片：问题正文、`request <id> · 有效`、允许 / 拒绝 |
+
+## 19.2 实测（PARTIAL）
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 请求出现 | ✅ 卡片显示「需要你确认 · 开发机 .5.8 / 允许我读取项目结构吗？/ request 64c8760a · 有效」 | `m4-07-approval-card.png` |
+| 点“允许”后写入回答 | ✅ 审批目录里的 `.req`/`.answer` 被脚本消费（目录只剩 `ask.sh`），脚本退出后 pi 继续（pane 显示 `Elapsed 52.0s` 后回到 Working） | 目录快照 + pane 内容 |
+| nonce 校验 | ✅ 脚本端校验 `nonce`+`request_id`，不匹配返回 `INVALID_OR_REPLAY` | `ask.sh` 代码 |
+| 过期与重放 | ✅ 脚本 120 s 超时返回 `EXPIRED`；回答文件读一次即删 | `ask.sh` 代码 |
+| **“一次工具调用只产生一次请求”** | ❌ **未达成**：用自然语言让 pi 执行脚本时，pi 会自己包一层循环/重试，产生了多个请求（64c8760a → 551bc6ed → cc2d007d） | logcat/UI |
+
+## 19.3 结论
+
+- **客户端这半边（发现请求 → 展示 → 允许/拒绝 → 写回答 → 审计）已经跑通**，且严格按 D5 契约（nonce/过期/一次性）。
+- **pi 侧接入方式还没定型**：靠“提示 pi 去跑脚本”不可靠（pi 会重试/包循环）。
+  正确做法是写 **pi 扩展**（注册一个工具或用 `ctx.ui.confirm`），让每次权限请求恰好产生一次 `.req`。
+  这需要 pi 扩展 API 的具体用法（`~/.pi/agent/npm/.../pi-coding-agent` 的 docs 在本机是缺失的，需再查）。
+- 因此本节状态标 **PARTIAL**：客户端已验证，触发源待替换为扩展。
+
+## 19.4 下一步（二选一）
+
+1. **补齐 pi 扩展**：查 pi 扩展 API（`pi.registerTool` / `pi.on("tool_call")` + `ctx.ui.confirm`），让 ask 变成一个真正的工具；
+2. **换 Claude hook**：`PermissionRequest` hook 天然一次调用一次请求，且是你日常使用的 agent（需要批准改 `~/.claude`）。
