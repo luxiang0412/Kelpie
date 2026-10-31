@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -62,6 +63,8 @@ import dev.herdr.core.herdr.WriteOutcome
 import dev.herdr.feature.board.conversation.ConversationItem
 import dev.herdr.feature.board.conversation.ConversationBranch
 import dev.herdr.feature.board.conversation.IncrementalConversationMapper
+import dev.herdr.feature.board.design.DisclosureIndicator
+import dev.herdr.feature.board.design.TouchTargetIconButton
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.MonoStyle
 import dev.herdr.feature.board.markdown.MarkdownText
@@ -285,7 +288,7 @@ private fun ToolRow(item: ConversationItem.Tool) {
                 },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(if (expanded) "▾" else "▸", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+            DisclosureIndicator(expanded)
             Spacer(Modifier.width(Space.xs))
             Text(
                 item.name,
@@ -416,11 +419,7 @@ private fun CollapsibleRow(title: String, body: String, mono: Boolean = false, m
                 .semantics { contentDescription = "$title，${if (expanded) "已展开" else "已折叠"}，点击切换" },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                if (expanded) "▾" else "▸",
-                style = MaterialTheme.typography.labelMedium,
-                color = palette.textSecondary,
-            )
+            DisclosureIndicator(expanded)
             Spacer(Modifier.width(Space.xs))
             Text(
                 title,
@@ -579,12 +578,11 @@ private fun ComposerBar(
                         capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
                     ),
                 )
-                TextButton(
+                TouchTargetIconButton(
+                    iconRes = dev.herdr.feature.board.R.drawable.ic_fullscreen,
+                    contentDescription = "打开长 Prompt 编辑",
                     onClick = { longEditor = true },
-                    modifier = Modifier.heightIn(min = 48.dp).widthIn(min = 48.dp),
-                ) {
-                    Text("⤢", style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
-                }
+                )
                 Surface(
                     color = if (canSend) palette.accent else palette.outline,
                     shape = RoundedCornerShape(Radius.chip),

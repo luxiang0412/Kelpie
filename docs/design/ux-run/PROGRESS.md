@@ -7,7 +7,8 @@
 | UX-00 仓库审计与基线 | PASS | 分支 `ux/graphite-editorial`；审计与基线文档已提交 |
 | UX-01a 对话顶栏大字体裁剪 | PASS | 自适应高度单行标题；fontScale 1.3 真机验证；UI 16/16 无回归 |
 | UX-01b InlineCode 保真 | PASS | 移除空格伪 padding；新增 2 项 UI 保真断言（AVD 通过） |
-| UX-00a 基础 Tokens/Theme/图标契约 | PARTIAL | 色值对齐 §2.2 + borderSubtle + 34 项对比度测试通过；图标契约/字阶语义命名未做 |
+| UX-00a 基础 Tokens/Theme/图标契约 | PASS | 色值对比度 34 项 + 4 个矢量图标 + Component/字阶契约；页面留白组件待接入（转 UX-02a） |
+| FIX-01 未捕获 SSH 异常致崩溃 | PARTIAL | handler + runCatching 已加；设备侧复现失败（WiFi adb 被杀），未验证 |
 | UX-02a 工作台顶栏/主机选择器/底部导航 | TODO | |
 | UX-02b Attention First 列表 | TODO | |
 | 其余 Task Packets | TODO | 待前序完成后按序执行 |

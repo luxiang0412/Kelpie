@@ -661,3 +661,17 @@
 ## I-94 旋转场景只观察到“未丢草稿”，未证明没有二次加载覆盖
 
 - 横屏后草稿仍在、输入栏可点；但 Activity 重建时的 `loadDraft` 与用户输入竞争未做专项验证。
+
+## I-95 SSH 断链异常未捕获 → 进程 FATAL（已加固，未设备验证）
+
+- **证据**：`logcat -b crash` 三次 `FATAL EXCEPTION: DefaultDispatcher-worker-N`，根因
+  `ConnectionException: Broken transport; encountered EOF`（摘要 `spike/results/ux-crash-evidence.txt`）
+- **修复**：`appScope`/`MonitorService` 增加 `CoroutineExceptionHandler`；`readPane` 轮询加 `runCatching`
+- **未验证**：设备侧复现失败（该机只走 WiFi adb，关 WiFi 后即离线）
+- **建议**：用 USB adb 或断网开关（`adb shell cmd connectivity airplane-mode`）复现；必要时逐个 SSH 调用加 `runCatching`
+
+## I-96 本轮操作事故：关闭真机 WiFi 导致 adb 离线
+
+- 为复现断链执行 `svc wifi disable`，但该机 adb 走 WiFi，命令导致自身失去连接渠道，未能恢复。
+- **影响**：真机暂时失联（不影响数据）；后续真机截图与验收需用户手动开 WiFi 或重启。
+- **教训**：涉及网络开关的设备实验，必须先确认 adb 传输通道（USB vs WiFi），或改用 `airplane-mode` + 预留恢复路径。

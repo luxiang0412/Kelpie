@@ -135,7 +135,7 @@ class ComposerUiTest {
     @Test
     fun longPromptEditor_opensAndKeepsText() {
         render(HostConnectionManager.ComposerState(text = "第一行"))
-        rule.onNodeWithText("⤢").performClick()
+        rule.onNodeWithContentDescription("打开长 Prompt 编辑").performClick()
         rule.onNodeWithText("长 Prompt").assertExists()
         rule.onNodeWithText("3 字符（草稿会自动保存）").assertExists()
     }

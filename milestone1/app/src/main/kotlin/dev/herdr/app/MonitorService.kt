@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import dev.herdr.core.herdr.AgentStatus
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,7 +47,12 @@ class MonitorService : Service() {
         }
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            CoroutineExceptionHandler { _, e ->
+                android.util.Log.w("HerdrScope", "monitor uncaught: ${e.javaClass.simpleName}")
+            },
+    )
     private var collectJob: Job? = null
     private val lastNotified = HashMap<String, Long>()
 

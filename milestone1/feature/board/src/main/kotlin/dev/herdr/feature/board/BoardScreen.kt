@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import dev.herdr.core.data.HostConnectionManager
 import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.Pane
+import dev.herdr.feature.board.design.ChevronAffordance
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.Motion
 import dev.herdr.feature.board.design.Radius
@@ -321,7 +322,7 @@ private fun AttentionCard(pane: Pane, onSelectAgent: (Pane) -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text("›", style = MaterialTheme.typography.titleLarge, color = palette.textSecondary)
+            ChevronAffordance()
         }
     }
 }
@@ -370,7 +371,7 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text("›", style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
+        ChevronAffordance()
     }
 }
 

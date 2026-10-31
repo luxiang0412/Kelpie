@@ -1,22 +1,25 @@
-# UX-00a report — 基础 Tokens / Theme / 对比度（PARTIAL）
+# UX-00a report — 基础 Tokens / Theme / 图标契约（PARTIAL → 图标与组件已补）
 
-- baseline commit / branch：`128632a` / `ux/graphite-editorial`
-- inspected real files：`feature/board/.../design/Tokens.kt`（`HerdrPalette`、`LightPalette`、`DarkPalette`、`Space`、`Radius`、`Motion`、`StatusText`、`MonoStyle`、`typography()`）、`Theme.kt`、所有使用 `LocalHerdrPalette` 的页面
-- exact goal：把 Graphite × Editorial §2.2 的颜色/对比度落到**唯一** Token 实现上；不重构页面布局，避免截图差异无法归因
+- baseline commit / branch：`6b10196`（本节）/ `ux/graphite-editorial`
+- inspected real files：`design/Tokens.kt`、`Theme.kt`、`BoardScreen.kt:324,373`（`›` 字形）、`ConversationScreen.kt:288,420,586`（`▸▾` `⤢` 字形）、`app/src/androidTest/.../ComposerUiTest.kt`（依赖 `⤢` 文本）
+- exact goal（本轮新增部分）：把主要点击控件的**字体字形图标**替换为矢量图标 + 48dp 触达；补语义字阶与页面留白组件
 - changed files：
-  - `design/Tokens.kt`：`HerdrPalette` 新增 `borderSubtle`；Light/Dark 色值对齐 §2.2（canvas/surface/raised/textPrimary/textSecondary/accent/onAccent/borderSubtle）；`LightPalette`/`DarkPalette` 由 `private` 改 `internal` 以便 JVM 对比度测试读取
-  - 新增 `feature/board/src/test/.../design/ContrastTest.kt`（纯 JVM，WCAG 2.1 相对亮度）
-- why matches UX-D0：§2.2 明确「业务页面禁止散落色值」「borderSubtle 不是焦点线」；本轮只改 token 值 + 可见性，未改任何页面结构
-- tests：`:feature:board:testDebugUnitTest` **BUILD SUCCESSFUL**，`ContrastTest` 34 项断言全通过，实测最小值：
-  - 文本：light `textSecondary/raised` **5.97**、dark `textSecondary/raised` **7.18**（阈值 4.5）
-  - 状态色：light 最低 `IDLE/statusBg` **5.41**、dark 最低 `IDLE/statusBg` **6.16**（阈值 3.0）
-  - accent/onAccent：light **6.22**、dark **8.76**
-- screenshots：`spike/results/ux00a-board-dark.png`（看板，深色，fontScale 1.0，zh-CN，真机）、`spike/results/ux00a-conv-dark.png`（对话，同条件）
-- safety regressions checked：未改发送/草稿/账本/配对/连接/草稿库；无 Room 结构变化；`borderSubtle` 仅新增字段
+  - 新增 `design/Components.kt`：`PageGutter`（20/16dp）、`ComposerGutter`（16/12dp）、`TouchTargetIconButton`、`ChevronAffordance`、`DisclosureIndicator`、`AppTextStyles`（@Composable getter，单一真相）
+  - 新增 4 个 Vector drawable：`ic_chevron_right`、`ic_collapsed`、`ic_expanded`、`ic_fullscreen`（各 < 1KB）
+  - `BoardScreen.kt`：两处 `›` → `ChevronAffordance()`
+  - `ConversationScreen.kt`：三处 `▸/▾` → `DisclosureIndicator(expanded)`；Composer `⤢` → `TouchTargetIconButton(ic_fullscreen, "打开长 Prompt 编辑")`
+  - `ComposerUiTest.kt`：点击目标从文本 `⤢` 改为 contentDescription
+- why matches UX-D0：§2.2「不再用 `›` `▸` `⤢` 等字形做主要点击图标」「图标视觉 20–24dp、触达 ≥48dp」
+- tests：
+  - `:app:assembleDebug` BUILD SUCCESSFUL
+  - `:feature:board:testDebugUnitTest` BUILD SUCCESSFUL
+  - AVD `herdr_m2c1` 全量 UI：**OK (18 tests)**（原 16 + InlineCodeFidelity 2）
+- screenshots：`spike/results/ux00a2-conv-light.png`（真机 1080×2400，Light，zh-CN，fontScale 1.0）：顶栏单行、Composer 出现矢量全屏图标、行内码紧贴、无空格伪 padding
+- safety regressions：未改发送/草稿/账本/配对/连接；仅替换图标与新增组件
 - 四类结论：
-  - **已实现并验证**：色值对齐 §2.2；`borderSubtle` 语义 token；34 项对比度断言（JVM）通过；深色看板/对话真机截图
-  - **已实现但未验证**：321dp/320dp 极窄（P5/P6）与 en 语言（P3/P4）截图未拍
-  - **未实现**：图标契约（`›`/`▸`/`⤢` 字形仍是主要点击/指示符号）、`AppTextStyles` 语义字阶命名（目前直接引用 Material typography）、`TouchTargetIconButton`/`PageGutter` 共享组件
-  - **已知问题**：深色色值改动属**默认值变更**，标 `PROVISIONAL / 待用户视觉终审`；字阶仍是 8 档但页面只用 3 档，属 UX-02 系列任务范围
-- commit：见本条提交
+  - **已实现并验证**：4 个矢量图标 + 48dp 触达；`›`/`▸`/`▾`/`⤢` 字形清零；语义字阶与留白组件落地；18 项 UI 测试通过
+  - **已实现但未验证**：`PageGutter`/`ComposerGutter` 尚未被页面引用（下一任务接入）；320dp/fontScale1.6（P5/P6）未截图
+  - **未实现**：正式图标集（copy/更多/设置等仍需后续任务）；`AppTextStyles` 尚未替换全部页面字号
+  - **已知问题**：图标为手绘近似 Material 形状，非品牌资产；标 `PROVISIONAL`
+- commit：见 `ux(UX-00a): …` 提交
 - rollback：`git revert <commit>`

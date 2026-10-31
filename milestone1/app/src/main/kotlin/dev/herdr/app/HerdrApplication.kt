@@ -14,8 +14,17 @@ import kotlinx.coroutines.launch
 
 class AppContainer(app: Application) {
 
+    /**
+     * 兜底：SSH 传输层异常（如 `Broken transport; encountered EOF`）可能在 Default 调度器上
+     * 以未捕获异常形式冒出；没有 handler 时会直接 FATAL 整个进程（2026-11-01 实测三次）。
+     * 这里只记录标签与异常类型，**不打印**主机、路径或消息内容。
+     */
+    private val crashGuard = kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        android.util.Log.w("HerdrScope", "uncaught background exception: ${e.javaClass.simpleName}")
+    }
+
     val appScope = kotlinx.coroutines.CoroutineScope(
-        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default,
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default + crashGuard,
     )
     val prefs = AppPrefs(app)
     val hosts = HostRepository(app)
