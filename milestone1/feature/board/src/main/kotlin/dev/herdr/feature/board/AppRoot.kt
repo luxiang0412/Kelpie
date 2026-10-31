@@ -55,6 +55,10 @@ fun AppRoot(vm: HostsViewModel) {
                 vm.selectPane(null)
                 screen = SCREEN_BOARD
             },
+            composer = composer,
+            onTextChange = vm::updateComposerText,
+            onSend = { state.board.selectedPane?.let { vm.sendPrompt(it) } },
+            onDismissOutcome = vm::clearComposerOutcome,
             onOpenTranscript = state.board.selectedPane?.agentSessionPath?.let {
                 {
                     state.board.selectedPane?.let { p -> vm.openTranscript(p) }

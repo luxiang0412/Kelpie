@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -26,13 +28,68 @@ import dev.herdr.core.herdr.Pane
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PaneDetailScreen(pane: Pane?, onBack: () -> Unit, onOpenTranscript: (() -> Unit)? = null) {
+fun PaneDetailScreen(
+    pane: Pane?,
+    onBack: () -> Unit,
+    onOpenTranscript: (() -> Unit)? = null,
+    composer: dev.herdr.core.data.HostConnectionManager.ComposerState? = null,
+    onTextChange: (String) -> Unit = {},
+    onSend: () -> Unit = {},
+    onDismissOutcome: () -> Unit = {},
+) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Pane 详情") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
             )
+        },
+        bottomBar = {
+            if (pane != null) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .imePadding()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    val canSend = pane.agent != null && composer != null
+                    composer?.message?.let { msg ->
+                        val color = when (composer.outcome) {
+                            is dev.herdr.core.herdr.WriteOutcome.Rejected -> MaterialTheme.colorScheme.error
+                            is dev.herdr.core.herdr.WriteOutcome.Unknown -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.outline
+                        }
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text(msg, style = MaterialTheme.typography.labelSmall, color = color, modifier = Modifier.weight(1f))
+                            TextButton(onClick = onDismissOutcome) { Text("知道了") }
+                        }
+                    }
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        androidx.compose.material3.OutlinedTextField(
+                            value = composer?.text ?: "",
+                            onValueChange = onTextChange,
+                            modifier = Modifier.weight(1f),
+                            placeholder = {
+                                Text(if (pane.agent == null) "这个 pane 没有运行 agent" else "给 ${pane.agent} 发消息…")
+                            },
+                            maxLines = 4,
+                            enabled = canSend && composer?.sending != true,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        androidx.compose.material3.Button(
+                            onClick = onSend,
+                            enabled = canSend && composer?.text?.isNotBlank() == true && composer?.sending != true,
+                        ) { Text(if (composer?.sending == true) "发送中" else "发送") }
+                    }
+                    Text(
+                        if (canSend) "写操作超时会被标记为“未知”，不会自动重发（D2/D21）"
+                        else "只有运行 agent 的 pane 才能接收消息",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+            }
         },
     ) { padding ->
         if (pane == null) {

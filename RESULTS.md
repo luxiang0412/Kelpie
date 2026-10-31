@@ -1012,3 +1012,34 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 
 1. **补齐 pi 扩展**：查 pi 扩展 API（`pi.registerTool` / `pi.on("tool_call")` + `ctx.ui.confirm`），让 ask 变成一个真正的工具；
 2. **换 Claude hook**：`PermissionRequest` hook 天然一次调用一次请求，且是你日常使用的 agent（需要批准改 `~/.claude`）。
+
+---
+
+# 20. 回复入口修复（2026-10-31）
+
+## 问题
+
+用户反馈“App 里看不到回复消息的入口”。原因有两层：
+
+1. **入口太深**：原来只有「看板 → 点 pane → 详情 → 查看对话 → 对话页底部」这一条路径；
+2. **多数情况根本没有入口**：`查看对话` 按钮只在 pane 上报了 `agent_session`（JSONL 路径）时才显示，
+   而用户日常跑的 pi 没有安装 herdr 的 pi 集成 → `agent_session = null` → 按钮不出现。
+
+实测确认：`w1:p1` 的 `agent_session` 为 `null`，详情页确实没有任何回复入口（`m5-01-no-reply-entry.png`）。
+
+## 修复
+
+把**回复输入栏直接放到 Pane 详情页底部**（`PaneDetailScreen` 的 `bottomBar`）：
+
+- 不再依赖 transcript / `agent_session`；
+- 只有 `pane.agent != null` 时可发送，否则输入框禁用并提示“这个 pane 没有运行 agent”；
+- 沿用 `WriteLedger` 三态：已发送 / 被拒绝 / 结果未知（不自动重发）；
+- 键盘弹出时 `imePadding()` 顶起，发送按钮始终可点。
+
+## 验证（VERIFIED）
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 普通 pi pane（`w1:p1`，`agent_session=null`） | ✅ 详情页出现「给 pi 发消息…」输入框 + 发送 | `m5-02-reply-entry.png` |
+| 真实发送（沙箱 `w4:p1`） | ✅ 输入 `reply with just DETAIL` → 详情页显示「已发送」→ pi 回复 `DETAIL` | `m5-03-reply-detail.png` + pane 内容 |
+| 无 agent 的 shell pane | ✅ 输入框禁用 + 提示 | 代码 |
