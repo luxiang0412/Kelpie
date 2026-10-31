@@ -152,3 +152,19 @@ P-4  → 只在你想把“9”变成确定值时做                            
 2. **transcript 视图（只读）**：用 `agent_session.path`（D35）+ SFTP + `SftpTail` 渲染 pi 的 JSONL。
 3. **主机体验**：只连活动主机开关、排序/搜索、跨主机聚合“等你处理”总数。
 4. **写操作（仅 L1）**：需先定审批路线（Claude hook / herdr-acp）。
+
+
+## M2 完成后的状态（2026-10-31）
+
+- ✅ M2-1 多主机：两台**真实**主机（.5.8 / .5.31）并行连接、chips 切换、独立 Supervisor/信任库/Room
+- ✅ M2-2A 性能基线：冷启动中位 555 ms、滚动 jank 0.90%（120 Hz）
+- ✅ M2-2B transcript 只读：`agent_session.path` → SFTP 尾部快照 → pi JSONL → 消息列表；2 s 自动刷新
+- 单测：17/17（分组 5 + 编解码 9 + 解析器 3）；Room 仪器测试 4/4
+
+### M3 候选（按价值）
+
+1. **transcript 增量化**：移植 `SftpTail`（D25 三条硬约束）+ Room 缓存 + 离线可看 + 只读历史。
+2. **Macrobenchmark**：`:benchmark` 模块、StartupTiming/FrameTiming、Baseline Profile、流式输出场景。
+3. **输入与审批（仅 L1）**：`agent.prompt` + 结构化审批（pi 集成或 Claude hook）；D22 禁止读屏一键批准。
+4. **多主机聚合**：跨主机“等你处理”总数、只连活动主机开关（D37 边界）。
+5. **Claude/Codex 的 transcript parser**（Provider 化，D19）。

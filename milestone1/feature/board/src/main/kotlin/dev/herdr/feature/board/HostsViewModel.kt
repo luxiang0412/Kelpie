@@ -79,6 +79,7 @@ class HostsViewModel(
     private val _transcript = MutableStateFlow(TranscriptState())
     val transcript: StateFlow<TranscriptState> = _transcript.asStateFlow()
     private val loader = dev.herdr.core.herdr.TranscriptLoader()
+    private var transcriptPoll: Job? = null
 
     private class Runtime(
         val cfg: HostRepository.HostConfig,
@@ -185,6 +186,7 @@ class HostsViewModel(
         }
         _transcript.value = TranscriptState(path = path, loading = true)
         loadTranscript(path)
+        startTranscriptPolling(path)
     }
 
     fun reloadTranscript() {
@@ -194,7 +196,29 @@ class HostsViewModel(
     }
 
     fun closeTranscript() {
+        transcriptPoll?.cancel()
+        transcriptPoll = null
         _transcript.value = TranscriptState()
+    }
+
+    /**
+     * 只读对话的**自动刷新**（M3）：打开期间每 2 s 重新读一次尾部快照。
+     * 不做增量 offset（M4 再接 SftpTail），但避免“手动点刷新才更新”的割裂感。
+     */
+    private fun startTranscriptPolling(path: String) {
+        transcriptPoll?.cancel()
+        transcriptPoll = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(2_000)
+                val hostId = _state.value.activeId ?: continue
+                val conn = runtimes[hostId]?.supervisor?.currentConnection() ?: continue
+                val r = runCatching { loader.load(conn, path) }
+                val msgs = r.getOrNull() ?: continue
+                if (msgs.size != _transcript.value.messages.size || msgs.lastOrNull() != _transcript.value.messages.lastOrNull()) {
+                    _transcript.value = _transcript.value.copy(messages = msgs, loading = false, error = null)
+                }
+            }
+        }
     }
 
     private fun loadTranscript(path: String) {

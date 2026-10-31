@@ -88,7 +88,7 @@ fun BoardScreen(
                 ) {
                     state.board.groups.forEach { group ->
                         item(key = "h-${group.status}") { GroupHeader(group) }
-                        items(group.panes, key = { it.paneId }) { pane ->
+                        items(group.panes, key = { "${state.activeId}-${it.paneId}" }) { pane ->
                             PaneCard(pane) { onSelectPane(pane) }
                         }
                     }

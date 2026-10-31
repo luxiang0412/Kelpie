@@ -827,3 +827,15 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 | 隔离 | 两台主机各自独立 Supervisor / 信任库 / Room 分区 | logcat + 代码 |
 
 至此“多主机”在**两台真实机器**上验证通过（不是合成数据）。
+
+## 14.6 transcript 自动刷新（M3，VERIFIED）
+
+- 打开对话页期间，每 **2 s** 重新读一次尾部快照（仍非 offset 增量），消息集合变化才更新 UI。
+- 实测：对话页打开（已有 #1/#2），在主机上让 pi 再跑一轮（**不点刷新**），2–3 s 后页面自动出现 `#3 你：用一句话告诉我 2+2 等于几` 与 `#4 assistant：2+2 等于 4。`
+- 证据：`spike/results/m2-09-transcript-autorefresh.png`。
+- 代价：每次 256 KiB 尾部读 + 解析，50 ms RTT 下约 200–400 ms；M4 换成 `SftpTail`（offset 增量）后可把成本降到只读增量。
+
+## 14.7 顺手修的两个小问题
+
+1. `LazyColumn` 的 item key 改成 `"${activeId}-${paneId}"`，避免切换主机时列表状态复用导致偶发的“卡片缺失”观感（未稳定复现，预防性修复）。
+2. 多主机切换后，看板重进会与主机真实快照逐项一致（本轮核对过 5 个 pane 的状态与 agent）。
