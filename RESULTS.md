@@ -1156,3 +1156,11 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
   新增显式 `MIGRATION_1_2`（升级不清空草稿）。
 - **回归**：Compose UI 16/16 通过；JVM 全部通过。
 - **未验证**：真机 IME/TalkBack/旋转/最大字号；真实 E2E；Room 迁移测试（I-89）；防抖窗口丢稿风险（I-90）。
+
+## 真实 Pi E2E（已获批准，2026-10-31 17:20）
+
+- 真机 → `test`/`w7:p1` 发送 `Reply-with-one-line-M2C2V-ACK-0120`；
+- Herdr 返回 **Accepted**（UI 横幅）；远端 JSONL 14 → **16 行**（user `985860c5` → assistant `e546b12a`，间隔 1.85s）；
+- Pi 回复内容 `M2C2V-ACK-0120` 与预期一致；App **增量显示**该回复，底部时自动跟随；
+- 未验证：上滑不跳底/新消息提示、断线重连、分支切换、Tool 关联、APPEND/PATCH/FULL 计数（无埋点）。
+- 证据：`spike/results/m2c2v-{board-before,conv-before,typed,sent,reply}.png`

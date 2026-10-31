@@ -178,3 +178,52 @@ JVM:         全部通过         ← 新增 WriteLedgerPersistTest 5 个
 | 真实链路 | **弱**：真实 Pi 会话从未跑通过一次发送→回复→增量显示 |
 | 真机手感 | **未知**：IME/TalkBack/旋转/字号全未人工验收 |
 | 性能 | **无数据**：没有一次可信的真机 FrameTimingMetric |
+
+---
+
+# 真实 Pi E2E 执行记录（已获批准，2026-10-31 17:20 UTC+8）
+
+## 授权与范围
+
+| 项 | 值 |
+| --- | --- |
+| 批准 | 用户明确批准本轮 E2E 写入 |
+| 目标 | `luxiang@192.168.5.8` / Session `test` / pane `w7:p1`（pi，cwd `~/project/private/herdr-gui-research`） |
+| Prompt | `Reply-with-one-line-M2C2V-ACK-0120`（无命令、不触发工具） |
+| 写入 | 仅该 pane 的 pi 会话 JSONL 追加事件 |
+| 未触碰 | 其他 Session（`default`/`ljn`）、全局 pi 配置、仓库文件 |
+
+## 时间线（可复核）
+
+| 时间 | 事件 | 证据 |
+| --- | --- | --- |
+| 17:19 | 基线：JSONL **14 行**，`w7:p1` `done` / `completion_seq=122` | ssh `wc -l` |
+| 17:19 | 真机打开会话，渲染真实 pi 回复（标题/列表/行内代码全部正确） | `m2c2v-conv-before.png` |
+| 17:20 | 输入 prompt，**键盘弹出但输入栏未被遮挡**，文本换行 2 行，发送键变为可用（蓝） | `m2c2v-typed.png` |
+| 17:20:4x | 点击发送 → 气泡出现 → 显示「**已接受（Accepted）：远端已收到，未代表执行完成**」，输入框清空 | `m2c2v-sent.png` |
+| 17:20:41.108Z | 远端 JSONL 新增 **user** 事件 `id=985860c5, parentId=555d4c38` | ssh tail |
+| 17:20:42.960Z | 远端 JSONL 新增 **assistant** 事件 `id=e546b12a, parentId=985860c5`，内容 `M2C2V-ACK-0120` | ssh tail + python 解析 |
+| 17:21 | App 增量显示该回复（`Pi` 标签 + 文本），列表在底部时自动跟随 | `m2c2v-reply.png` |
+| 结束 | JSONL **16 行**（+2），prompt 文本出现 2 次（user + assistant 复制） | ssh `wc -l` / `grep -c` |
+
+## 结论（区分两件事）
+
+- **Herdr 接受输入**：✅ 已证实（Accepted 横幅 + 远端事件落盘）。
+- **Pi 已处理完成**：✅ 已证实（JSONL 出现 `role=assistant` 的回复，内容与预期一致）。
+- **App 增量显示**：✅ 已证实（无需手动刷新；回复出现在用户消息之后）。
+
+## 仍未验证（诚实标注）
+
+| 项 | 原因 |
+| --- | --- |
+| 上滑阅读时不被拉回底部 / 「↓ 新消息」提示 | 本次回复很快到达且列表在底部，未构造"先上滑再等新消息"的场景 |
+| 断线重连后不重复消息、不误发 | 未做断网实验 |
+| 分支切换 | 未在该会话制造分支 |
+| APPEND / PATCH / FULL 命中计数 | 应用内无该埋点（只有单测断言），本轮只能从「+2 条增量显示、无整页重载」间接推断 |
+| ToolCall/ToolResult 真实关联 | 本次 prompt 未触发工具调用 |
+
+## 顺带发现
+
+1. 看板真实数据下状态词正确（`已完成` / `空闲`），与 snapshot 的 `done`/`idle` 一致。
+2. 发送后 Accepted 横幅常驻直到手动「知道了」—— 符合设计（不自动消失，避免用户错过）。
+3. 真机 MIUI 输入法下 `input text` 注入与手动输入表现一致，输入栏位置正确（IME 验收的一个子项已覆盖）。
