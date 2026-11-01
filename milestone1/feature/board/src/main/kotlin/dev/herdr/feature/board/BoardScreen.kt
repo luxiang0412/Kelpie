@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -211,7 +212,10 @@ fun BoardScreen(
                 }
             } else {
                 LazyColumn(
-                    Modifier.fillMaxSize(),
+                    Modifier
+                        .fillMaxSize()
+                        .widthIn(max = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600) 720.dp else Int.MAX_VALUE.dp)
+                        .align(Alignment.CenterHorizontally),
                     contentPadding = PaddingValues(start = pageGutter, end = pageGutter, bottom = Space.huge),
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {

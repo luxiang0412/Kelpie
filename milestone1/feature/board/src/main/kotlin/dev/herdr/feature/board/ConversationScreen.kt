@@ -375,7 +375,10 @@ private fun MessageList(
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600) 720.dp else Int.MAX_VALUE.dp)
+                .align(Alignment.TopCenter),
             contentPadding = PaddingValues(horizontal = Space.page, vertical = Space.m),
             verticalArrangement = Arrangement.spacedBy(Space.m),
         ) {
