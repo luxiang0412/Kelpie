@@ -40,3 +40,7 @@
 - 方案 B（`5a53ae7`）：`ClaudeTranscriptParser` + 按路径分发。
 - 方案 C（`da5afca`）：`ClaudeSessionLocator`（纯逻辑）+ `ClaudeSessionResolver`（只读 SFTP 定位）。
 - **真机 E2E 首发通过**：`docs/design/ux-run/ADAPT-CLAUDE-E2E.md`。修复 C-1（缓存丢 `agentSessionId`）、C-2（`hasTranscript` 判据）、C-3（回填窗口切掉首条 user 消息）。
+
+## 缺口补齐：GFM 表格（I-99）
+
+`MdBlock.Table` + `TableBlock`（表头/分隔线/列等分），`PARSER_VERSION` 2→3；单测 `MarkdownTableTest` 6 项，真机浅/深色截图（`spike/results/table1.png`、`table-dark.png`）。

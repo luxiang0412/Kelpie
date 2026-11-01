@@ -682,5 +682,5 @@
 ## I-98 Claude 历史被分支回溯截断（已修）
 `ConversationBranch` 依 `parentId` 回溯，Claude 的 `parentUuid` 指向被跳过的非消息事件导致链路中断、断点前消息（含工具卡）整段丢失。已改为 Claude 不输出 `parentId`，并在 `ConversationBranch` 中退化为线性渲染。
 
-## I-99 Markdown 表格不渲染（未实现）
-Claude 常输出 GFM 表格，当前渲染成带竖线的普通文字。`MarkdownParser` 无 table 块类型，属功能缺口。
+## I-99 Markdown 表格不渲染（已修）
+`MarkdownParser` 增加 `MdBlock.Table`（表头 + 分隔行识别、单元格行内语法、列数容错、纯文本投影），`MarkdownText` 增加 `TableBlock` 渲染；`PARSER_VERSION` 2→3。单测 6 项 + 真机浅/深色截图验证。

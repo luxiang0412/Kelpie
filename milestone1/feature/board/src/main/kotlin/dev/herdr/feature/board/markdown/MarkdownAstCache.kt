@@ -15,7 +15,7 @@ package dev.herdr.feature.board.markdown
  */
 object MarkdownAstCache {
 
-    const val PARSER_VERSION = 2
+    const val PARSER_VERSION = 3
     const val MAX_ENTRIES = 256
     const val MAX_SOURCE_LENGTH = 120_000
     private const val SAMPLE = 48

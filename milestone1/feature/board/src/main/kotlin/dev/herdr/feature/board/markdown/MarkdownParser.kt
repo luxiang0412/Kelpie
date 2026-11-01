@@ -11,8 +11,9 @@ package dev.herdr.feature.board.markdown
  *   - 围栏代码块 ```lang
  *   - 行内：`code`、**bold**、*italic*、[text](url)
  *   - 段落（空行分隔）
+ *   - GFM 表格（`| a | b |` + `|---|---|`，首行为表头；对齐标记忽略，单元格支持行内语法）
  *
- * 不支持（有意）：嵌套列表、表格、图片、HTML、脚注、setext 标题、转义序列扩展。
+ * 不支持（有意）：嵌套列表、图片、HTML、脚注、setext 标题、转义序列扩展。
  * 未知语法按普通文本渲染，绝不抛异常。
  */
 sealed interface MdBlock {
@@ -22,6 +23,8 @@ sealed interface MdBlock {
     data class Ordered(val start: Int, val items: List<List<MdSpan>>) : MdBlock
     data class Quote(val spans: List<MdSpan>) : MdBlock
     data class CodeFence(val language: String?, val code: String, val closed: Boolean) : MdBlock
+    /** GFM 表格：首行表头 + 至少一列；单元格已做行内解析。 */
+    data class Table(val header: List<List<MdSpan>>, val rows: List<List<List<MdSpan>>>) : MdBlock
 }
 
 sealed interface MdSpan {
@@ -120,11 +123,45 @@ object MarkdownParser {
                     blocks += MdBlock.Ordered(start, items)
                 }
 
+                isTableStart(lines, i) -> {
+                    flushParagraph()
+                    val header = splitRow(lines[i])
+                    i += 2 // 跳过表头与分隔行
+                    val rows = ArrayList<List<List<MdSpan>>>()
+                    while (i < lines.size && lines[i].contains('|') && lines[i].isNotBlank()) {
+                        val cells = splitRow(lines[i])
+                        // 补齐/裁剪到表头列数，避免错列
+                        rows += List(header.size) { idx -> cells.getOrNull(idx).orEmpty() }
+                        i++
+                    }
+                    blocks += MdBlock.Table(header, rows)
+                }
+
                 else -> { paragraph += line; i++ }
             }
         }
         flushParagraph()
         return blocks
+    }
+
+    /** `|` 分隔行：允许 `|` / `:` 对齐标记，单元格只允许 `-` 与 `:`。 */
+    private val tableSeparator = Regex("""^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$""")
+
+    private fun isTableStart(lines: List<String>, i: Int): Boolean {
+        if (i + 1 >= lines.size) return false
+        val head = lines[i]
+        if (!head.contains('|') || head.isBlank()) return false
+        val sep = lines[i + 1]
+        if (!sep.contains('|')) return false
+        return tableSeparator.matches(sep.trim())
+    }
+
+    /** 拆单元格：去掉首尾竖线后按 `|` 切分，逐格做行内解析。 */
+    private fun splitRow(raw: String): List<List<MdSpan>> {
+        var t = raw.trim()
+        if (t.startsWith("|")) t = t.substring(1)
+        if (t.endsWith("|")) t = t.dropLast(1)
+        return t.split('|').map { parseInline(it.trim()) }
     }
 
     private fun isBullet(t: String) = t.startsWith("- ") || t.startsWith("* ")
@@ -207,6 +244,14 @@ object MarkdownParser {
             is MdBlock.Bullets -> b.items.joinToString("\n") { "• " + plain(it) }
             is MdBlock.Ordered -> b.items.mapIndexed { i, it -> "${b.start + i}. " + plain(it) }.joinToString("\n")
             is MdBlock.CodeFence -> b.code
+            // 表格投影成 `a | b` 的行文本（无障碍朗读/摘要用，不丢内容）
+            is MdBlock.Table -> buildString {
+                append(b.header.joinToString(" | ") { plain(it) })
+                b.rows.forEach { row ->
+                    append(0x0A.toChar())
+                    append(row.joinToString(" | ") { plain(it) })
+                }
+            }
         }
     }
 

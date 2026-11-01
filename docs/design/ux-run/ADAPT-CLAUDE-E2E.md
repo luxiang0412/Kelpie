@@ -62,5 +62,21 @@ agent_session = {"agent":"claude","kind":"id","source":"herdr:claude","value":"1
 
 ## 6. 仍未解决（如实登记）
 
-- **Markdown 表格不渲染**：Claude 常输出 `| 部分 | 内容 |` 表格，当前按普通段落显示竖线（`MarkdownParser` 无表格块）。属功能缺口，未实现。
+- ~~**Markdown 表格不渲染**~~ → 已实现（见 §7）。
 - 反复 markdown 长消息滚动时，顶部内容会被顶栏遮住（截图可见），属视觉细节，待与 DESIGN-SYSTEM 行高复核。
+
+## 7. GFM 表格（I-99 已修）
+
+`MarkdownParser` 新增 `MdBlock.Table(header, rows)`：
+- 识别条件：当前行含 `|`，且下一行匹配 `|---|---|` 分隔行（允许 `:---:` 对齐标记、允许省略首尾竖线）；
+- 单元格逐个走既有 `parseInline`（行内码/加粗/链接照常生效）；
+- 列数不齐按表头裁剪/补空，绝不抛异常；只有竖线没有分隔行 → 仍是普通段落；
+- `toPlainText` 投影为 `a | b` 行文本（无障碍朗读不丢内容）；
+- `MarkdownAstCache.PARSER_VERSION` 2 → 3（语法子集变更，旧 AST 整体失效）。
+
+渲染（`TableBlock`）：`surfaceRaised` 圆角容器 + 表头 SemiBold + 表头下 1dp 分隔线 + 行间 1dp 分隔线；按列 `weight` 等分，不做横向滚动（手机宽度下换行更可读）。
+
+验证：
+- 单测 `MarkdownTableTest` 6 项（基本两列、对齐标记/无首尾竖线、单元格行内语法、列数不齐、非表格、纯文本投影）全绿；
+- 真机浅色 `spike/results/table1.png`、深色 `spike/results/table-dark.png`：表头/分隔线/换行均正确；
+- 回归：`core:herdr` + `core:data` + `feature:board` 单测全绿，Compose UI **28/28**（AVD）。

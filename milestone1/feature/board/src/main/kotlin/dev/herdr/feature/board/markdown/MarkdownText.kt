@@ -29,6 +29,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.contentDescription
@@ -173,6 +174,60 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
         }
 
         is MdBlock.CodeFence -> CodeBlock(block)
+
+        is MdBlock.Table -> TableBlock(block, textColor, highlight)
+    }
+}
+
+/**
+ * GFM 表格：按列等分（Compose 文本会自然换行，不做横向滚动，避免与气泡宽度打架）。
+ * 表头加重 + 底部 1dp 分隔线；行之间 1dp 细分隔线由背景色承担，保证深色也能看清。
+ */
+@Composable
+private fun TableBlock(
+    table: MdBlock.Table,
+    textColor: androidx.compose.ui.graphics.Color,
+    highlight: String?,
+) {
+    val palette = LocalHerdrPalette.current
+    val columns = table.header.size.coerceAtLeast(1)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.card / 2))
+            .background(palette.surfaceRaised),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
+            table.header.forEachIndexed { idx, cell ->
+                Text(
+                    text = inline(cell, highlight),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor,
+                    modifier = Modifier
+                        .weight(if (idx == columns - 1) 1.2f else 1f)
+                        .padding(end = 8.dp),
+                )
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(palette.borderSubtle))
+        table.rows.forEachIndexed { rowIndex, row ->
+            if (rowIndex > 0) {
+                Box(Modifier.fillMaxWidth().height(1.dp).background(palette.borderSubtle))
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp)) {
+                row.forEachIndexed { idx, cell ->
+                    Text(
+                        text = inline(cell, highlight),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        modifier = Modifier
+                            .weight(if (idx == columns - 1) 1.2f else 1f)
+                            .padding(end = 8.dp),
+                    )
+                }
+            }
+        }
     }
 }
 
