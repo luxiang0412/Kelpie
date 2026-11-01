@@ -684,3 +684,6 @@
 
 ## I-99 Markdown 表格不渲染（已修）
 `MarkdownParser` 增加 `MdBlock.Table`（表头 + 分隔行识别、单元格行内语法、列数容错、纯文本投影），`MarkdownText` 增加 `TableBlock` 渲染；`PARSER_VERSION` 2→3。单测 6 项 + 真机浅/深色截图验证。
+
+## I-100 PEM 私钥导入后无法认证（已修）
+`SshConnector.loadKey` 无条件先用 `OpenSSHKeyV1KeyFile` 解析，PEM 私钥会被**静默解析成错误的密钥**，导致 `Exhausted available authentication methods`。改为按内容选择 provider（OpenSSH v1 / PKCS8）。真机验证：PEM RSA 私钥导入后 `connected` + `ping ok`。

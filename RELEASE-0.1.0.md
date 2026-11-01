@@ -1,13 +1,13 @@
-# Herdr Android 客户端 0.1.0（首个可安装版本）
+# Herdr Android 客户端 0.1.0 / 0.1.1（首个可安装版本）
 
-构建时间：2026-11-01 · 分支 `ux/graphite-editorial` · 产物 `dist/herdr-0.1.0.apk`
+构建时间：2026-11-01 · 分支 `ux/graphite-editorial` · 产物 `dist/herdr-0.1.1.apk`
 
 ## 1. 版本信息
 
 | 项 | 值 |
 | --- | --- |
 | applicationId | `dev.herdr.app` |
-| versionName / versionCode | `0.1.0` / `1` |
+| versionName / versionCode | `0.1.1` / `2`（0.1.0 已被 0.1.1 取代） |
 | minSdk / targetSdk / compileSdk | 26 / 34 / 37 |
 | 签名 | 正式 key（`~/.herdr/herdr-release.jks`，SHA-256 `f7a7cdc6826ea7dce1fee51f56cceb98f9ebf5968c98c04a0555e6eb5a10fca4`） |
 | R8 | 关闭（sshj/JSON 反射风险尚未验证完，0.2 再开） |
@@ -15,7 +15,7 @@
 | 语言 | 中文 / English（Android 13+ 可单独设置） |
 | 外观 | 浅色 / 深色 / 跟随系统 |
 
-安装：`adb install -r dist/herdr-0.1.0.apk`
+安装：`adb install -r dist/herdr-0.1.1.apk`
 > 注意：本版是**正式签名**，与之前的 debug 包签名不同。真机若装过 debug 包需先卸载，卸载会清空主机配置（私钥需重新粘贴/选文件）。
 
 ## 2. 能满足的需求（已真机验证）
@@ -53,3 +53,13 @@ Mic 语音输入（降级系统键盘语音）、附件、跨主机聚合视图�
 - **升级**：同签名 `adb install -r`，Room 迁移 3→4→5→6 自动执行（只加列或清派生缓存，不清主机配置）。
 - **回滚**：重新安装上一版 APK（签名一致才能覆盖）；如回滚到 debug 包需先卸载并重新配置主机。
 - 签名文件 `~/.herdr/herdr-release.jks` 与 `milestone1/keystore.properties` **不入库**（已加入 `.gitignore`），丢失后无法覆盖升级。
+
+## 7. 0.1.1（真机首配时发现并修复）
+
+**缺陷**：PEM 格式 RSA 私钥（`-----BEGIN RSA PRIVATE KEY-----`）导入后无法认证，界面反复显示「认证失败：Exhausted available authentication methods」。
+
+**根因**：`SshConnector.loadKey` 无条件先用 `OpenSSHKeyV1KeyFile` 解析；对 PEM 私钥它**不报错但解析出错误的密钥**，于是 sshj 拿着不匹配的 key 去认证 → 服务器拒绝（桌面 JVM 探针复现：`luxiang_rsa` 用 PKCS8 解析可认证成功，用 OpenSSH v1 解析则失败）。
+
+**修复**：按**文件内容**选择 provider —— 含 `BEGIN OPENSSH PRIVATE KEY` 用 `OpenSSHKeyV1KeyFile`，其余 PEM 用 `PKCS8KeyFile`（并保留 OpenSSH 兜底），返回全部成功者由 sshj 依次尝试。
+
+**验证**：真机导入 `~/.ssh/luxiang_rsa`（PEM，4096 位）→ `HerdrConn: connected generation=1` / `ping ok version=0.9.5 protocol=22`；看板显示 `default` 会话 7 个 Agent（`spike/results/rel011-board.png`）。桌面 sshj 探针确认 `id_rsa`（OpenSSH 格式 RSA）在本机 SSH 服务上会被拒、`luxiang_rsa`（PEM）可用 —— 结论：**RSA 私钥请用 PEM 格式**，或改用 ed25519。

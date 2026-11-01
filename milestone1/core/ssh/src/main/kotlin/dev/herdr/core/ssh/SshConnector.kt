@@ -65,10 +65,27 @@ class SshConnector(
         return SshFailure.Network("connect failed: ${e.message}", e)
     }
 
+    /**
+     * 按**文件内容**选择 key provider（不能只试一种）：
+     *  - `BEGIN OPENSSH PRIVATE KEY` → OpenSSH v1（ed25519 / rsa-openssh）
+     *  - 其它 PEM（`BEGIN RSA PRIVATE KEY` / `BEGIN PRIVATE KEY`）→ PKCS8KeyFile
+     * 都失败才报 KeyUnusable。返回全部成功的 provider，由 sshj 依次尝试。
+     */
     private fun loadKey(ssh: SSHClient, file: File): List<KeyProvider> {
         if (!file.exists()) throw SshFailure.KeyUnusable("key not found: ${file.name}")
-        val v1 = runCatching<KeyProvider> { OpenSSHKeyV1KeyFile().apply { init(file) } }.getOrNull()
-        if (v1 != null) return listOf(v1)
+        val text = runCatching { file.readText() }.getOrDefault("")
+        val isOpenSshV1 = text.contains("BEGIN OPENSSH PRIVATE KEY")
+        val candidates = ArrayList<KeyProvider>(2)
+        if (isOpenSshV1) {
+            runCatching { OpenSSHKeyV1KeyFile().apply { init(file) } }.getOrNull()?.let { candidates += it }
+        } else {
+            runCatching {
+                net.schmizz.sshj.userauth.keyprovider.PKCS8KeyFile().apply { init(file) }
+            }.getOrNull()?.let { candidates += it }
+            // 兼容 OpenSSH 库对老 PEM 的解析（个别机型/格式差异）
+            runCatching { OpenSSHKeyV1KeyFile().apply { init(file) } }.getOrNull()?.let { candidates += it }
+        }
+        if (candidates.isNotEmpty()) return candidates
         return runCatching { listOf(ssh.loadKeys(file.absolutePath)) }
             .getOrElse { throw SshFailure.KeyUnusable("unsupported key format: ${it.message}", it) }
     }
