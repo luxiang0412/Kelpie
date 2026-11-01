@@ -391,7 +391,8 @@ class HostsViewModel(
     private fun closeTranscriptInternal() {
         transcriptPoll?.cancel(); transcriptPoll = null
         transcriptObserve?.cancel(); transcriptObserve = null
-        transcriptTailer?.close(); transcriptTailer = null
+        transcriptTailer?.close()
+        transcriptTailer = null
     }
 
     override fun onCleared() {

@@ -33,7 +33,7 @@ class TranscriptTailer(
 
     /** 返回本次新增的消息条数；异常向上抛（调用方决定是否显示错误）。 */
     suspend fun sync(): Int = withContext(Dispatchers.IO) {
-        val client = sftp ?: conn.openSftp().also { sftp = it }
+        val client = sftp ?: conn.sharedSftp().also { sftp = it }
         val size = client.stat(path).size
         val cursor = store.cursor(hostId, path)
         var start = cursor?.offset ?: 0L
@@ -100,8 +100,11 @@ class TranscriptTailer(
             .joinToString("") { "%02x".format(it) }
     }
 
+    /**
+     * 只释放引用，**不关闭 SFTP 通道**：通道由 [SshConnection] 持有。
+     * （实测关闭它会把整条 SSH 连接判死，导致每次退出对话都重连一次。）
+     */
     override fun close() {
-        sftp?.let { c -> runCatching { c.close() } }
         sftp = null
     }
 }

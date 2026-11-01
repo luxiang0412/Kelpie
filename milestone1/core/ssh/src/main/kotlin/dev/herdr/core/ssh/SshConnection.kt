@@ -26,6 +26,9 @@ class SshConnection(
 
     private val permits = Semaphore(maxConcurrentExec)
     @Volatile private var closed = false
+    /** 共享 SFTP：由连接持有生命周期。调用方（tailer）只借用，不得 close。 */
+    private var sharedSftp: net.schmizz.sshj.sftp.SFTPClient? = null
+    private val sftpLock = Any()
 
     val isAlive: Boolean get() = !closed && ssh.isConnected && ssh.isAuthenticated
 
@@ -75,6 +78,31 @@ class SshConnection(
     }
 
     /**
+     * 复用同一条连接上的 SFTP 通道。
+     *
+     * **重要**：关闭 SFTP 通道会让服务端把整条 SSH 连接判定为断开
+     * （实测：退出对话时 close 导致 `connection lost` → 每次返回都重连）。
+     * 因此 SFTP 的生命周期跟随连接，调用方不得自行关闭。
+     */
+    suspend fun sharedSftp(): net.schmizz.sshj.sftp.SFTPClient = withContext(Dispatchers.IO) {
+        if (closed) throw SshFailure.Network("connection closed")
+        synchronized(sftpLock) {
+            sharedSftp?.let { existing ->
+                // sshj 的 SFTPClient 没有公开 isOpen；用一次轻量 stat 探活
+                val alive = runCatching { existing.stat(".") }.isSuccess
+                if (alive) return@synchronized existing else { runCatching { existing.close() }; sharedSftp = null }
+            }
+            val created = try {
+                ssh.newSFTPClient()
+            } catch (e: Exception) {
+                throw SshFailure.Network("open sftp failed: ${e.message}", e)
+            }
+            sharedSftp = created
+            created
+        }
+    }
+
+    /**
      * 打开一个长连接 exec（用于订阅）。调用方负责 close。
      * 不走 permits：订阅是长连接，单独占 1 个通道（D15 的预算里已留 1 个）。
      */
@@ -100,6 +128,7 @@ class SshConnection(
 
     override fun close() {
         closed = true
+        synchronized(sftpLock) { runCatching { sharedSftp?.close() }; sharedSftp = null }
         runCatching { ssh.disconnect() }
         runCatching { ssh.close() }
     }
