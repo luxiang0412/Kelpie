@@ -42,4 +42,18 @@
     <string name="board_host_settings">主机设置</string>
     <string name="board_host_all_problems">查看全部问题</string>
     <string name="board_cache_banner_prefix">显示的是缓存内容</string>
+    <string name="tool_status_pending">尚未收到结果</string>
+    <string name="tool_status_received">结果已收到</string>
+    <string name="tool_status_unmatched">未关联的工具结果</string>
+    <string name="tool_label_args">参数</string>
+    <string name="tool_label_command">命令</string>
+    <string name="tool_label_output">输出</string>
+    <string name="tool_copy_command">复制命令</string>
+    <string name="tool_copy_result">复制结果</string>
+    <string name="tool_view_full">查看完整输出</string>
+    <string name="tool_partial_only">仅保存了部分输出</string>
+    <string name="tool_expand">展开</string>
+    <string name="tool_collapse">收起</string>
+    <string name="unknown_content_title">暂不支持预览</string>
+    <string name="unknown_content_copy">复制原文</string>
 </resources>

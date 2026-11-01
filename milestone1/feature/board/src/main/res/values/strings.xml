@@ -42,4 +42,18 @@
     <string name="board_host_settings">Host settings</string>
     <string name="board_host_all_problems">All problems</string>
     <string name="board_cache_banner_prefix">Showing cached content</string>
+    <string name="tool_status_pending">Result not received</string>
+    <string name="tool_status_received">Result received</string>
+    <string name="tool_status_unmatched">Unmatched tool result</string>
+    <string name="tool_label_args">Arguments</string>
+    <string name="tool_label_command">Command</string>
+    <string name="tool_label_output">Output</string>
+    <string name="tool_copy_command">Copy command</string>
+    <string name="tool_copy_result">Copy result</string>
+    <string name="tool_view_full">View full output</string>
+    <string name="tool_partial_only">Only partial output is available</string>
+    <string name="tool_expand">Expand</string>
+    <string name="tool_collapse">Collapse</string>
+    <string name="unknown_content_title">Preview unavailable</string>
+    <string name="unknown_content_copy">Copy raw text</string>
 </resources>

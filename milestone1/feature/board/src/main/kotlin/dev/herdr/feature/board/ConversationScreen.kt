@@ -51,7 +51,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -311,7 +313,10 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (Strin
                         AssistantMessage(item.text, onQuote)
                     }
                     is ConversationItem.Thinking -> CollapsibleRow(stringResource(R.string.label_thinking), item.text, muted = true)
-                    is ConversationItem.Tool -> ToolRow(item)
+                    is ConversationItem.Tool -> ToolRow(
+                        item,
+                        "${pane.terminalId}|${pane.agentSessionPath}|${pane.paneId}|${item.callId ?: item.index}",
+                    )
                     is ConversationItem.Unknown -> CollapsibleRow("未知内容", item.text, muted = true)
                 }
             }
@@ -341,79 +346,207 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (Strin
     }
 }
 
-/** toolCall + toolResult：名称、执行状态、参数摘要、输出按需展开（B4）。 */
+/**
+ * Tool 卡（CONVERSATION-SPEC v0.2 §7）：
+ * 容器 surfaceRaised + 1dp borderSubtle + 12dp 圆角；Header ≥52dp，含 20dp 图标、工具名、真实状态、折叠箭头；
+ * 展开后按「参数 / 命令 / 输出」分段，输出最多 12 行预览 + 「查看完整输出」全屏页（不在 LazyColumn 内嵌竖向滚动）；
+ * 只显示数据真实存在的复制操作。
+ */
 @Composable
-private fun ToolRow(item: ConversationItem.Tool) {
+private fun ToolRow(item: ConversationItem.Tool, stateKey: String) {
     val palette = LocalHerdrPalette.current
-    var expanded by remember(item.index, item.result) { mutableStateOf(false) }
-    val hasResult = item.result != null
-    // UX-03c：结果"已返回"≠"执行成功"；也不从输出里的 error 字样盲猜失败。
-    // 只如实区分「还没结果 / 已返回」，错误关键字仅作为低强调提示。
-    val statusColor = if (hasResult) palette.textSecondary else palette.statusFg(AgentStatus.WORKING)
-    val statusText = if (hasResult) "已返回" else "运行中"
+    val clipboard = LocalClipboardManager.current
+    var expanded by rememberSaveable(stateKey) { mutableStateOf(false) }
+    var viewFull by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 52.dp)
-                .clickable { expanded = !expanded }
-                .semantics {
-                    contentDescription =
-                        "工具 ${item.name}，$statusText，${if (expanded) "已展开" else "已折叠"}，点击切换"
-                },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DisclosureIndicator(expanded)
-            Spacer(Modifier.width(Space.xs))
-            Text(
-                item.name,
-                style = MaterialTheme.typography.labelLarge,
-                color = palette.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.width(Space.s))
-            Text(statusText, style = MaterialTheme.typography.labelSmall, color = statusColor)
-            if (!item.pairedById && hasResult) {
-                Spacer(Modifier.width(Space.s))
-                Text("未配对（无可靠 ID）", style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
-            }
-            if (item.resultError && hasResult) {
-                Spacer(Modifier.width(Space.s))
-                Text("输出含 error 关键字", style = MaterialTheme.typography.labelSmall, color = palette.textSecondary)
-            }
-        }
-        if (item.argumentsSummary.isNotBlank()) {
-            Text(
-                item.argumentsSummary.replace('\n', ' '),
-                style = MonoStyle,
-                color = palette.textSecondary,
-                maxLines = if (expanded) 6 else 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = Space.l, end = Space.s, bottom = Space.xs),
-            )
-        }
-        AnimatedVisibility(visible = expanded) {
-            val body = item.result
-            if (body == null) {
-                Text(
-                    "还没有结果",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = palette.textSecondary,
-                    modifier = Modifier.padding(start = Space.l, top = Space.xs, bottom = Space.xs),
+    val hasResult = item.result != null
+    // 状态语义矩阵：只反映源事实，绝不推断「执行中 / 成功」
+    val statusText = when {
+        hasResult && item.pairedById -> stringResource(R.string.tool_status_received)
+        hasResult -> stringResource(R.string.tool_status_unmatched)
+        else -> stringResource(R.string.tool_status_pending)
+    }
+    val preview = item.result?.let { previewLines(it, 12) }
+
+    Surface(
+        color = palette.surfaceRaised,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, palette.borderSubtle),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp)
+                    .clickable { expanded = !expanded }
+                    .padding(start = Space.m, end = Space.s, top = Space.s, bottom = Space.s)
+                    .semantics {
+                        contentDescription =
+                            "工具 ${item.name}，$statusText，${if (expanded) "已展开" else "已折叠"}，点击切换"
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(R.drawable.ic_tool),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(palette.textSecondary),
+                    modifier = Modifier.size(20.dp),
                 )
-            } else {
-                Surface(
-                    color = palette.surfaceRaised,
-                    shape = RoundedCornerShape(Radius.code),
-                    modifier = Modifier.fillMaxWidth().padding(start = Space.l).heightIn(max = 260.dp),
-                ) {
-                    Box(Modifier.padding(Space.m).verticalScroll(rememberScrollState())) {
+                Spacer(Modifier.width(Space.s))
+                Text(
+                    item.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = palette.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    statusText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.textSecondary,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.width(Space.xs))
+                DisclosureIndicator(expanded)
+            }
+
+            // Summary：最多 2 行，只显示真实的参数/命令前缀
+            if (item.argumentsSummary.isNotBlank() && !expanded) {
+                Text(
+                    item.argumentsSummary.replace('\n', ' '),
+                    style = MonoStyle,
+                    color = palette.textSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 40.dp, end = Space.m, bottom = Space.s),
+                )
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column(Modifier.padding(start = Space.m, end = Space.m, bottom = Space.m)) {
+                    if (item.argumentsSummary.isNotBlank()) {
+                        DetailLabel(stringResource(R.string.tool_label_args))
                         Text(
-                            body,
+                            item.argumentsSummary,
                             style = MonoStyle,
                             color = palette.textPrimary,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(Space.s))
+                    }
+                    val body = item.result
+                    DetailLabel(stringResource(R.string.tool_label_output))
+                    if (body == null) {
+                        Text(
+                            stringResource(R.string.tool_status_pending),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = palette.textSecondary,
+                        )
+                    } else {
+                        Text(
+                            preview ?: body,
+                            style = MonoStyle,
+                            color = palette.textPrimary,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (preview != null) {
+                            // 规格禁止在 LazyColumn 内嵌竖向滚动 → 完整内容进全屏页
+                            TextButton(
+                                onClick = { viewFull = true },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.tool_view_full),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
+                    }
+                    Row {
+                        if (item.argumentsSummary.isNotBlank()) {
+                            TextButton(
+                                onClick = { clipboard.setText(AnnotatedString(item.argumentsSummary)) },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.tool_copy_command),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
+                        if (body != null) {
+                            TextButton(
+                                onClick = { clipboard.setText(AnnotatedString(body)) },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.tool_copy_result),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (viewFull && item.result != null) {
+        FullOutputDialog(text = item.result, onDismiss = { viewFull = false })
+    }
+}
+
+@Composable
+private fun DetailLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        color = LocalHerdrPalette.current.textSecondary,
+        modifier = Modifier.padding(bottom = 2.dp),
+    )
+}
+
+/** 完整输出阅读页：可滚动、可选中、可复制（内容来自 transcript 原文）。 */
+@Composable
+private fun FullOutputDialog(text: String, onDismiss: () -> Unit) {
+    val palette = LocalHerdrPalette.current
+    val clipboard = LocalClipboardManager.current
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(color = palette.surface, shape = RoundedCornerShape(16.dp)) {
+            Column(Modifier.heightIn(max = 560.dp).padding(Space.l)) {
+                Text(
+                    stringResource(R.string.tool_label_output),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = palette.textPrimary,
+                )
+                Spacer(Modifier.height(Space.s))
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(
+                        text,
+                        style = MonoStyle,
+                        color = palette.textPrimary,
+                        modifier = Modifier
+                            .heightIn(max = 400.dp)
+                            .verticalScroll(rememberScrollState()),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = { clipboard.setText(AnnotatedString(text)) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.tool_copy_result),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(
+                            stringResource(R.string.composer_done),
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
                 }
@@ -422,28 +555,42 @@ private fun ToolRow(item: ConversationItem.Tool) {
     }
 }
 
+/** 取前 n 行；行数不足返回 null（表示无需「查看完整输出」）。 */
+private fun previewLines(text: String, n: Int): String? {
+    var count = 0
+    var idx = -1
+    while (true) {
+        idx = text.indexOf('\n', idx + 1)
+        if (idx < 0) return null
+        count++
+        if (count == n) return text.take(idx) + "\n…"
+    }
+}
+
 @Composable
 private fun UserMessage(text: String) {
     val palette = LocalHerdrPalette.current
+    // 用户消息靠右；宽度上限按 CONVERSATION-SPEC §3.3（88% / 86% / 520dp）
+    val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val fraction = if (width < 360) 0.88f else 0.86f
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
             color = palette.surfaceRaised,
-            shape = RoundedCornerShape(Radius.card),
-            modifier = Modifier.fillMaxWidth(0.86f),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(fraction),
         ) {
             Text(
                 text,
                 style = MaterialTheme.typography.bodyLarge,
                 color = palette.textPrimary,
-                modifier = Modifier.padding(horizontal = Space.m, vertical = Space.s),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
             )
         }
     }
 }
 
 /**
- * assistant 正文：Markdown 子集渲染（标题/列表/引用/行内样式/代码块）。
- * 超长消息折叠预览；解析在 [MarkdownText] 内部的后台线程完成。
+ * assistant 正文：Markdown 子集渲染 + 超长折叠；正文可长按系统选择；末尾常显「复制 / 更多」。
  */
 @Composable
 private fun AssistantMessage(text: String, onQuote: (String) -> Unit) {
@@ -452,7 +599,6 @@ private fun AssistantMessage(text: String, onQuote: (String) -> Unit) {
     val collapsible = text.length > 2500 || lineCount > 40
     var expanded by remember(text) { mutableStateOf(!collapsible) }
     Column(Modifier.fillMaxWidth()) {
-        // CONV-ACTIONS-001：正文支持系统长按选择（选区不被父级手势拦截）
         androidx.compose.foundation.text.selection.SelectionContainer {
             MarkdownText(
                 source = if (expanded || !collapsible) text else cutAtLine(text, 1200),
@@ -476,9 +622,8 @@ private fun AssistantMessage(text: String, onQuote: (String) -> Unit) {
 }
 
 /**
- * CONV-ACTIONS-001（已批准）：Agent 消息末尾常显低强调「复制 + 更多」。
- * - 复制只取可阅读正文（源的 Markdown 原文），不含 Agent 名/时间/按钮字样；
- * - 更多菜单只放**真正实现**的动作，不放 Quote/Share 占位。
+ * CONV-ACTIONS-001（已批准）：消息末尾常显低强调「复制 + 更多」。
+ * 复制取源文本；更多菜单只放已实现的动作。
  */
 @Composable
 private fun MessageActions(text: String, onQuote: (String) -> Unit) {
@@ -510,7 +655,11 @@ private fun MessageActions(text: String, onQuote: (String) -> Unit) {
                     .heightIn(min = 48.dp)
                     .semantics { contentDescription = "更多操作" },
             ) {
-                Text(stringResource(R.string.action_more), style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+                Text(
+                    stringResource(R.string.action_more),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = palette.textSecondary,
+                )
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(
@@ -768,7 +917,7 @@ private fun ComposerBar(
             }
         }
         Text(
-            "已接受（Accepted）只代表远端收到，不代表执行完成；结果未知（Unknown）不会自动重发。",
+            stringResource(R.string.composer_footnote),
             style = MaterialTheme.typography.labelSmall,
             color = palette.textSecondary,
             modifier = Modifier.padding(top = Space.xs),
