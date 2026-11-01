@@ -65,6 +65,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.herdr.core.data.HostConnectionManager
 import dev.herdr.core.herdr.AgentStatus
@@ -317,7 +318,7 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (Strin
                         item,
                         "${pane.terminalId}|${pane.agentSessionPath}|${pane.paneId}|${item.callId ?: item.index}",
                     )
-                    is ConversationItem.Unknown -> CollapsibleRow("未知内容", item.text, muted = true)
+                    is ConversationItem.Unknown -> UnknownContent(item.text)
                 }
             }
         }
@@ -572,12 +573,17 @@ private fun UserMessage(text: String) {
     val palette = LocalHerdrPalette.current
     // 用户消息靠右；宽度上限按 CONVERSATION-SPEC §3.3（88% / 86% / 520dp）
     val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
-    val fraction = if (width < 360) 0.88f else 0.86f
+    val fraction = when {
+        width < 360 -> 0.88f
+        width < 600 -> 0.86f
+        else -> 1f
+    }
+    val maxWidth = if (width >= 600) 520.dp else Dp.Unspecified
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
             color = palette.surfaceRaised,
             shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(fraction),
+            modifier = if (maxWidth == Dp.Unspecified) Modifier.fillMaxWidth(fraction) else Modifier.widthIn(max = maxWidth),
         ) {
             Text(
                 text,
@@ -693,6 +699,40 @@ private fun cutAtLine(text: String, max: Int): String {
     return head + suffix
 }
 
+/** Unknown / 暂不支持的内容：中性说明 + 复制原文，不丢数据、不伪装成成功结果。 */
+@Composable
+private fun UnknownContent(text: String) {
+    val palette = LocalHerdrPalette.current
+    val clipboard = LocalClipboardManager.current
+    var showRaw by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            stringResource(R.string.unknown_content_title),
+            style = MaterialTheme.typography.labelSmall,
+            color = palette.textSecondary,
+        )
+        Row {
+            TextButton(onClick = { showRaw = !showRaw }, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(
+                    if (showRaw) stringResource(R.string.tool_collapse) else stringResource(R.string.tool_expand),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+            TextButton(
+                onClick = { clipboard.setText(AnnotatedString(text)) },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(R.string.unknown_content_copy), style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        if (showRaw) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(text, style = MonoStyle, color = palette.textPrimary)
+            }
+        }
+    }
+}
+
 /**
  * Agent 分组表头：连续多条 Agent 内容共享一个标识。
  * 未知 agent 时用中性「Agent」，不编造产品名。
@@ -706,7 +746,7 @@ private fun AgentGroupHeader(pane: Pane) {
     } ?: "Agent"
     Text(
         name,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelSmall, // type.meta 13/19
         color = palette.textSecondary,
         modifier = Modifier.padding(top = Space.xs),
     )
@@ -751,12 +791,14 @@ private fun CollapsibleRow(title: String, body: String, mono: Boolean = false, m
                 androidx.compose.foundation.layout.Box(
                     Modifier.padding(Space.m).verticalScroll(rememberScrollState()),
                 ) {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
                     Text(
                         body,
                         style = if (mono) MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace)
                         else MaterialTheme.typography.bodyMedium,
                         color = if (muted) palette.textSecondary else palette.textPrimary,
                     )
+                    }
                 }
             }
         }
