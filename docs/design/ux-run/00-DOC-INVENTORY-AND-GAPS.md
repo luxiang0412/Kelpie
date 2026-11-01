@@ -8,13 +8,13 @@
 | # | 任务书要求阅读 | 实际文件 | 状态 |
 | --- | --- | --- | --- |
 | 1 | `HERDR-ANDROID-UI-ENGINEERING-CONTRACT-v0.1.md` | 存在 | ✅ 已读（契约：优先级、禁止项） |
-| 2 | `HERDR-UX-D0-DESIGN-SYSTEM-v0.1.md` | **不存在** | ⚠️ 缺失 → 以任务书 §2.2 内联 token 表为准 |
+| 2 | `HERDR-UX-D0-DESIGN-SYSTEM-v0.1.md` | **存在（546 行）** | ✅ 已读全（此前误判缺失，见 `00-DOCS-READ-CORRECTION.md`） |
 | 3 | `HERDR-UX-D0-BOARD-SPEC-v0.2.md` | 存在（213 行） | ✅ 已读 |
 | 4 | `HERDR-UX-D0-CONVERSATION-SPEC-v0.2.md` | 存在（577 行） | ✅ 已读 |
-| 5 | `HERDR-UX-D0-COMPOSER-SPEC-v0.2.md` | **不存在**（只有 v0.1，563 行） | ⚠️ 缺失 → 以 v0.1 为准 |
+| 5 | `HERDR-UX-D0-COMPOSER-SPEC-v0.2.md` | **存在（574 行）** | ✅ 已读全（此前误判缺失，见 `00-DOCS-READ-CORRECTION.md`） |
 | 6 | `HERDR-UX-D0-VISUAL-REVIEW-v0.1.md` | 存在 | ✅ 已读 |
 
-**差异登记**：任务书引用的 2 份文档在仓库中不存在。按任务书规则本应在 UX-00 就登记，我在 UX-00 漏了。
+**差异登记更正**：这 2 份文档**存在**。我此前只跑了一次 `ls` 且未复核就宣称缺失，是错误判断；已在 `00-DOCS-READ-CORRECTION.md` 更正并补全 6 份文档的读取。
 
 ## 2. 流程违规（自报）
 
