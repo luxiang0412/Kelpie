@@ -1,0 +1,10 @@
+RESULT,sftp,canonicalize=/home/luxiang
+RESULT,sftp,ls_dot=207 entries
+RESULT,sftp,stat=FileStat(size=24, mtimeMs=1793433847000, inode=null),attrs=[size=24;uid=1000,gid=1000;mode=[mask=100664];atime=1793433736,mtime=1793433847;],err=null
+RESULT,sftp,1-initial,lines=3,last={"n":3},ms=433.2
+RESULT,sftp,2-append,lines=2,last={"n":5},ms=717.7
+RESULT,sftp,3-truncate,result=Reset(reason=identity-changed),ms=359.2
+RESULT,sftp,4-after-truncate,lines=1,last={"n":1},ms=422.8
+RESULT,sftp,5-replace-larger,result=Reset(reason=identity-changed),ms=561.0
+RESULT,sftp,6-after-replace,lines=200,last={"big":200},ms=505.5
+RESULT,sftp,7-backfill,lines=50,first={"big":151},last={"big":200},ms=224.8

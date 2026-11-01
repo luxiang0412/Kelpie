@@ -10,7 +10,7 @@
 | ms | 960 | 394 | 363 | 456 | 358 | 397 | 365 | 379 |
 
 - **中位 ≈ 379 ms**（排除首次 dexopt）；对比改动前 debug 中位 **555 ms**。
-- 原始记录：`spike/results/m1-coldstart-release.txt`。
+- 原始记录：`docs/evidence/m1-coldstart-release.txt`。
 - 测量方式：`adb shell am force-stop` → 间隔 1 s → `am start -W`，共 8 次，无并行任务。
 
 ## 2. 滚动帧统计（`dumpsys gfxinfo`，固定脚本）
@@ -22,7 +22,7 @@
 | 看板（2 个 agent） | **0** | — | — | — | — | ❌ 无效样本：列表不足一屏，未产生滚动帧（记录为不可用，不作为“性能良好”的证据） |
 | 对话（约 10 条消息） | 483 | **3（0.62%）** | 6 ms | 7 ms | 8 ms | 短会话基线（**不代表 500 条长会话**） |
 
-原始记录：`spike/results/m1-jank-board-release.txt`、`m1-jank-conversation-release.txt`。
+原始记录：`docs/evidence/m1-jank-board-release.txt`、`m1-jank-conversation-release.txt`。
 
 ## 3. 未完成项（诚实记录）
 

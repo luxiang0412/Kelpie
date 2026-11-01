@@ -25,7 +25,7 @@
 - **现象**：`herdr --version` = 0.9.3；文档基线是 0.9.5（master `bc8c289`）。
 - **影响**：本轮所有 schema 事实，严格说只对 **0.9.3** 成立；0.9.5 可能已增加方法或字段。
 - **复现**：`herdr --version`；`herdr api schema --json | jq .protocol`。
-- **建议**：Spike 1 第一步先导出目标主机的 schema，和 `spike/results/herdr-api.schema.json` 逐字段 diff；把 diff 写进结果。上线前固定“支持的最低协议号”。
+- **建议**：Spike 1 第一步先导出目标主机的 schema，和 `docs/evidence/herdr-api.schema.json` 逐字段 diff；把 diff 写进结果。上线前固定“支持的最低协议号”。
 - **状态**：已记录，待在线复核。
 
 ### I-4 系统 SSH 配置存在 `StrictHostKeyChecking no`
@@ -183,7 +183,7 @@
     build/install/herdr-spike-jvm/bin/herdr-spike-jvm --mode connect \
     --host 192.168.5.8 --port 22 --user luxiang --key 'C:/Users/luxia/.ssh/id_rsa' --runs 1
   ```
-  日志：`spike/results/s1-sshj-auth-debug.log`。
+  日志：`docs/evidence/s1-sshj-auth-debug.log`。
 - **已排除**：密钥未授权（OpenSSH 可登录，`IdentityAgent=none` 也一样）；公钥不一致（sshj 导出的指纹与 `ssh-keygen -lf` 相同）；host key 校验（F1/F2/F4 正常）。
 - **已尝试无效**：注册 BouncyCastle、把 `rsa-sha2-512/256` 提前、`init(private, public)` 双文件、改用 PKCS#1 密钥（那个直接解析失败）。
 - **影响**：MaxSessions/并发/每请求延迟/NDJSON 往返全部无法测量；Phase 1 的 SSH 层选型存在真实风险。
@@ -233,7 +233,7 @@
 ## I-30 有效并发通道上限是 9，不是 sshd 默认的 10
 
 - **现象**：同一连接上 9 个并发 exec 成功；第 10 个报 `OpenFailException: open failed`；fresh 连接、10 作为首测也复现 2/2。连接本身保持可用。
-- **复现**：`spike/jvm` → `--mode channels --list 10`（见 `spike/results/s1-maxsessions.csv`）。
+- **复现**：`spike/jvm` → `--mode channels --list 10`（见 `docs/evidence/s1-maxsessions.csv`）。
 - **未知**：`/etc/ssh/sshd_config*` 没有显式 `MaxSessions`，`sshd -T` 需要 root（未用 sudo），所以无法确认是 9 还是“10 减 1 个槽位被占用”。
 - **建议**：按 9 记账（D15），客户端上限 4；若要确认，需要你批准一次 `sudo sshd -T | grep -i maxsessions`。
 
@@ -655,7 +655,7 @@
 ## I-93 最大系统字体（1.3）下对话页标题栏裁剪
 
 - **现象**：`title` + `projectLine` 双行标题在 font_scale 1.3 时副标题被裁切，且与列表首项视觉重叠。
-- **证据**：`spike/results/m2c2v-font-max.png`
+- **证据**：`docs/evidence/m2c2v-font-max.png`
 - **建议**：标题栏改为单行（副标题移至技术信息），或按字体缩放动态高度；顺带检查看板底部导航标签。
 
 ## I-94 旋转场景只观察到“未丢草稿”，未证明没有二次加载覆盖
@@ -665,7 +665,7 @@
 ## I-95 SSH 断链异常未捕获 → 进程 FATAL（已加固，未设备验证）
 
 - **证据**：`logcat -b crash` 三次 `FATAL EXCEPTION: DefaultDispatcher-worker-N`，根因
-  `ConnectionException: Broken transport; encountered EOF`（摘要 `spike/results/ux-crash-evidence.txt`）
+  `ConnectionException: Broken transport; encountered EOF`（摘要 `docs/evidence/ux-crash-evidence.txt`）
 - **修复**：`appScope`/`MonitorService` 增加 `CoroutineExceptionHandler`；`readPane` 轮询加 `runCatching`
 - **未验证**：设备侧复现失败（该机只走 WiFi adb，关 WiFi 后即离线）
 - **建议**：用 USB adb 或断网开关（`adb shell cmd connectivity airplane-mode`）复现；必要时逐个 SSH 调用加 `runCatching`

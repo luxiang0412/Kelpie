@@ -62,12 +62,12 @@
 
 ### 1.1 运行前保护
 
-1. 执行 `git status --porcelain=v1`、`git branch --show-current`、`git rev-parse HEAD`、`git remote -v`。保存到 `docs/design/ux-run/00-baseline.md`。
+1. 执行 `git status --porcelain=v1`、`git branch --show-current`、`git rev-parse HEAD`、`git remote -v`。保存到 `docs/run/00-baseline.md`。
 2. 工作树里如果**只有这次导入的 UX-D0 文档、原型和任务包**为未追踪文件，可在新工作分支中先单独提交这些资料，作为受本轮授权的文档基线；须逐一确认它们来自本 ZIP 的文件清单。若还有任何其它未提交/未追踪用户改动：**禁止 stash/reset/clean**，执行只读审计并标记 `BLOCKED-WORKTREE`，不得写入代码；留下报告后停止实施。
 3. 若干净：新建隔离分支 `ux/graphite-editorial`；如分支已存在，不强制覆盖，使用唯一的递增后缀，并记录。禁止直接在 `main` 连续改动。
 4. 识别 Windows PowerShell / Linux / macOS 环境、Java 版本、Gradle wrapper、可用 AVD；**只用实际存在的构建脚本**，不盲套 `./gradlew` 或 bash。
 5. 读取现有 `AGENTS.md` 和项目测试指南，先运行最小可用的现有检查作为 baseline：失败必须记录，不得描述为自己的回归。
-6. 新增 `docs/design/ux-run/PROGRESS.md`：每个 Task ID 一行，状态只能是 `TODO / IN_PROGRESS / PASS / PARTIAL / BLOCKED / SKIPPED`；不得把编译成功标记为视觉 PASS。
+6. 新增 `docs/run/PROGRESS.md`：每个 Task ID 一行，状态只能是 `TODO / IN_PROGRESS / PASS / PARTIAL / BLOCKED / SKIPPED`；不得把编译成功标记为视觉 PASS。
 7. 对于与运行环境无关的文档和代码修改可继续；真机被 MIUI instrumentation 阻断时，优先使用已验证的新 AVD，**不再无限排查 MIUI**。
 
 ### 1.2 连续执行逻辑
@@ -87,7 +87,7 @@
 
 - 每个任务至多涉及一个清晰用户能力/视觉子问题；复杂任务应拆成两个子提交，不混安全修复和外观改动。
 - 提交主题：`ux(UX-01a): fix conversation top bar at large font` 等；禁止虚假的 `fully verified` 字样。
-- 每个 Task 附 `docs/design/ux-run/UX-<ID>-REPORT.md`，四类必须明确：**已实现并验证 / 已实现但未验证 / 未实现 / 已知问题**。
+- 每个 Task 附 `docs/run/UX-<ID>-REPORT.md`，四类必须明确：**已实现并验证 / 已实现但未验证 / 未实现 / 已知问题**。
 - 成功完成一个任务才可 commit；`PARTIAL` 的实验代码若不影响主线构建，可单独提交 `wip` 清晰标记，原则上优先回滚不完整 UI，只保留报告。
 - 可推送**新分支**至现有配置好的 `origin`（不需要合并 main），失败时保留本地提交，不自行修改远端仓库设置或凭证。
 - 不向外部提交真实对话截图。Fixture 统一采用无机密的假数据。
@@ -204,7 +204,7 @@
 2. 查找 `Tokens.kt`、Theme、Board、Conversation、Composer、InlineCode、Tool、Hosts、Settings、Room Draft、WriteLedger、Navigation。用 `rg` 搜索、IDE/本地代码阅读确认真实定义，**不要因为 task 内写了建议名称就重建相同类**。
 3. 列当前已经实现的能力与差距，尤其已接通/未接通的菜单与控件。为 Design System 的 Open 决策建一份 `DECISION-IMPLEMENTATION-DEFAULTS.md`，只记录本任务书授权的暂定默认值。
 4. 运行已有测试 baseline；抓取当前 Board/Conversation/Composer 各一张 Android 截图或清楚标为 `NOT_CAPTURED` 并解释。
-5. 保存 `docs/design/ux-run/UX-00-AUDIT.md`、初始 `PROGRESS.md`；commit 文档基线。
+5. 保存 `docs/run/UX-00-AUDIT.md`、初始 `PROGRESS.md`；commit 文档基线。
 
 **禁止**：此步修改 UI 业务实现。**验收**：审计中的所有路径都存在，状态与原始证据对应。
 
@@ -487,7 +487,7 @@
 5. 记录正式性能测量限制：MIUI 上 instrumentation 与 dropShaderCache 问题仍可能存在；模拟器 Benchmark 仅证明流程，不宣称真机滚动性能改善；对相同 Fixture 的算法 microbench 可以另行记录。
 6. 目视核对：文本不裁剪、对齐、拼写/翻译、空白、层级、状态语义色单信号、低对比边界、Send/Copy ≥48dp、不靠颜色单独传状态。
 7. 跑一次 Secrets/日志/截图检查；确认未将真实主机密钥、私钥、真实对话或用户草稿引入仓库；确认发行变体不包含 debug-only Fixture 或实验语音入口。
-8. `docs/design/ux-run/FINAL-REVIEW.md` 用表格列任务状态、测试证据、截图目录、Commit IDs、仍然未验证事项和建议用户醒后重点视觉检查的3–5点。
+8. `docs/run/FINAL-REVIEW.md` 用表格列任务状态、测试证据、截图目录、Commit IDs、仍然未验证事项和建议用户醒后重点视觉检查的3–5点。
 9. 只将已通过和可构建的代码提交至工作分支并推送该分支；**不自动合并 main**。
 
 **最终验收等级**：

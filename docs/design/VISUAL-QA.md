@@ -6,11 +6,11 @@
 
 | 文件 | 内容 | 主题 |
 | --- | --- | --- |
-| `spike/results/m1-10-board-dark.png` | 看板（分区 + 紧凑行 + 底部导航） | 深色 |
-| `spike/results/m1-13-board-light.png` | 看板 | 浅色 |
-| `spike/results/m1-11-conversation-dark.png` | 对话（用户气泡/assistant/折叠行/Composer） | 深色 |
-| `spike/results/m1-14-conversation-light.png` | 对话 | 浅色 |
-| `spike/results/m1-12-techsheet-dark.png` | 技术信息 Sheet（字段 + 复制） | 深色 |
+| `docs/evidence/m1-10-board-dark.png` | 看板（分区 + 紧凑行 + 底部导航） | 深色 |
+| `docs/evidence/m1-13-board-light.png` | 看板 | 浅色 |
+| `docs/evidence/m1-11-conversation-dark.png` | 对话（用户气泡/assistant/折叠行/Composer） | 深色 |
+| `docs/evidence/m1-14-conversation-light.png` | 对话 | 浅色 |
+| `docs/evidence/m1-12-techsheet-dark.png` | 技术信息 Sheet（字段 + 复制） | 深色 |
 
 ## 2. 自检结果
 

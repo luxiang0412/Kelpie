@@ -13,7 +13,7 @@
 - 信任库按 `(host, port, ssh 算法)` 存；算法名从 SSH wire blob 解析，不依赖 `getAlgorithm()`。
 - 不读系统 `~/.ssh/known_hosts` / `~/.ssh/config`。
 
-**依据**：P0-1 修订；`spike/jvm/.../trust/HostKeyTrust.kt`；单测 F1–F5 + sshj 适配层测试全绿；sshj 0.41.2 的 `HostKeyVerifier` 签名已编译验证。
+**依据**：P0-1 修订；`archive/spike/jvm/.../trust/HostKeyTrust.kt`；单测 F1–F5 + sshj 适配层测试全绿；sshj 0.41.2 的 `HostKeyVerifier` 签名已编译验证。
 
 **状态**：`已定`（实现层）。真实 sshd 全流程为 `待实测确认`。
 
@@ -134,7 +134,7 @@
 - 启动时先探测：`remote-api-bridge --check` → 成功用 1；失败则检测 `socat`/`nc` 用 2；再失败提示用户升级 herdr。
 - **不升级主机 herdr**（用户明确禁止）；探测结果写入审计日志。
 
-**依据**：`RESULTS.md` ON-10；`spike/results/environment-report.md` §2。
+**依据**：`RESULTS.md` ON-10；`docs/evidence/environment-report.md` §2。
 
 **状态**：`已定`。方案 3 的可行性仍 `BLOCKED`（需 sshj 可用 + 会话 socket）。
 
@@ -160,7 +160,7 @@
 - 复测顺序（见 `NEXT-STEPS.md`）：① Ed25519 专用密钥（需授权写入 `authorized_keys`，需批准）；② 若 Ed25519 成功 → 产品本来就只用 Ed25519，风险降级；③ 若仍失败 → 评估 Apache MINA SSHD / JSch 做一次最小对照。
 - 在 Android 上额外测一次（JVM 通过不等于 Android 通过，Keystore/BouncyCastle 行为不同）。
 
-**依据**：`RESULTS.md` ON-12；`spike/results/s1-sshj-auth-debug.log`。
+**依据**：`RESULTS.md` ON-12；`docs/evidence/s1-sshj-auth-debug.log`。
 
 **状态**：`待实测确认`（决策是“先修不换”）。
 
@@ -177,7 +177,7 @@
   - 任何需要写远端状态的动作先列清单、等批准。
 - 所有远程命令使用**绝对路径** `/home/luxiang/.local/bin/herdr`（非交互 PATH 不含 `~/.local/bin`）。
 
-**依据**：`spike/results/environment-report.md` §1、§2、§5。
+**依据**：`docs/evidence/environment-report.md` §1、§2、§5。
 
 **状态**：`已定`。
 

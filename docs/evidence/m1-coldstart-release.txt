@@ -1,0 +1,8 @@
+run1 TotalTime: 960
+run2 TotalTime: 394
+run3 TotalTime: 363
+run4 TotalTime: 456
+run5 TotalTime: 358
+run6 TotalTime: 397
+run7 TotalTime: 365
+run8 TotalTime: 379

@@ -157,9 +157,9 @@
 herdr-android-client-research-v2.md   # 调研 v2.1（7 项 P0 已修）
 herdr-android-spike-plan.md           # Spike 任务书（v2.2 实测修正）
 RESULTS.md / DECISIONS.md / ISSUES.md / NEXT-STEPS.md / archive/docs/PHASE0-SUMMARY.md
-spike/jvm/          # Kotlin/JVM：指纹/写账本/SFTP tailer + 23 个单测（全绿）+ 在线探针
-spike/android/      # 最小 Android App：F1–F4 + exec/ping + snapshot + 订阅 + SFTP
-spike/results/      # 所有原始证据（schema、CSV、日志、截图）
+archive/spike/jvm/          # Kotlin/JVM：指纹/写账本/SFTP tailer + 23 个单测（全绿）+ 在线探针
+archive/spike/android/      # 最小 Android App：F1–F4 + exec/ping + snapshot + 订阅 + SFTP
+docs/evidence/      # 所有原始证据（schema、CSV、日志、截图）
 ```
 
 ---

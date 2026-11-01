@@ -1,0 +1,30 @@
+# UX-06 report — 会话内搜索（仅搜索已加载消息）
+
+- baseline：`e19f0ee` / `ux/graphite-editorial`
+- 依据：CONVERSATION-SPEC v0.2 §2（搜索属次级能力，实现后才显示入口）+ 任务书 UX-06「若不可稳定检索完整远端历史，只做『仅搜索已加载消息』并明确标注边界」
+- 数据边界（审计结论，见 `UX-06-PLAN.md`）：
+  - 客户端只增量拉取 JSONL 尾部（`TranscriptTailer`），**无法保证**完整远端历史
+  - 因此搜索范围 = `ConversationBranch.effective(messages)` 的已加载条目，UI 常驻标注 `Only the loaded messages are searched`
+- 改动：
+  - 新增 `ic_search` 矢量图标；顶栏状态胶囊右侧新增搜索入口（**只有实现后才显示**）
+  - `MessageList` 新增 `searchOpen/onCloseSearch`；新增 `SearchBar` 组件：
+    - `OutlinedTextField`（单行）+ 命中计数 `n/N` / `No match`
+    - 上一处 / 下一处（48dp）+ 关闭
+    - 常驻边界说明
+  - 匹配：`withContext(Dispatchers.Default)` 上对条目文本做 `contains(ignoreCase = true)`，**输入防抖 250ms**
+  - 覆盖范围：User / Assistant / Thinking / Tool（参数+结果）/ Unknown 的文本
+  - 定位：按**条目在有效序列中的索引**（等价稳定 key），命中即 `animateScrollToItem`，并把阅读状态切到 `BrowsingHistory`（不自动跟随新消息）
+  - 资源：新增 7 个 key（zh/en）
+- 测试：
+  - `:app:assembleDebug` / `:app:assembleDebugAndroidTest` BUILD SUCCESSFUL
+  - AVD `emulator-5556` 全量 UI → **OK (26 tests)**（无回归）
+  - **未新增搜索专用 UI 测试**（见「未实现」）
+- 截图（AVD 393dp / en / Light，Fixture 20 条）：
+  - Before：`docs/evidence/ux06-before-search.png`
+  - After（搜索打开）：`docs/evidence/ux06-search-open.png` —— 顶栏出现搜索图标；搜索栏与「Only the loaded messages are searched」
+- 四类结论：
+  - **已实现并验证**：搜索入口、防抖匹配、命中计数、上/下一处定位、边界标注；编译与 26 项 UI 无回归；截图
+  - **已实现但未验证**：中文查询、代码片段查询、500/2000 条下的响应时间（未做性能测量，**不宣称**性能数字）
+  - **未实现**：**命中高亮**（当前只滚动定位，正文不描边，因为需要改动 Markdown 的 SpanStyle 管线）；搜索专用 UI 测试；ToolResult 折叠内容的搜索开关；结果超过 N 条时的截断提示
+  - **已知问题**：搜索状态不持久化（离开对话即关闭）；`SearchBar` 使用 `Space.page` 固定 16dp，未接 `PageGutter`
+- 回滚：`git revert <this commit>`

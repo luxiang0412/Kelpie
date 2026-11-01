@@ -1,6 +1,6 @@
 # Herdr Android — UX-D0 自主实施进度
 
-> 此文件是初始模板。Pi 开始执行后，将其维护为 `docs/design/ux-run/PROGRESS.md` 的实时内容。状态值只能是 TODO / IN_PROGRESS / PASS / PARTIAL / BLOCKED / SKIPPED。不要预先标绿。
+> 此文件是初始模板。Pi 开始执行后，将其维护为 `docs/run/PROGRESS.md` 的实时内容。状态值只能是 TODO / IN_PROGRESS / PASS / PARTIAL / BLOCKED / SKIPPED。不要预先标绿。
 
 | ID | Task | 状态 | Commit | 关键证据 / 阻断 |
 |---|---|---|---|---|

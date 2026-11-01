@@ -1,6 +1,6 @@
 # DESIGN-SYSTEM — Quiet Command
 
-> 代码位置：`milestone1/feature/board/src/main/kotlin/dev/herdr/feature/board/design/Tokens.kt`
+> 代码位置：`android/feature/board/src/main/kotlin/dev/herdr/feature/board/design/Tokens.kt`
 > 依据：`HERDR-ANDROID-UX-DESIGN-REVIEW-2026-10-31.md` §4/§5。**所有页面禁止硬编码颜色与尺寸**，一律取 tokens。
 
 ## 1. 颜色

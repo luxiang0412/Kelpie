@@ -7,7 +7,7 @@
 | 文档版本 | v2.1（v1：2026-10-28；v2：2026-10-29；v2.1：2026-10-29，按 7 项 P0 问题修订） |
 | 作者 | v1 由 Grok Bot 调研；ChatGPT 做深度技术复核；v2 由 Grok Bot 合并，并对照源码和文档核实；v2.1 修订 7 项 P0 安全/语义问题 |
 | 核实基线 | herdr 0.9.5（master `bc8c289`，2026-10-28）、Claude Code 官方文档（2026-10）、Codex App Server 官方文档、pi-mono 1.4.0、Compose Material3 发布页（2026-10-21） |
-| 本地 schema 基线 | herdr **0.9.3**（Windows 主机实测），`protocol = 22`、`schema_version = 1`、102 个方法，导出文件 `spike/results/herdr-api.schema.json`。**0.9.3 ≠ 0.9.5**，凡是只在这一份 schema 上确认的结论都标注了“0.9.3 schema” |
+| 本地 schema 基线 | herdr **0.9.3**（Windows 主机实测），`protocol = 22`、`schema_version = 1`、102 个方法，导出文件 `docs/evidence/herdr-api.schema.json`。**0.9.3 ≠ 0.9.5**，凡是只在这一份 schema 上确认的结论都标注了“0.9.3 schema” |
 | 配套文件 | `herdr-android-spike-plan.md`：Spike 任务书；`RESULTS.md` / `DECISIONS.md` / `ISSUES.md` / `NEXT-STEPS.md`：Phase 0 执行记录 |
 | 标记约定 | ✅ 已核实（附权威来源）；🧪 已实测（附本地证据文件）；❌ 验证失败；【待验证】要靠 Spike 实测或没有找到权威来源 |
 
@@ -552,7 +552,7 @@ v2 只写了“写三个文件、等一个文件”，缺了请求身份、过�
 
 > v2.1 新增（P0）。v2 把“团队场景”当成差异化方向，但 **Herdr 根本没有提供这些原语**。
 
-证据：本地 0.9.3 `herdr api schema --json` 共 102 个方法，**没有任何** `presence.*` / `lock.*` / `lease.*` / `owner.*`（🧪 `spike/results/herdr-api.schema.json`）；`ping.capabilities` 只有 6 个客户端特性开关，也与协作无关。`agent.wait` 是“等状态”，`pane.read` 的 `revision` 只能比较不能占位（见[写操作语义](#写操作语义超时不自动重试而且没有锁)）。
+证据：本地 0.9.3 `herdr api schema --json` 共 102 个方法，**没有任何** `presence.*` / `lock.*` / `lease.*` / `owner.*`（🧪 `docs/evidence/herdr-api.schema.json`）；`ping.capabilities` 只有 6 个客户端特性开关，也与协作无关。`agent.wait` 是“等状态”，`pane.read` 的 `revision` 只能比较不能占位（见[写操作语义](#写操作语义超时不自动重试而且没有锁)）。
 
 结论：**“谁在处理哪个 agent / 避免两人同时回答同一个问题”必须靠我们自己加的协调层**，这与“尽量不写服务端”的约束直接冲突。可选方案与取舍：
 

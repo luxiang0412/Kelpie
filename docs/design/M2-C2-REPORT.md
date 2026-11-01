@@ -86,7 +86,7 @@ Unknown 的重新发送：必须点「重新发送…」→ 弹出确认对话�
 
 ### 1.6 视觉
 
-`spike/results/m2c2-composer-dark.png`（真机深色）：Markdown 正文、折叠的思考/tool 行、
+`docs/evidence/m2c2-composer-dark.png`（真机深色）：Markdown 正文、折叠的思考/tool 行、
 新 Composer（占位符、`⤢` 长编辑入口、48dp 发送按钮）、底部三态说明。
 
 ---

@@ -25,7 +25,7 @@
 | 2000 | **298 ms** |
 
 对比（同设备、同协议）：debug 变体 787 / 786 / 834 ms；M2-A 优化前 1577 / 1529 / 1583 ms。
-证据：`spike/results/m2b-fixture-start-benchmark.txt`。
+证据：`docs/evidence/m2b-fixture-start-benchmark.txt`。
 
 ⚠️ 这是 **Fixture 页首帧**，不是 `StartupTimingMetric`，也不等于正式 App 冷启动（M1 release 中位 379 ms）。
 

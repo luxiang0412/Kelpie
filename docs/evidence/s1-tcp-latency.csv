@@ -1,0 +1,11 @@
+run,kind,ms
+1,tcp_open_22,105
+2,tcp_open_22,111
+3,tcp_open_22,122
+4,tcp_open_22,107
+5,tcp_open_22,99
+6,tcp_open_22,111
+7,tcp_open_22,119
+8,tcp_open_22,107
+9,tcp_open_22,102
+10,tcp_open_22,102

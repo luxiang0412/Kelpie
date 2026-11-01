@@ -28,7 +28,7 @@
 
 ## 执行须知（给执行 AI）
 
-- **环境变量**：下面的命令都使用这些变量，开始前先让用户填写，并写进 `spike/.env`（这个文件**不要提交**）：
+- **环境变量**：下面的命令都使用这些变量，开始前先让用户填写，并写进 `archive/spike/.env`（这个文件**不要提交**）：
 
   ```bash
   export SPIKE_HOST=dev.example.com      # 远程开发机（必须是隔离的、可归零的机器）
@@ -88,7 +88,7 @@
 1. 主机侧检查（在本机执行，**全部只读**）：
 
    ```bash
-   source spike/.env
+   source archive/spike/.env
    SSH="ssh -i $SPIKE_KEY -p $SPIKE_PORT $SPIKE_USER@$SPIKE_HOST"
    $SSH 'command -v herdr; herdr --version'          # 非交互 shell 的 PATH 可能不同，先确认二进制路径
    $SSH 'herdr --session '"$HERDR_SESSION"' status'
@@ -235,8 +235,8 @@
 1. 导出 schema，作为后续数据类和参数名的依据：
 
    ```bash
-   $SSH 'herdr api schema --json' > spike/results/herdr-api.schema.json
-   $SSH 'herdr --session '"$HERDR_SESSION"' api snapshot' > spike/results/s2-snapshot-cli.json
+   $SSH 'herdr api schema --json' > docs/evidence/herdr-api.schema.json
+   $SSH 'herdr --session '"$HERDR_SESSION"' api snapshot' > docs/evidence/s2-snapshot-cli.json
    ```
 
 2. 订阅（一个长连接 channel，一直读）。
@@ -756,7 +756,7 @@
 
 ## 给执行 AI 的总指令
 
-> 你是这个项目的 Spike 执行者。先完整阅读 `herdr-android-client-research-v2.md`（v2.1）和本任务书；让用户填写 `spike/.env`（包括 `SPIKE_HOST_KEY_SHA256`），然后按 Spike 1 → 8 的顺序执行（1–4 是关键路径）。
+> 你是这个项目的 Spike 执行者。先完整阅读 `herdr-android-client-research-v2.md`（v2.1）和本任务书；让用户填写 `archive/spike/.env`（包括 `SPIKE_HOST_KEY_SHA256`），然后按 Spike 1 → 8 的顺序执行（1–4 是关键路径）。
 >
 > 硬性要求：
 > 1. **每条结论只能写 `已验证` / `验证失败` / `尚未验证`**，并有可重放的命令和证据文件；没跑过的步骤**绝不得**写成已验证，也不得用“应该 / 估讦 / 大体上”代替数据。
@@ -766,7 +766,7 @@
 > 5. 真机相关项（延迟、耗电、后台、键盘）必须用真机；只有模拟器就标 `尚未验证`。
 > 6. 某个 Spike 超过建议用时的 1.5 倍还没结论，就记录现状和卡点，进入下一个。
 >
-> 交付：`RESULTS.md`、`DECISIONS.md`、`ISSUES.md`、`NEXT-STEPS.md` 四个文件，外加 `spike/results/` 里的原始数据。最后给一份不超过一页的总结：哪些路线确认可行、选定了哪些方案、还有哪些风险。
+> 交付：`RESULTS.md`、`DECISIONS.md`、`ISSUES.md`、`NEXT-STEPS.md` 四个文件，外加 `docs/evidence/` 里的原始数据。最后给一份不超过一页的总结：哪些路线确认可行、选定了哪些方案、还有哪些风险。
 
 > **v2.2 实测修正（2026-10-31）**：
 > - JSON API 的 `pane.split` 参数是 **`target_pane_id`**，不是 `pane_id`；传错会被**静默忽略**并 split 到焦点 pane（已发生过一次误操作，见 `ISSUES.md` I-34）。

@@ -1,0 +1,14 @@
+# Spike 1/2 本地环境记录（2026-10-29T16:32:42+08:00）
+
+os: MINGW64_NT-10.0-26200 3.6.3-7674c51e.x86_64 x86_64
+java(main): openjdk version "17.0.3" 2022-04-19 LTS
+gradle: Gradle 9.4.1
+kotlin-plugin: 2.2.10 (gradle cache)
+sshj: 0.41.2 (maven central, verified by compilation)
+junit-jupiter: 5.11.4
+
+herdr (local client): herdr 0.9.3
+herdr server status: stopped (本地未启动)
+adb devices:
+emulator-5554	device
+

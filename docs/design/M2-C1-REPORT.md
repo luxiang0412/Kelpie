@@ -77,7 +77,7 @@ ConversationBenchmark_startup_500
 
 ### 1.6 UI 截图
 
-`spike/results/m2c1-conversation-dark.png`（Markdown 标题/列表/引用/行内码/链接/代码块，深色）。
+`docs/evidence/m2c1-conversation-dark.png`（Markdown 标题/列表/引用/行内码/链接/代码块，深色）。
 
 ---
 

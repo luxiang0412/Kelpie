@@ -30,4 +30,4 @@
 
 ## 4. 睡醒后查看什么
 
-阅读 `docs/design/ux-run/PROGRESS.md` 与 `FINAL-REVIEW.md`，查看 Android 真机/AVD 截图、工作分支及 Commit；未执行的任务必须保留真实阻断原因。**不要只看“已实现”字样，必须看实测/截图/测试证据。**
+阅读 `docs/run/PROGRESS.md` 与 `FINAL-REVIEW.md`，查看 Android 真机/AVD 截图、工作分支及 Commit；未执行的任务必须保留真实阻断原因。**不要只看“已实现”字样，必须看实测/截图/测试证据。**

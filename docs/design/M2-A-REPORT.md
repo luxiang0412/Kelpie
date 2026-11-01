@@ -28,7 +28,7 @@
 - 行最小高度 **56 dp**（≥48 dp 触达），`semantics(mergeDescendants = true)` 合并朗读「状态 + agent + 标题 + 项目」；
 - 对比度：状态前景色取 Quiet Command 色板（报告实测最低 5.41:1），浅/深色均验证。
 
-证据：`spike/results/m2a-board-light.png`、`m2a-board-dark.png`。
+证据：`docs/evidence/m2a-board-light.png`、`m2a-board-dark.png`。
 
 ### 1.2 Fixture 数据集（确定性）
 

@@ -2,7 +2,7 @@
 
 > 更新：2026-10-29（离线 JVM 验证 + 对 `luxiang@192.168.5.8` 的只读在线验证）
 > 对应文档：`herdr-android-client-research-v2.md`（v2.1）、`herdr-android-spike-plan.md`
-> 环境报告：`spike/results/environment-report.md`
+> 环境报告：`docs/evidence/environment-report.md`
 >
 > 状态词（本轮起统一使用英文标记）：**VERIFIED** / **FAILED** / **BLOCKED** / **NOT TESTED**
 > （分别对应之前的「已验证 / 验证失败 / 尚未验证」；`BLOCKED` 专指“被外部前置条件卡住”，`NOT TESTED` 指“本轮范围内但没开始”）
@@ -26,7 +26,7 @@
 
 ## 1. 环境
 
-完整报告见 `spike/results/environment-report.md`。要点：
+完整报告见 `docs/evidence/environment-report.md`。要点：
 
 | 项目 | 值 |
 | --- | --- |
@@ -40,7 +40,7 @@
 
 ## 2. S1-OFFLINE：离线 JVM 验证（VERIFIED）
 
-证据：`spike/results/s1-local-unit-tests.txt`（22 PASSED / 0 FAILED，可重跑：`spike/jvm` → `gradle test`）。
+证据：`docs/evidence/s1-local-unit-tests.txt`（22 PASSED / 0 FAILED，可重跑：`spike/jvm` → `gradle test`）。
 
 | ID | 项 | 状态 | 证据 |
 | --- | --- | --- | --- |
@@ -58,17 +58,17 @@
 
 | ID | 项 | 实测 | 证据 |
 | --- | --- | --- | --- |
-| ON-1 | 主机指纹带外核对 | `ssh-keyscan` + `ssh-keygen -lf` 得到 ED25519 `SHA256:lfFYDnJNKAPT1jtyrA6bU89XDcKtHQiy7PPdiX0G0T8`，与 OpenSSH 实际握手用的 host key 一致 | `results/environment-report.md` §4 |
+| ON-1 | 主机指纹带外核对 | `ssh-keyscan` + `ssh-keygen -lf` 得到 ED25519 `SHA256:lfFYDnJNKAPT1jtyrA6bU89XDcKtHQiy7PPdiX0G0T8`，与 OpenSSH 实际握手用的 host key 一致 | `docs/evidence/environment-report.md` §4 |
 | ON-2 | F1 未知主机 fail-closed（真机） | 抛 `HostKeyUnknownException`，**未发送任何凭据**，信任库**未写入**，耗时 338 ms（仅 KEX） | `RESULT,F1,...store_written=false` |
 | ON-3 | F4 篡改指纹（真机） | 抛 `HostKeyMismatchException`，pin 记录**未被改写** | `RESULT,F4,...pin_unchanged=true` |
 | ON-4 | F2/F3 显式确认后静默通过（真机） | 提示次数 = 1；写入 `192.168.5.8:22:ssh-ed25519 SHA256:lfFY...` | `RESULT,F2/F3,prompts=1` |
-| ON-5 | 指纹实现与 OpenSSH 一致 | 我们算出的指纹与 `ssh-keygen -lf` **逐字符相同**（踩坑：sshj 的 `getEncoded()` 是 X.509，`SecurityUtils.getFingerprint()` 是 MD5） | `spike/jvm/.../trust/SshjVerifier.kt` |
-| ON-6 | TCP 22 建连延迟 | 10 次平均 **108.5 ms** | `results/s1-tcp-latency.csv` |
-| ON-7 | 一次性 SSH 往返（TCP+KEX+auth+exec+exit） | 10 次 **1040–1139 ms**，P50 ≈ **1107 ms** | `results/s1-ssh-cli-latency.csv` |
-| ON-8 | herdr 版本/协议/schema | 0.9.0 / protocol 22 / schema_version 1 / 102 方法 | `results/herdr-api.remote-0.9.0.schema.json` |
+| ON-5 | 指纹实现与 OpenSSH 一致 | 我们算出的指纹与 `ssh-keygen -lf` **逐字符相同**（踩坑：sshj 的 `getEncoded()` 是 X.509，`SecurityUtils.getFingerprint()` 是 MD5） | `archive/spike/jvm/.../trust/SshjVerifier.kt` |
+| ON-6 | TCP 22 建连延迟 | 10 次平均 **108.5 ms** | `docs/evidence/s1-tcp-latency.csv` |
+| ON-7 | 一次性 SSH 往返（TCP+KEX+auth+exec+exit） | 10 次 **1040–1139 ms**，P50 ≈ **1107 ms** | `docs/evidence/s1-ssh-cli-latency.csv` |
+| ON-8 | herdr 版本/协议/schema | 0.9.0 / protocol 22 / schema_version 1 / 102 方法 | `docs/evidence/herdr-api.remote-0.9.0.schema.json` |
 | ON-9 | `test` 会话是否存在 | `herdr session list` 只有 `default`、`ljn`；`sessions/test/` 不存在 | 同上 §2 |
-| ON-10 | `remote-api-bridge` 可用性 | **不存在**（`unknown command`），rc=2 | `results/environment-report.md` §2 |
-| ON-11 | 0.9.0 的 API 语义不变量 | `agent.wait` 无锁参数、写操作无幂等键、`pane.agent_status_changed` 必带 `pane_id`、协作原语 0 命中 | `results/herdr-schema-summary.md` + 差异对比 |
+| ON-10 | `remote-api-bridge` 可用性 | **不存在**（`unknown command`），rc=2 | `docs/evidence/environment-report.md` §2 |
+| ON-11 | 0.9.0 的 API 语义不变量 | `agent.wait` 无锁参数、写操作无幂等键、`pane.agent_status_changed` 必带 `pane_id`、协作原语 0 命中 | `docs/evidence/herdr-schema-summary.md` + 差异对比 |
 
 ### 3.2 失败（FAILED）
 
@@ -76,7 +76,7 @@
 | --- | --- | --- | --- |
 | ON-12 | sshj 0.41.2 公钥认证（RSA 3072/4096） | 三次 `publickey` 尝试后 `UserAuthException: Exhausted available authentication methods` | ① 不是密钥未授权：同一私钥用 OpenSSH 客户端（`IdentitiesOnly=yes`、`IdentityAgent=none`）可登录；② 不是密钥解析错：sshj 导出的公钥指纹 `SHA256:LiY1T1l9W1yMOCam/EPG1SlrjIDlmQp9zhzP27CcXpE` 与 `ssh-keygen -lf id_rsa.pub` **完全一致**；③ 不是 host key 校验导致：F1/F2/F4 均正常 |
 
-证据：`results/s1-sshj-auth-debug.log`（含 `Server supports signature algorithms: [... rsa-sha2-512, rsa-sha2-256]`、三次 `Attempting authentication using OpenSSHKeyV1KeyFile`、最终 `publickey auth failed`）。
+证据：`docs/evidence/s1-sshj-auth-debug.log`（含 `Server supports signature algorithms: [... rsa-sha2-512, rsa-sha2-256]`、三次 `Attempting authentication using OpenSSHKeyV1KeyFile`、最终 `publickey auth failed`）。
 
 已尝试且**无效**的修法：`SecurityUtils.registerSecurityProvider(null)` 注册 BC；`DefaultConfig.keyAlgorithms` 把 `rsa-sha2-512/256` 提前；`OpenSSHKeyV1KeyFile().init(privateKey, publicKey)` 双文件初始化；改用 PKCS#1 的 `luxiang_rsa`（该 key sshj 连解析都失败，报 `No provider available for Unknown key file`）。
 
@@ -84,7 +84,7 @@
 
 ## 4. S2-SCHEMA：API 静态事实（VERIFIED，已在 0.9.0 目标主机复验）
 
-证据：`results/herdr-api.remote-0.9.0.schema.json`（远端导出，275 KB）+ `results/herdr-schema-summary.md`（本地 0.9.3 摘要）。
+证据：`docs/evidence/herdr-api.remote-0.9.0.schema.json`（远端导出，275 KB）+ `docs/evidence/herdr-schema-summary.md`（本地 0.9.3 摘要）。
 
 | ID | 事实 | 状态 |
 | --- | --- | --- |
@@ -153,16 +153,16 @@
 
 | 文件 | 内容 |
 | --- | --- |
-| `spike/results/environment-report.md` | 本轮只读环境报告（主机、herdr、Claude、SSH） |
-| `spike/results/herdr-api.remote-0.9.0.schema.json` | 目标主机 herdr 0.9.0 的 schema 导出 |
-| `spike/results/herdr-api.schema.json` | 本机 herdr 0.9.3 的 schema 导出 |
-| `spike/results/herdr-schema-summary.md` | 从 schema 自动生成的摘要 |
-| `spike/results/s1-local-unit-tests.txt` | 22 个单测输出 |
-| `spike/results/s1-ssh-cli-latency.csv` | 一次性 SSH 往返 10 次 |
-| `spike/results/s1-tcp-latency.csv` | TCP 22 建连 10 次 |
-| `spike/results/s1-sshj-auth-debug.log` | sshj 认证失败的 debug 日志（ON-12） |
-| `spike/results/s1-local-env.txt` | 本机执行环境 |
-| `spike/jvm/` | 可重跑工程（`gradle test` / `gradle installDist` + `--mode hostkey|connect|channels|bridge`） |
+| `docs/evidence/environment-report.md` | 本轮只读环境报告（主机、herdr、Claude、SSH） |
+| `docs/evidence/herdr-api.remote-0.9.0.schema.json` | 目标主机 herdr 0.9.0 的 schema 导出 |
+| `docs/evidence/herdr-api.schema.json` | 本机 herdr 0.9.3 的 schema 导出 |
+| `docs/evidence/herdr-schema-summary.md` | 从 schema 自动生成的摘要 |
+| `docs/evidence/s1-local-unit-tests.txt` | 22 个单测输出 |
+| `docs/evidence/s1-ssh-cli-latency.csv` | 一次性 SSH 往返 10 次 |
+| `docs/evidence/s1-tcp-latency.csv` | TCP 22 建连 10 次 |
+| `docs/evidence/s1-sshj-auth-debug.log` | sshj 认证失败的 debug 日志（ON-12） |
+| `docs/evidence/s1-local-env.txt` | 本机执行环境 |
+| `archive/spike/jvm/` | 可重跑工程（`gradle test` / `gradle installDist` + `--mode hostkey|connect|channels|bridge`） |
 
 ---
 
@@ -196,7 +196,7 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 
 ## 9.3 协议行为（VERIFIED）
 
-证据：`spike/results/s2-snapshot-bridge.json`、`s2-snapshot-cli.json`、`s2-subscribe-*.txt`、`s2-ping-latency.csv`。
+证据：`docs/evidence/s2-snapshot-bridge.json`、`s2-snapshot-cli.json`、`s2-subscribe-*.txt`、`s2-ping-latency.csv`。
 
 | ID | 项 | 结果 |
 | --- | --- | --- |
@@ -271,7 +271,7 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 ## 9.9 专用 pane 里的写操作 / 事件 / pi（2026-10-31 15:30–15:40）
 
 已获批：A（专用 workspace + 写操作与事件测试）、P-2（在专用 pane 跑 pi）。
-专用 workspace：**`w4`**（label `spike`，cwd `~/spike-sandbox`，`--no-focus`），使用 pane **`w4:p1`**。
+专用 workspace：**`w4`**（label `archive/spike`，cwd `~/spike-sandbox`，`--no-focus`），使用 pane **`w4:p1`**。
 用户原有 4 个 pane（`w1:p1`、`w1:p2`、`w2:p1`、`w3:p1`）**未收到任何输入**。
 
 | ID | 项 | 结果 | 证据 |
@@ -322,7 +322,7 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 | `events_lost` | **未出现**；恢复读取后 30 个事件**全部送达**（无丢失、无重放） |
 | 结论 | 订阅能承受 25 s 级卡顿。要触发 `events_lost` 需要 >100 个 pane 量级（填满 socket 缓冲），属于压力测试，按你的约束**不做** → 恢复路径本轮 `NOT TESTED` |
 
-证据：`spike/results/s2-events-lost-attempt.ndjson`。
+证据：`docs/evidence/s2-events-lost-attempt.ndjson`。
 
 ### Q-1 交互式 pi：agent.prompt / agent.wait / 无锁（VERIFIED）
 
@@ -392,7 +392,7 @@ nohup ~/.local/bin/herdr --session test server > ~/spike-test-boot.log 2>&1 &
 
 ### R-3 SFTP 实链（VERIFIED）
 
-证据：`spike/results/s4-sftp-live.csv`。
+证据：`docs/evidence/s4-sftp-live.csv`。
 
 | 步骤 | 结果 | 耗时 |
 | --- | --- | --- |
@@ -646,7 +646,7 @@ App：`spike/android`（最小 Activity，非 Compose；源码见该目录 READM
 | 项 | 结果 | 证据 |
 | --- | --- | --- |
 | 安装 / 启动 | ✅ `dev.herdr.app` 安装成功并启动 | `adb install` |
-| 首次连接：主机指纹对话框 | ✅ 显示 `192.168.5.8:22:ssh-ed25519` + `SHA256:lfFY…`，按钮「取消 / 信任该主机」 | `spike/results/m1-02-connect.png` |
+| 首次连接：主机指纹对话框 | ✅ 显示 `192.168.5.8:22:ssh-ed25519` + `SHA256:lfFY…`，按钮「取消 / 信任该主机」 | `docs/evidence/m1-02-connect.png` |
 | 信任后连接 | ✅ 日志 `connected generation=1`、`ping ok version=0.9.5 protocol=22` | logcat `HerdrConn` |
 | 看板 | ✅ 分组（空闲 2 / 未知 3）、计数、pane 卡片（agent/状态/标题/ws·tab·cwd）、页脚 `herdr 0.9.5 · protocol 22 · 5 个 pane` | `m1-05-board-connected.png` |
 | Pane 详情（只读） | ✅ pane_id / terminal_id / workspace / tab / agent_status / revision / cwd / title | `m1-03-detail.png` |
@@ -723,7 +723,7 @@ HOME=~/spike-sandbox/pihome herdr integration install pi
 | 之后 UI | `已连接 · herdr 0.9.5 · protocol 22`，看板数据仍在 | 
 
 结论：**连接代次 + 退避重连 + 订阅重建 + 快照对账**在真实断链下工作正常，恢复时间 **≈1.7 s**（P95 目标 3 s 内）。
-证据：`spike/results/m1-06-after-recovery.png`。
+证据：`docs/evidence/m1-06-after-recovery.png`。
 
 ---
 
@@ -775,7 +775,7 @@ HOME=~/spike-sandbox/pihome herdr integration install pi
 | 显示刷新率 | **120 Hz**（`renderFrameRate 120.00001`） | — | 设备符合预期 |
 | 键盘动画 | 未测（看板无输入框） | 0 帧 > 16.7 ms | ⛔ NOT TESTED（留给 M3/输入栏） |
 
-证据：`spike/results/m2-coldstart.txt`、`spike/results/m2-scroll-jank.txt`。
+证据：`docs/evidence/m2-coldstart.txt`、`docs/evidence/m2-scroll-jank.txt`。
 
 下一步（M3）：引入 `:benchmark` + Macrobenchmark（StartupTiming / FrameTiming）、Baseline Profile，
 并把“流式输出时的滚动”纳入测量（现在没有流式数据源）。
@@ -832,7 +832,7 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 
 - 打开对话页期间，每 **2 s** 重新读一次尾部快照（仍非 offset 增量），消息集合变化才更新 UI。
 - 实测：对话页打开（已有 #1/#2），在主机上让 pi 再跑一轮（**不点刷新**），2–3 s 后页面自动出现 `#3 你：用一句话告诉我 2+2 等于几` 与 `#4 assistant：2+2 等于 4。`
-- 证据：`spike/results/m2-09-transcript-autorefresh.png`。
+- 证据：`docs/evidence/m2-09-transcript-autorefresh.png`。
 - 代价：每次 256 KiB 尾部读 + 解析，50 ms RTT 下约 200–400 ms；M4 换成 `SftpTail`（offset 增量）后可把成本降到只读增量。
 
 ## 14.7 顺手修的两个小问题
@@ -1115,7 +1115,7 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 ## M2-B（2026-10-31，提交 b0ece0a）
 
 - **benchmark 变体**：`:app:assembleBenchmark` 成功；设备 `run-as` 报 `package not debuggable` → R8/非调试生效。
-- **Fixture 首帧**（benchmark 变体，真机）：100 → 375 ms、500 → 344 ms、2000 → 298 ms（`spike/results/m2b-fixture-start-benchmark.txt`）。
+- **Fixture 首帧**（benchmark 变体，真机）：100 → 375 ms、500 → 344 ms、2000 → 298 ms（`docs/evidence/m2b-fixture-start-benchmark.txt`）。
 - **Markdown 渲染**：标题/列表/引用/行内样式/代码块/链接，深色截图 `m2b-markdown-dark.png`、浅色 `m2b-markdown-light.png`。
 - **单元测试**：新增 19 个（Markdown 12 + Tool 配对 7），`:feature:board:testDebugUnitTest` 全绿；`:core:herdr:test` 全绿。
 - **未获得**：FrameTimingMetric / StartupTimingMetric / Perfetto（MIUI BAL 阻断 instrumentation 启动 Activity，I-74；`dropShaderCache` 失败 I-78）。
@@ -1163,11 +1163,11 @@ herdr snapshot.agents[].agent_session(kind=path)  →  Pane.agentSessionPath
 - Herdr 返回 **Accepted**（UI 横幅）；远端 JSONL 14 → **16 行**（user `985860c5` → assistant `e546b12a`，间隔 1.85s）；
 - Pi 回复内容 `M2C2V-ACK-0120` 与预期一致；App **增量显示**该回复，底部时自动跟随；
 - 未验证：上滑不跳底/新消息提示、断线重连、分支切换、Tool 关联、APPEND/PATCH/FULL 计数（无埋点）。
-- 证据：`spike/results/m2c2v-{board-before,conv-before,typed,sent,reply}.png`
+- 证据：`docs/evidence/m2c2v-{board-before,conv-before,typed,sent,reply}.png`
 
 ## 真机补充验收（同日）
 
 - **杀进程草稿恢复（I-87）**：✅ force-stop 后重进会话，草稿 `DRAFT-RESTORE-*` 完整恢复。
 - **横屏旋转**：✅ 草稿保留、布局重排、发送可用。
 - **最大字体 1.3**：⚠️ 输入栏/正文/按钮可用，但对话页标题栏被裁剪（新 I-93）。
-- 证据：`spike/results/m2c2v-{draft-restore,font-max,font-max-dark,rotated}.png`
+- 证据：`docs/evidence/m2c2v-{draft-restore,font-max,font-max-dark,rotated}.png`

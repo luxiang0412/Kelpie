@@ -40,3 +40,8 @@ android/local.properties
 # 临时抓取文件
 tmp-*.xml
 tmp_*.txt
+
+# 归档目录：探针代码保留，历史截图/日志只留本地（证据已整理到 docs/evidence/）
+archive/spike/results/
+archive/spike/*/build/
+archive/spike/*/.gradle/

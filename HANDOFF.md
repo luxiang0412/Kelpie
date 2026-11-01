@@ -23,7 +23,7 @@ cd spike/jvm
 ## 2. 环境变量
 
 ```bash
-cp spike/.env.example spike/.env && ${EDITOR} spike/.env
+cp archive/spike/.env.example archive/spike/.env && ${EDITOR} archive/spike/.env
 ```
 
 `.env` 已被 git 忽略。里面的主机/密钥/指纹按你的新环境改。
@@ -33,12 +33,12 @@ cp spike/.env.example spike/.env && ${EDITOR} spike/.env
 
 | 文件 | 说明 |
 | --- | --- |
-| `spike/results/herdr-api.remote-0.9.0.schema.json` | 目标主机 herdr 0.9.0 的 schema |
-| `spike/results/herdr-api.schema.json` | 本机 herdr 0.9.3 的 schema |
-| `spike/results/environment-report.md` | 只读环境报告 |
-| `spike/results/s1-*.{csv,txt,log}` | 延迟、指纹用例、sshj 失败日志 |
+| `docs/evidence/herdr-api.remote-0.9.0.schema.json` | 目标主机 herdr 0.9.0 的 schema |
+| `docs/evidence/herdr-api.schema.json` | 本机 herdr 0.9.3 的 schema |
+| `docs/evidence/environment-report.md` | 只读环境报告 |
+| `docs/evidence/s1-*.{csv,txt,log}` | 延迟、指纹用例、sshj 失败日志 |
 
-`spike/jvm/known_hosts.spike`（本地信任库）**未入库**，属于运行期状态；换机器要重新走一次
+`archive/spike/jvm/known_hosts.spike`（本地信任库）**未入库**，属于运行期状态；换机器要重新走一次
 「未知主机 → 显示指纹 → 带外核对 → 显式确认」。
 
 ## 4. 三条待批准的动作（在 `NEXT-STEPS.md` §1 有完整命令与回滚）

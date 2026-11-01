@@ -34,7 +34,7 @@ Fixture 首帧：**375 / 344 / 298 ms**（100/500/2000，benchmark 变体）。
 - 代码块：语言标识、复制按钮、横向滚动、等宽字体、默认 12 行 + 「展开全部 N 行」；
 - 不安全 URL（`javascript:` / `file:` / `intent:`）：删除线 + 「（链接已停用）」，**不可点击**；
 - 未知语法（表格、图片）按纯文本渲染，不崩溃；
-- 截图：`spike/results/m2b-markdown-light.png`、`m2b-markdown-dark.png`（深色见图：标题/列表/引用/行内码/链接/代码块可读）。
+- 截图：`docs/evidence/m2b-markdown-light.png`、`m2b-markdown-dark.png`（深色见图：标题/列表/引用/行内码/链接/代码块可读）。
 
 ### 1.3 渲染模型与配对
 

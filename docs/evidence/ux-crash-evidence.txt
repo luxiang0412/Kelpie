@@ -1,0 +1,13 @@
+# 证据摘要：SSH 断链导致进程 FATAL（2026-10-31 ~ 11-01，真机 dev.herdr.app）
+# 原始 logcat 含主机/路径信息，此处仅保留类型与线程名（已脱敏）
+
+10-31 23:21:21.425  FATAL EXCEPTION: DefaultDispatcher-worker-10  (process dev.herdr.app)
+11-01 00:16:15.760  FATAL EXCEPTION: DefaultDispatcher-worker-2   (process dev.herdr.app)
+11-01 01:00:02.709  FATAL EXCEPTION: DefaultDispatcher-worker-4   (process dev.herdr.app)
+
+共同根因（第三处完整栈）：
+  Caused by: net.schmizz.sshj.connection.ConnectionException: Broken transport; encountered EOF
+    at net.schmizz.sshj.transport.Reader.run(Reader.java:66)
+  Suppressed: DiagnosticCoroutineContextException: [StandaloneCoroutine{Cancelling}, Dispatchers.Default]
+
+结论：传输层异常在 Default 调度器上以未捕获协程异常形式冒出 → 进程崩溃（无 CoroutineExceptionHandler）。
