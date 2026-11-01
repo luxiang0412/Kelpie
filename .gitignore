@@ -24,3 +24,11 @@ spike/android/app/build/
 spike/android/local.properties
 *.apk
 *.aab
+
+# 正式签名配置与密钥库（绝不入库）
+milestone1/keystore.properties
+keystore.properties
+*.jks
+*.keystore
+
+dist/

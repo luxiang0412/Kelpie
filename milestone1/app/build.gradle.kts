@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.plugin.compose") }
 android {
     namespace = "dev.herdr.app"
@@ -7,10 +9,24 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "0.1.0-m1"
+        versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true }
+    // 正式签名：仓库根有 keystore.properties 时使用（不进 git）；否则回退 debug key（仅内部试用）
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    signingConfigs {
+        create("releaseSigned") {
+            if (keystorePropsFile.exists()) {
+                val props = Properties()
+                keystorePropsFile.inputStream().use { input -> props.load(input) }
+                storeFile = rootProject.file(props.getProperty("storeFile").orEmpty())
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         // benchmark：基于 release 语义（不可调试 + R8），用于 Macrobenchmark 与 UI 测试。
         // Fixture 只进入 debug 与 benchmark 变体，正式 release 包不含任何 fixture 代码。
@@ -24,9 +40,13 @@ android {
             matchingFallbacks += listOf("release")
         }
         getByName("release") {
-            // M3 只用 debug 版验收；release 的 R8/Baseline Profile 留到 M4 再开
+            // 0.1.0：首个可安装版本，先不开 R8（sshj/JSON 反射风险未验证完）
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystorePropsFile.exists()) {
+                signingConfigs.getByName("releaseSigned")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
