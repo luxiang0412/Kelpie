@@ -7,6 +7,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -134,6 +135,19 @@ object Radius {
 }
 
 /** 动效：所有动画必须有目的（状态切换/内容新增），时长克制。 */
+/** 系统「移除动画」时返回 false；调用方据此直接 snap（DESIGN-SYSTEM §6）。 */
+@Composable
+fun animationsEnabled(): Boolean {
+    val resolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
+    return remember(resolver) {
+        android.provider.Settings.Global.getFloat(
+            resolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
+}
+
 object Motion {
     const val FAST = 120
     const val NORMAL = 200

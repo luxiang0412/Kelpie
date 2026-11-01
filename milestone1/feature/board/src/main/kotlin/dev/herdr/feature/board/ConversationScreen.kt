@@ -1,6 +1,12 @@
 package dev.herdr.feature.board
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.focus.onFocusChanged
@@ -81,6 +87,7 @@ import dev.herdr.feature.board.conversation.ConversationBranch
 import dev.herdr.feature.board.conversation.IncrementalConversationMapper
 import dev.herdr.feature.board.design.ComposerGutter
 import dev.herdr.feature.board.design.DisclosureIndicator
+import dev.herdr.feature.board.design.animationsEnabled
 import dev.herdr.feature.board.design.TouchTargetIconButton
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.MonoStyle
@@ -499,7 +506,7 @@ private fun ToolRow(item: ConversationItem.Tool, stateKey: String) {
                 )
             }
 
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(visible = expanded, enter = if (animationsEnabled()) fadeIn() + expandVertically() else EnterTransition.None, exit = if (animationsEnabled()) fadeOut() + shrinkVertically() else ExitTransition.None) {
                 Column(Modifier.padding(start = Space.m, end = Space.m, bottom = Space.m)) {
                     if (item.argumentsSummary.isNotBlank()) {
                         DetailLabel(stringResource(R.string.tool_label_args))
