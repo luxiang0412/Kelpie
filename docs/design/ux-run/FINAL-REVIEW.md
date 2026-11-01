@@ -1,92 +1,49 @@
 # FINAL REVIEW — UX-D0 Graphite × Editorial
 
-> 分支：`ux/graphite-editorial`（**未合并 main**，已推送 origin）｜基线 `f56430c`
-> **结论等级：`FUNCTIONAL_PARTIAL`** — 可构建、全部自动化测试通过、安全红线未被触碰；
-> 视觉任务完成大部分，6 项为 PARTIAL、1 项 SKIPPED（STT）。真机验收仅完成 UX-02a。
+> 分支：`ux/graphite-editorial`（**未合并 main**，已推送 origin）
+> 结论等级：**`FUNCTIONAL_PARTIAL`**
 
-## 1. 任务状态（唯一权威表）
+## 1. 任务状态
 
-| Task | 状态 | Commit | 关键证据 |
-| --- | --- | --- | --- |
-| UX-00 审计/基线 | PASS | `704365c` | `UX-00-AUDIT.md`、`PROGRESS.md` |
-| UX-01a 对话顶栏大字体裁剪（I-93） | PASS | `48a94b1` | 真机 1.3 截图 |
-| UX-01b InlineCode 保真 | PASS | `128632a` | `InlineCodeFidelityTest` 2 项 |
-| UX-00a Tokens/对比度/图标契约 | PASS | `6b10196`,`7cc5112` | `ContrastTest` 34 断言；4 矢量图标；字形图标清零 |
-| UX-02a 工作台顶栏/主机选择器 | PASS | `e19e731` | 真机 P1/P2 + AVD P5/P6 |
-| UX-02b Attention First / done 折叠 | PASS | `309e3a1` | `BOARD-DONE-001` 落实；AVD 截图 |
-| UX-02c 单条 Banner / Unknown 入口 | PASS | `8d4d3ee` | `BoardBannerTest` 5 项 |
-| UX-03a 对话正文/身份头/气泡 | PASS | `edfaf40` | 分组表头、16/25、86% 气泡、围栏闭合 |
-| UX-03b Markdown/CodeBlock 视觉 | PASS | `62d03a1` | 引用 12dp、悬挂缩进、code 13/20 |
-| UX-03c Tool/Thinking/长输出 | PASS | `62d03a1` | 移除「失败」盲猜、52dp 头部 |
-| UX-03d 复制/系统选择/更多 | PASS | `ddb2fb8` | `MessageActionsTest` 3 项 |
-| UX-03e 阅读位置/新消息 | PARTIAL | `22c7a35` | 四状态+锚点+未读；`Resyncing` 未做；手势未实测 |
-| UX-04a Composer 轻量双层 | PASS | `017a24e` | AVD 截图 |
-| UX-04b 长 Prompt/草稿/异常 | PASS | `8f580ce` | 取消回退 + 三态不回归 |
-| UX-04c 引用消息 → Composer | PARTIAL | `8f580ce` | 追加式引用；光标插入未做 |
-| UX-05a i18n（zh/en） | PARTIAL | `63b0533`,`87edec2` | 46 key + 三屏接线 + 测试去中文化 |
-| UX-05b App 内语言设置 | PARTIAL | `f03420f` | API33+ `LocaleManager`；切换生效未验证 |
-| UX-06 会话内搜索 | PARTIAL | `42b8c6b` | 仅审计+计划；**未加搜索 UI** |
-| UX-07a STT Spike | PASS | `cc55234` | 结论文档：不实现，降级系统键盘语音 |
-| UX-07b STT 实施 | SKIPPED | — | 门槛未满足 |
-| UX-08a 主机/设置一致性 | PARTIAL | `cc55234`,`42b8c6b` | Hosts 页可滚动；分组与文案未做 |
-| UX-08b 空态/异常态/Motion | PARTIAL | `9c00752` | 审计为主；多数项已在前面任务完成 |
-| UX-08c 品牌图标 | PASS（PROPOSAL） | `cc55234` | 3 个 Focus Orbit 方向，未替换资产 |
-| UX-09 全局 QA | PARTIAL | `9c00752` | 决策表核对 + 回归 + 隐私检查 |
+完整逐项状态见 `PROGRESS.md`（唯一权威）。汇总：**PASS 13 / PARTIAL 8 / SKIPPED 1 / PROPOSAL 1**。
 
-## 2. 自动化测试（本轮真实执行）
+## 2. 已实现并验证的核心能力
 
-```
-:app:assembleDebug                     BUILD SUCCESSFUL
-:app:assembleDebugAndroidTest          BUILD SUCCESSFUL
-:feature:board:testDebugUnitTest       BUILD SUCCESSFUL
-:core:data:testDebugUnitTest           BUILD SUCCESSFUL
-:core:herdr:test                       BUILD SUCCESSFUL
-AVD emulator-5556 am instrument         OK (26 tests)   ← 在 en-US 语言下运行
-:core:data DraftMigrationTest          OK (1 test)
-```
+1. **设计 Token**：色板（含 `error`、`focusRing`）、字阶（display 26/34、titlePage 18/26、bodyReading 16/25、mdH1–3 21/29·18/26·16/24、code 13/20）、Shape（card 16、codeTool 12、composer 20/18）、对比度实测 5.86–16.30。
+2. **工作台**：主机选择器在标题下方、Attention First（blocked 前 2 卡）、done 默认收起、idle/unknown 分区、单行单一语义色、1dp 分隔线、按优先级单条 Banner + 「全部问题」。
+3. **对话**：Agent 正文全宽阅读排版、用户气泡 88/86/520dp、组首一次中性标识、Tool 卡（容器/图标/参数·命令·输出/复制/全量阅读页/无嵌套滚动）、Thinking 可选中、Unknown 降级为「暂不支持预览」、消息尾「复制 + 更多」+ 系统长按选择。
+4. **Composer**：双层 Surface、2dp focus ring、40dp 圆形 Send（48dp 触达）、1–5 行、Enter 换行、长 Prompt 全屏编辑（取消回退）、离线禁用 Send、Unknown 二次确认 + 「查看发送记录」、IdentityUncertain 告知、≥600dp 720dp 居中。
+5. **搜索**（本会话新增）：仅搜索已加载消息、防抖 250ms、n/N 计数、上/下一处定位、常驻边界说明。
+6. **i18n**：zh/en 双语资源；Hosts 33 条、Sheet、搜索、工具卡、术语（需要处理/指令已接收/发送结果无法确认）。
+7. **减少动效**：读系统 `ANIMATOR_DURATION_SCALE`，关闭时折叠直接 snap。
 
-UI 测试构成：看板 9 + Composer 7 + InlineCode 2 + Board Banner 5 + MessageActions 3 = 26。
+## 3. 证据
 
-## 3. 截图（全部实际拍摄）
+- 测试：AVD `emulator-5556` Compose UI **26/26**；JVM 全绿（`ContrastTest` 38 断言、`MarkdownParserTest` 12、`ConversationPairingTest` 9、`ConversationBranchTest` 5、`IncrementalMapperEquivalenceTest` 7、`MapperCostTest` 2、`MarkdownAstCacheTest` 6、`DraftTest` 15、`WriteLedgerPersistTest` 5）。
+- 截图（`spike/results/`）：`ux09-p1-board-light`、`ux09-p2-board-dark`、`ux09-p5-320-dark-1.6`、`ux09-p8-600-light`、`ux08b-empty-p1`、`ux08a-hosts`、`ux06-search-open`、`ux04a-v2-composer`、`ux03ab-spacing`、`ux00a-v2-conv-light`、`real-board-spec`（真机，较早）。
+- 真机（Redmi 22021211RC / A14）：本轮**离线**，仅保留更早的真机截图；本轮矩阵为 AVD，已在报告中标注来源。
 
-| 文件 | 来源 |
-| --- | --- |
-| `ux01a-after-font13.png`、`ux01b-inline-code.png`、`ux00a-*`、`ux00a2-conv-light.png`、`ux02a-p1/p2` | **真机** Redmi 1080×2400 |
-| `ux02a-p5-320-dark-1.6.png`、`ux02a-p6-320-light-1.6.png` | AVD 320dp / fontScale 1.6 |
-| `ux02b-avd-p1/p2`、`ux03a-avd-p1/p2`、`ux03b-avd-p2`、`ux03d-avd`、`ux04a-avd`、`ux05a-en`、`ux05a-zh`、`ux05b-lang` | AVD 393dp |
+## 4. 未完成（诚实清单）
 
-## 4. 本轮修掉的真实缺陷（10 个）
+| # | 项 | 影响 |
+| --- | --- | --- |
+| 1 | 搜索**命中高亮** | 用户体验：只知道跳到哪，看不到高亮 |
+| 2 | **≥600dp 内容居中**（除 Composer） | P8 截图已暴露：看板仍是整宽左对齐 |
+| 3 | 真机 P1–P8 全矩阵 + TalkBack + 中文 IME | 无法宣称真机通过 |
+| 4 | 通知文案 / 部分 `contentDescription` 未本地化 | 英文模式下可能残留中文 |
+| 5 | 草稿归属选择 UI（IdentityUncertain 的「恢复/放弃」） | 目前只有告知 + 发送前校验 |
+| 6 | 对话/Hosts 空态未迁到共享 `EmptyState` | 一致性 |
+| 7 | `UX-07b` 语音 | SKIPPED（无本地识别路径） |
+| 8 | 真机 FrameTimingMetric | 仍为 0（MIUI 限制未变），不宣称性能 |
 
-1. 大字体下对话顶栏裁剪压住首条消息（I-93）；
-2. 行内码用空格伪造 padding（复制/选区被污染）；
-3. 深色 token 仅 3 档且差距过小 → 对齐 UX-D0；
-4. `› ▸ ▾ ⤢` 字形当图标 → 4 个矢量图标 + 48dp 触达；
-5. **`BOARD-DONE-001`（已批准）实际未落实** → 默认收起；
-6. 一行三重语义色（彩点+彩字+彩 chevron）→ 只留一处；
-7. 代码块折叠预览误报「未闭合」→ 补闭合 fence；
-8. 滚动时闪出原始 Markdown（` ``` ` 可见）→ ≤2k 字符同步解析；
-9. **Tool 结果用 error 关键字盲猜「失败」** → 改为「已运行/已返回 + 低强调提示」；
-10. Hosts 页设置项在无主机时不可达 → 页面可滚动。
-   附：SSH 断链未捕获异常导致进程 FATAL ×3 → 加 `CoroutineExceptionHandler` + `runCatching`（**设备未复验**）。
+## 5. 需要你终审的 5 个点
 
-## 5. 未验证 / 未实现（诚实清单）
+1. **深色 Token**（`#10151D/#181F2A/#222B39`）与 `attention` 新色；
+2. **主机选择器在标题下方**（`BOARD-HOST-001`，仍是 Proposed）；
+3. **Composer 圆形 Send（↑）** 是否比你原来的「发送」文字按钮好；
+4. **工具卡**的容器/边框/图标密度是否合适；
+5. **320dp/1.6** 下看板标题与 Refresh 同行的排版是否可接受（P5 截图）。
 
-**未验证**：真机 P1–P8 全量；TalkBack 顺序；中文 IME 组合输入；手势导航 Insets；语言切换后状态保留；
-上滑不被拉回与「N 条新消息」；`reduce motion`；SSH 崩溃修复的设备侧复现；en + 320dp 换行。
+## 6. 回滚
 
-**未实现**：`UX-06` 搜索 UI（只交付审计+计划）；`UX-07b` 语音；`StatusText`/`HostsScreen`/`TechnicalInfoSheet`/
-通知的 i18n；统一 `EmptyState` 组件；`Resyncing` 状态；引用到光标处；Android 12 及以下的 App 内语言切换；
-品牌图标资产；真机 FrameTimingMetric（I-74/I-78 限制未变）。
-
-## 6. 用户醒后请重点看这 5 处
-
-1. **深色 token**（`#10151D / #181F2A / #222B39`）是否符合你的审美 —— 这是 `PROVISIONAL`；
-2. **主机选择器在标题下方**（`BOARD-HOST-001`）是否符合预期；
-3. **对话正文 16/25 + 分组表头**：连续 Agent 回复只出现一次灰色 agent 名，是否够清晰；
-4. **Composer 轻量双层**（surface + 20dp 圆角 + 16dp 边距）是否比旧的大盒子"轻"；
-5. **行内码变紧凑**（去掉伪 padding 后的真实间距）是否可接受 —— 这是保真的代价。
-
-## 7. 下一步（按依赖顺序）
-
-`UX-03e Resyncing → UX-04c 光标插入 → UX-05a 剩余 i18n → UX-05b 切换验证 → UX-06 搜索实现 →
-UX-08a 设置分组 → UX-08b 统一空态 → 真机 P1–P8 全量截图 + TalkBack/IME 走查 → UX-09 最终验收`
+按任务粒度 `git revert <sha>`；分支未合并 main，最省事是直接丢弃分支。
