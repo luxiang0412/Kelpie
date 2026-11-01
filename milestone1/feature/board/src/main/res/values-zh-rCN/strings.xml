@@ -97,4 +97,6 @@
     <string name="search_next">下一处</string>
     <string name="search_close">关闭搜索</string>
     <string name="search_entry">搜索</string>
+    <string name="settings_group_appearance">外观与语言</string>
+    <string name="settings_group_notifications">通知与后台</string>
 </resources>

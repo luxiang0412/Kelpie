@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -66,13 +68,35 @@ fun HostsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.hosts_0)) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.hosts_1)) } },
-                actions = {
-                    TextButton(onClick = { isNew = true; editing = null }) { Text(stringResource(R.string.hosts_2)) }
-                },
-            )
+            // UX-08a：内容自适应顶栏，1.3/1.6 字体下不裁剪（替换固定高度 TopAppBar）
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .statusBarsPadding(),
+            ) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .padding(start = 4.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.hosts_1))
+                    }
+                    Text(
+                        stringResource(R.string.hosts_0),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = { isNew = true; editing = null },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.hosts_2)) }
+                }
+                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
         },
     ) { padding ->
         if (state.hosts.isEmpty()) {
@@ -85,6 +109,9 @@ fun HostsScreen(
                 Text(stringResource(R.string.hosts_5))
                 Spacer(Modifier.height(16.dp))
                 Button(onClick = { isNew = true; editing = null }) { Text(stringResource(R.string.hosts_3)) }
+                Spacer(Modifier.height(24.dp))
+                HostsGroupHeader(stringResource(R.string.settings_group_appearance))
+                LanguageSection(context)
             }
         } else {
             // UX-08a：整页可滚动，否则空态会占满视口，设置项（语言/后台监控）在无主机时不可达
@@ -95,9 +122,13 @@ fun HostsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 24.dp),
             ) {
+                HostsGroupHeader(stringResource(R.string.settings_group_appearance))
+
                 // UX-05b：App 语言（跟随系统 / 简体中文 / English）。
                 // 仅 Android 13+ 用系统级 per-app locale；旧版本不引入 AppCompat 架构迁移，明确说明不可用。
                 LanguageSection(context)
+
+                HostsGroupHeader(stringResource(R.string.settings_group_notifications))
 
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -329,6 +360,17 @@ private fun KeyDialog(
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.hosts_10)) }
             }
         },
+    )
+}
+
+/** UX-08a：设置分组标题（type.titleSection 14/20 SemiBold）。 */
+@Composable
+private fun HostsGroupHeader(text: String) {
+    Text(
+        text,
+        style = dev.herdr.feature.board.design.SectionTitleStyle,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
     )
 }
 
