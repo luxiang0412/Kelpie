@@ -675,3 +675,12 @@
 - 为复现断链执行 `svc wifi disable`，但该机 adb 走 WiFi，命令导致自身失去连接渠道，未能恢复。
 - **影响**：真机暂时失联（不影响数据）；后续真机截图与验收需用户手动开 WiFi 或重启。
 - **教训**：涉及网络开关的设备实验，必须先确认 adb 传输通道（USB vs WiFi），或改用 `airplane-mode` + 预留恢复路径。
+
+## I-97 Claude 工具卡配对丢失（已修）
+`transcript_messages` 未持久化 `toolCallId` → Room 往返后工具卡显示「尚未收到结果」+「未关联的工具结果」。已加列并迁移（`MIGRATION_4_5`），真机验证「结果已收到」。
+
+## I-98 Claude 历史被分支回溯截断（已修）
+`ConversationBranch` 依 `parentId` 回溯，Claude 的 `parentUuid` 指向被跳过的非消息事件导致链路中断、断点前消息（含工具卡）整段丢失。已改为 Claude 不输出 `parentId`，并在 `ConversationBranch` 中退化为线性渲染。
+
+## I-99 Markdown 表格不渲染（未实现）
+Claude 常输出 GFM 表格，当前渲染成带竖线的普通文字。`MarkdownParser` 无 table 块类型，属功能缺口。

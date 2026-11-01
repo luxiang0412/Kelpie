@@ -52,6 +52,11 @@ data class TranscriptMessageEntity(
     val kind: String,
     val text: String,
     val toolName: String?,
+    /** 消息唯一 id（去重/分支）与父 id —— 之前没存，导致 Room 往返后配对与分支失效。 */
+    val msgId: String? = null,
+    val parentId: String? = null,
+    /** tool_use.id / tool_use_id —— 工具卡配对的唯一依据（D50/D53）。 */
+    val toolCallId: String? = null,
     val timestamp: Long?,
 )
 
@@ -126,7 +131,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 4,
+    version = 6,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {

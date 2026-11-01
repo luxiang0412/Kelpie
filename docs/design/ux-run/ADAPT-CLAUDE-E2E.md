@@ -43,3 +43,24 @@ agent_session = {"agent":"claude","kind":"id","source":"herdr:claude","value":"1
 - 该 Claude 会话没有工具调用，`ClaudeTranscriptParser` 的 tool_use↔tool_result 配对**只有单测覆盖**，无真机样本。
 - 已存在的会话缓存保留旧游标（256 KB 时代的 offset），所以老用户升级后**仍会缺最早几条**，直到该会话缓存被重置；新会话首次打开即 1 MB 全量（单测覆盖边界）。
 - `isSidechain`（子代理）跳过逻辑仅在单测验证。
+
+## 5. 第二轮：工具调用（真机）
+
+用户在该 Claude 会话里跑了 10 次 `Bash`（含 5 组 tool_use/tool_result）。真机暴露并修复两个新缺陷：
+
+| # | 现象 | 根因 | 修复 |
+| --- | --- | --- | --- |
+| C-4 | 工具卡全部显示「尚未收到结果」+ 一堆「未关联的工具结果」 | `transcript_messages` 表只存 `kind/text/toolName/timestamp`，**没存 `toolCallId`**；Room 往返后配对信息归零 | 表加 `msgId/parentId/toolCallId` 三列 + `MIGRATION_4_5`（并清空派生缓存重解析） |
+| C-5 | 整个工具调用段落**整段消失**（列表从后半段开始） | `ConversationBranch` 从最后一条沿 `parentId` 回溯，Claude 的 `parentUuid` 指向被跳过的非消息事件（`api-request-blob`/`attachment`/`mode`），链在中间断掉 → 断点之前全部丢弃 | Claude 解析器不再输出 `parentId`；`ConversationBranch` 在「最后一条没有 parentId」时如实退化为线性渲染 |
+| C-6 | 同一次 Bash 出现两张卡 | Claude 会把「增长中的」assistant 消息重写一遍（uuid 不同、`tool_use.id` 相同） | `ConversationResolve` 按 `toolCallId` 去重并取最后一次（内容最全） |
+
+验证（真机 Redmi，19:49）：
+- 折叠态：4 张 Bash 卡全部「结果已收到」，无重复、无「未关联」→ `spike/results/claude-tools15.png`
+- 展开态：`参数` = 真实 `{"command":"git log --stat …"}`，`输出` = 真实 git log → `spike/results/claude-tool-open2.png`
+- 单测：`:core:herdr`、`:core:data`、`:feature:board` 全绿（新增 `ClaudeLinearRenderTest`、`TranscriptTailerStartTest`、配对去重用例）
+- Compose UI：AVD **OK (28 tests)**
+
+## 6. 仍未解决（如实登记）
+
+- **Markdown 表格不渲染**：Claude 常输出 `| 部分 | 内容 |` 表格，当前按普通段落显示竖线（`MarkdownParser` 无表格块）。属功能缺口，未实现。
+- 反复 markdown 长消息滚动时，顶部内容会被顶栏遮住（截图可见），属视觉细节，待与 DESIGN-SYSTEM 行高复核。

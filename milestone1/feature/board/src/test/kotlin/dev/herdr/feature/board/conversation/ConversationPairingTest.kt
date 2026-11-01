@@ -121,4 +121,19 @@ class ConversationPairingTest {
         assertEquals(1, tools.size)
         assertNull(tools.single().result)
     }
+
+    @Test
+    fun `同 toolCallId 的重复调用只渲染最后一次（Claude 重发消息）`() {
+        val msgs = listOf(
+            ChatMessage(ChatMessage.Kind.TOOL_CALL, "{\"command\":\"l\"}", id = "u1", toolCallId = "toolu_1", toolName = "Bash"),
+            ChatMessage(ChatMessage.Kind.TOOL_CALL, "{\"command\":\"ls -la\"}", id = "u2", toolCallId = "toolu_1", toolName = "Bash"),
+            ChatMessage(ChatMessage.Kind.TOOL_RESULT, "total 0", id = "u3", toolCallId = "toolu_1"),
+        )
+        val items = ConversationResolve.resolve(msgs).map { ConversationResolve.toItem(it) }
+            .filterIsInstance<ConversationItem.Tool>()
+        assertEquals(1, items.size)
+        assertEquals("{\"command\":\"ls -la\"}", items[0].argumentsSummary)
+        assertEquals("total 0", items[0].result)
+        assertTrue(items[0].pairedById)
+    }
 }

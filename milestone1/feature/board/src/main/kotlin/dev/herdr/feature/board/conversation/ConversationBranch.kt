@@ -16,6 +16,10 @@ object ConversationBranch {
     fun effective(messages: List<ChatMessage>): List<ChatMessage> {
         val indexed = messages.filter { it.id != null }
         if (indexed.isEmpty()) return messages
+        // 只有「最后一条带 parentId」时才说明这是真正的树（Pi）。Claude 的 JSONL 里夹着
+        // api-request-blob / attachment 等非消息事件，parentUuid 链会断在消息序列中途；
+        // 此时按树回溯会把断点之前的消息（例如工具调用卡）整段丢掉 —— 如实退化为线性。
+        if (indexed.last().parentId == null) return messages
 
         val byId = HashMap<String, ChatMessage>(indexed.size)
         indexed.forEach { m -> m.id?.let { byId[it] = m } }

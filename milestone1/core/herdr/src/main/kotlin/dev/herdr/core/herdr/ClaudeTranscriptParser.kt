@@ -51,7 +51,7 @@ object ClaudeTranscriptParser {
                 // content 可能是纯字符串
                 val text = (msg["content"] as? JsonPrimitive)?.content
                 if (!text.isNullOrBlank() && role == "user") {
-                    out += ChatMessage(ChatMessage.Kind.USER, text, timestamp = ts, id = uuid, parentId = parentUuid)
+                    out += ChatMessage(ChatMessage.Kind.USER, text, timestamp = ts, id = uuid, parentId = null)
                 }
                 return@forEach
             }
@@ -63,14 +63,14 @@ object ClaudeTranscriptParser {
                         val text = (b["text"] as? JsonPrimitive)?.content ?: return@forEach
                         if (text.isBlank()) return@forEach
                         val kind = if (role == "assistant") ChatMessage.Kind.ASSISTANT else ChatMessage.Kind.USER
-                        out += ChatMessage(kind, text, timestamp = ts, id = uuid, parentId = parentUuid)
+                        out += ChatMessage(kind, text, timestamp = ts, id = uuid, parentId = null)
                     }
 
                     "thinking" -> {
                         val text = (b["thinking"] as? JsonPrimitive)?.content
                             ?: (b["text"] as? JsonPrimitive)?.content ?: return@forEach
                         if (text.isBlank()) return@forEach
-                        out += ChatMessage(ChatMessage.Kind.THINKING, text, timestamp = ts, id = uuid, parentId = parentUuid)
+                        out += ChatMessage(ChatMessage.Kind.THINKING, text, timestamp = ts, id = uuid, parentId = null)
                     }
 
                     "tool_use" -> {
@@ -84,7 +84,9 @@ object ClaudeTranscriptParser {
                             timestamp = ts,
                             toolCallId = id,
                             id = uuid,
-                            parentId = parentUuid,
+                            // 不输出 parentId：Claude 的 parentUuid 会指向被跳过的非消息事件，
+                            // 交给 ConversationBranch 会误删整段历史
+                            parentId = null,
                         )
                     }
 
@@ -98,7 +100,9 @@ object ClaudeTranscriptParser {
                             timestamp = ts,
                             toolCallId = id,
                             id = uuid,
-                            parentId = parentUuid,
+                            // 不输出 parentId：Claude 的 parentUuid 会指向被跳过的非消息事件，
+                            // 交给 ConversationBranch 会误删整段历史
+                            parentId = null,
                         )
                     }
 

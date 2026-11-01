@@ -45,7 +45,9 @@ object ConversationResolve {
             val id = m.toolCallId
             if (id == null) return@forEachIndexed
             when (m.kind) {
-                ChatMessage.Kind.TOOL_CALL -> if (!callIndexById.containsKey(id)) callIndexById[id] = i
+                // 同一个 toolCallId 出现多次（Claude 会重发「增长中的」assistant 消息，uuid 不同但
+                // message.id/tool_use.id 相同）→ 取最后一次（内容最全），否则会渲染出重复的工具卡
+                ChatMessage.Kind.TOOL_CALL -> callIndexById[id] = i
                 ChatMessage.Kind.TOOL_RESULT -> resultIndexById[id] = i
                 else -> Unit
             }
@@ -57,6 +59,7 @@ object ConversationResolve {
             when (m.kind) {
                 ChatMessage.Kind.TOOL_CALL -> {
                     val id = m.toolCallId
+                    if (id != null && callIndexById[id] != i) return@forEachIndexed
                     val resultIdx = id?.let { resultIndexById[it] }?.takeIf { callIndexById[id] == i }
                     if (resultIdx != null) consumedResults += resultIdx
                     out += Entry.Tool(originIndex[i], m, resultIdx?.let { unique[it] }, resultIdx)

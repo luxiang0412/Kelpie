@@ -1,6 +1,7 @@
 package dev.herdr.core.herdr
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -63,7 +64,9 @@ class ClaudeTranscriptParserTest {
         val msgs = ClaudeTranscriptParser.parse(lines)
         val assistant = msgs.first { it.kind == ChatMessage.Kind.ASSISTANT }
         assertEquals("a1", assistant.id)
-        assertEquals("u1", assistant.parentId)
+        // 故意不输出 parentId：Claude 的 parentUuid 指向被跳过的非消息事件，
+        // 交给 ConversationBranch 回溯会误删断点前的历史（真机已验证）
+        assertNull(assistant.parentId)
         assertTrue((assistant.timestamp ?: 0) > 0)
     }
 

@@ -22,6 +22,9 @@ class TranscriptStore(private val dao: TranscriptDao) {
                         .getOrDefault(ChatMessage.Kind.SYSTEM),
                     text = r.text,
                     toolName = r.toolName,
+                    id = r.msgId,
+                    parentId = r.parentId,
+                    toolCallId = r.toolCallId,
                     timestamp = r.timestamp,
                 )
             }
@@ -39,6 +42,9 @@ class TranscriptStore(private val dao: TranscriptDao) {
                     kind = m.kind.name,
                     text = m.text,
                     toolName = m.toolName,
+                    msgId = m.id,
+                    parentId = m.parentId,
+                    toolCallId = m.toolCallId,
                     timestamp = m.timestamp,
                 )
             },

@@ -30,6 +30,25 @@ class AppContainer(app: Application) {
     val hosts = HostRepository(app)
     val database: BoardDatabase = Room.databaseBuilder(app, BoardDatabase::class.java, "herdr.db")
         // 3→4：panes 增加 agentSessionId（Claude 会话 id）；只加列，不清表
+        .addMigrations(object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 解析规则变更（Claude 不再输出 parentId）：transcript 是纯派生缓存，清空重解析
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        })
+        .addMigrations(object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // transcript_messages 补三列：工具配对/去重/分支必需的元数据
+                db.execSQL("ALTER TABLE transcript_messages ADD COLUMN msgId TEXT")
+                db.execSQL("ALTER TABLE transcript_messages ADD COLUMN parentId TEXT")
+                db.execSQL("ALTER TABLE transcript_messages ADD COLUMN toolCallId TEXT")
+                // 缓存内容是按旧规则解析的（且没有 toolCallId），无法补算：清空缓存 + 游标，
+                // 让下次打开重新按新回填窗口解析。transcript 表纯派生数据，清空无副作用。
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        })
         .addMigrations(object : androidx.room.migration.Migration(3, 4) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE panes ADD COLUMN agentSessionId TEXT")
