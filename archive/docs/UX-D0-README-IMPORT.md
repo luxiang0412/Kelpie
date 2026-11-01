@@ -17,7 +17,7 @@
 | `PI-START-HERE.md` | 复制给 Pi 的单条启动指令 |
 | `docs/design/tasks/UX-D0-AUTONOMOUS-MASTER-PLAN.md` | **完整自主运行规则 + 24 个细分任务** |
 | `docs/design/tasks/UX-D0-TASK-TRACKER.md` | 任务进度表模板 |
-| `docs/design/tasks/HERDR-UX-01a-PI-TASK-PACKET-DRAFT.md` | UX-01a 的更细验收规格 |
+| `archive/docs/HERDR-UX-01a-PI-TASK-PACKET-DRAFT.md` | UX-01a 的更细验收规格 |
 | `docs/design/ux-d0/HERDR-UX-D0-DESIGN-SYSTEM-v0.1.md` | 共用 Design Tokens、状态、i18n、组件 |
 | `docs/design/ux-d0/HERDR-UX-D0-BOARD-SPEC-v0.2.md` | 工作台 |
 | `docs/design/ux-d0/HERDR-UX-D0-CONVERSATION-SPEC-v0.2.md` | 对话与工具记录 |

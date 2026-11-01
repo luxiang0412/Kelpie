@@ -1,7 +1,7 @@
 # 项目现状（给外部复核 / 调研用）
 
 > 生成时间：2026-10-31｜仓库：`herdr-gui-research`｜分支 `main`
-> 详见：`RESULTS.md`（逐项实测）、`DECISIONS.md`（D1–D30）、`ISSUES.md`（I-1–I-51）、`NEXT-STEPS.md`、`PHASE0-SUMMARY.md`
+> 详见：`RESULTS.md`（逐项实测）、`DECISIONS.md`（D1–D30）、`ISSUES.md`（I-1–I-51）、`NEXT-STEPS.md`、`archive/docs/PHASE0-SUMMARY.md`
 
 ---
 
@@ -156,7 +156,7 @@
 ```text
 herdr-android-client-research-v2.md   # 调研 v2.1（7 项 P0 已修）
 herdr-android-spike-plan.md           # Spike 任务书（v2.2 实测修正）
-RESULTS.md / DECISIONS.md / ISSUES.md / NEXT-STEPS.md / PHASE0-SUMMARY.md
+RESULTS.md / DECISIONS.md / ISSUES.md / NEXT-STEPS.md / archive/docs/PHASE0-SUMMARY.md
 spike/jvm/          # Kotlin/JVM：指纹/写账本/SFTP tailer + 23 个单测（全绿）+ 在线探针
 spike/android/      # 最小 Android App：F1–F4 + exec/ping + snapshot + 订阅 + SFTP
 spike/results/      # 所有原始证据（schema、CSV、日志、截图）

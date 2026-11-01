@@ -18,8 +18,8 @@
 4. `docs/design/ux-d0/HERDR-UX-D0-CONVERSATION-SPEC-v0.2.md`
 5. `docs/design/ux-d0/HERDR-UX-D0-COMPOSER-SPEC-v0.2.md`
 6. `docs/design/ux-d0/HERDR-UX-D0-VISUAL-REVIEW-v0.1.md`
-7. `docs/design/ux-d0/STATUS-BRIEF-FOR-EXTERNAL-REVIEW.md`（是历史快照，不代表当前代码）
-8. `docs/design/tasks/HERDR-UX-01a-PI-TASK-PACKET-DRAFT.md`（其草案标注由本文件明确授权范围替代）
+7. `archive/docs/STATUS-BRIEF-FOR-EXTERNAL-REVIEW-UX-D0.md`（是历史快照，不代表当前代码）
+8. `archive/docs/HERDR-UX-01a-PI-TASK-PACKET-DRAFT.md`（其草案标注由本文件明确授权范围替代）
 9. 仓库最新 `RESULTS.md`、`DECISIONS.md`、`ISSUES.md`、`NEXT-STEPS.md` 及 README/AGENTS.md（若存在）
 10. 实际 Android 源码、Gradle 构建文件、测试及已验证的运行脚本。
 

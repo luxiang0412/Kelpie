@@ -32,3 +32,11 @@ keystore.properties
 *.keystore
 
 dist/
+
+# 本机 SDK 路径（每台机器不同，绝不入库）
+milestone1/local.properties
+android/local.properties
+
+# 临时抓取文件
+tmp-*.xml
+tmp_*.txt
