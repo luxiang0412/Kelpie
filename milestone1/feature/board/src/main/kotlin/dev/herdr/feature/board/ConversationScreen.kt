@@ -1008,6 +1008,7 @@ private fun ComposerBar(
     val palette = LocalHerdrPalette.current
     // UX-04a（CMP-STYLE-001 暂定）：轻量双层 Surface —— 外层是页面底色，
     // 输入容器用 surface + 20dp 圆角（窄屏 18dp），Send 是唯一 Accent 操作。
+    var focusedComposer by remember { mutableStateOf(false) }
     val compact = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 360
     val gutter = if (compact) ComposerGutter.compact else ComposerGutter.normal
     val radius = if (compact) 18.dp else 20.dp
@@ -1091,27 +1092,26 @@ private fun ComposerBar(
             }
         }
 
-        Surface(color = palette.surface, shape = RoundedCornerShape(radius)) {
+        // 只保留一层容器：平时 1dp borderSubtle，聚焦时 2dp accent（不再叠加输入框自身描边）
+        Surface(
+            color = palette.surface,
+            shape = RoundedCornerShape(radius),
+            border = androidx.compose.foundation.BorderStroke(
+                if (focusedComposer) 2.dp else 1.dp,
+                if (focusedComposer) palette.focusRing else palette.borderSubtle,
+            ),
+        ) {
             Row(
-                Modifier.padding(start = Space.m, end = Space.xs, top = Space.xs, bottom = Space.xs),
-                verticalAlignment = Alignment.Bottom,
+                Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                var focused by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = composer.text,
                     onValueChange = onTextChange,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp, max = 140.dp)
-                        // stroke.focus 2dp（DESIGN-SYSTEM §2.3）：聚焦时用 Accent 环，不靠 borderSubtle
-                        .onFocusChanged { focused = it.isFocused }
-                        .then(
-                            if (focused) Modifier.border(
-                                width = 2.dp,
-                                color = palette.focusRing,
-                                shape = RoundedCornerShape(16.dp),
-                            ) else Modifier,
-                        )
+                        .onFocusChanged { focusedComposer = it.isFocused }
                         .semantics {
                             contentDescription = "指令输入框"
                             stateDescription = when {
@@ -1124,8 +1124,17 @@ private fun ComposerBar(
                         Text(
                             if (!hasAgent) stringResource(R.string.composer_no_agent) else stringResource(R.string.composer_hint),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = palette.textSecondary,
                         )
                     },
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
                     // 1–2 行起步，最多约 5 行后内部滚动；Enter 插入换行（不自动发送）
                     minLines = 1,
                     maxLines = 5,
@@ -1153,16 +1162,19 @@ private fun ComposerBar(
                     // 视觉圆面 40dp，落在 48dp 点击区中央（COMPOSER-SPEC §3.1）
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Box(
-                            Modifier.size(40.dp).background(
+                            Modifier.size(44.dp).background(
                                 if (canSend) palette.accent else palette.outline,
                                 androidx.compose.foundation.shape.CircleShape,
                             ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                "↑",
-                                color = palette.accentOn,
-                                style = MaterialTheme.typography.titleSmall,
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_send),
+                                contentDescription = null,
+                                colorFilter = ColorFilter.tint(
+                                    if (canSend) palette.accentOn else palette.textSecondary,
+                                ),
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
@@ -1173,7 +1185,9 @@ private fun ComposerBar(
             stringResource(R.string.composer_footnote),
             style = MaterialTheme.typography.labelSmall,
             color = palette.textSecondary,
-            modifier = Modifier.padding(top = Space.xs),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
         )
         }
     }
