@@ -94,7 +94,8 @@ fun MarkdownText(
         return
     }
 
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(Space.s)) {
+    // 段落间距 12dp（规格 10–14dp）；标题另有上下间距（见 RenderBlock）
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         parsed.forEach { block -> RenderBlock(block, color ?: palette.textPrimary) }
     }
 }
@@ -105,6 +106,7 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
     when (block) {
         is MdBlock.Heading -> Text(
             text = inline(block.spans),
+            modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
             style = when (block.level) {
                 1 -> MdH1Style
                 2 -> MdH2Style
@@ -120,7 +122,7 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
         )
 
         is MdBlock.Quote -> Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(3.dp).fillMaxHeight().background(palette.outline))
+            Box(Modifier.width(2.dp).fillMaxHeight().background(palette.borderSubtle))
             Spacer(Modifier.width(12.dp))
             Text(
                 text = inline(block.spans),
@@ -130,7 +132,7 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
         }
 
         // 列表悬挂缩进：标记占固定列宽，正文左缘对齐，换行后不会顶到标记下面
-        is MdBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        is MdBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             block.items.forEach { item ->
                 Row {
                     Text(
@@ -149,7 +151,7 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
             }
         }
 
-        is MdBlock.Ordered -> Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+        is MdBlock.Ordered -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             block.items.forEachIndexed { i, item ->
                 Row {
                     Text(
