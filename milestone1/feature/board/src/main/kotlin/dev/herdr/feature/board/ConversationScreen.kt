@@ -993,13 +993,31 @@ private fun ComposerBar(
     // COMPOSER-SPEC §5.1 OfflineDraft：离线/不可写时 Send 直接禁用（不让用户点了才被拒）
     val canSend = hasAgent && !composer.sending && composer.text.isNotBlank() && !offline
 
+    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
     Column(
         Modifier
             .fillMaxWidth()
             .imePadding()
             .navigationBarsPadding()
             .padding(horizontal = gutter, vertical = Space.s),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Column(
+            Modifier
+                .widthIn(max = if (screenWidth >= 600) 720.dp else Int.MAX_VALUE.dp)
+                .fillMaxWidth(),
+        ) {
+        // COMPOSER-SPEC §5.1 IdentityUncertain：身份不可靠（无 agent_session）且有草稿时，
+        // 明确告知草稿归属不确定；发送前仍会走 NeedsConfirm，不会静默发到新 Agent。
+        if (pane.agentSessionPath.isNullOrBlank() && composer.text.isNotBlank()) {
+            Text(
+                "会话身份无法完全确认：这份草稿可能来自之前的 Agent，发送前会再次校验目标",
+                style = MaterialTheme.typography.labelSmall,
+                color = palette.statusFg(AgentStatus.UNKNOWN),
+                modifier = Modifier.padding(bottom = Space.xs),
+            )
+        }
+
         if (offline) {
             Text(
                 "已离线，可继续编辑草稿（不会排队发送）",
@@ -1133,6 +1151,7 @@ private fun ComposerBar(
             color = palette.textSecondary,
             modifier = Modifier.padding(top = Space.xs),
         )
+        }
     }
 
     if (longEditor) {
