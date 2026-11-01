@@ -25,3 +25,21 @@
 因为 `docs/evidence/` 里 92 份**当前仍被引用**的证据合计 76 MB（多为 1080×2400 原始 PNG，单张 ~3 MB）。
 要进一步压缩，可对这些 PNG 做无损/调色板优化（预计 78 MB → 15–25 MB），属于**改动证据像素**的操作，
 需单独决策（改完要再跑一次 `filter-repo` 才能把旧 blob 从历史里清掉）。
+
+## 第二次重写：TinyPNG 压缩证据（同日）
+
+用户提供两个 TinyPNG key，用 `tools/compress_png.py` 压缩 `docs/evidence/` 下 87 张截图：
+**77.2 MB → 32.3 MB（省 58%）**，逐张开销与前后体积见 `docs/evidence/COMPRESSION.md`。
+抽检 `rel011-board` / `claude-tools15` / `table1`：文字、1dp 分隔线、深色对比度均无可见差异。
+
+压缩后用 `git filter-repo --strip-blobs-with-ids` 清掉 70 个旧（未压缩）blob，
+`.git` 从 **78 MB 降到 35 MB**。
+
+| 阶段 | `.git` | 说明 |
+| --- | --- | --- |
+| 原始 | 154 MB | 209 张历史截图 / 145 MB |
+| P4-1 剔除归档截图路径 | 78 MB | `spike/results/` 252 个旧路径 |
+| P4-2 TinyPNG + 清旧 blob | **35 MB** | 证据 33 MB（当前仍被引用的 92 份） |
+
+> 代价：history 里旧版本截图条目被删除（`git log -- docs/evidence/x.png` 只看得到压缩后的版本）；
+> 需要原始像素时从 `../herdr-gui-full-backup-20261101.bundle` 取。
