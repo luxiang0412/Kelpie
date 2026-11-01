@@ -23,7 +23,7 @@ class TranscriptLoader {
         maxBytes: Int = 256 * 1024,
         maxMessages: Int = 80,
     ): List<ChatMessage> = withContext(Dispatchers.IO) {
-        val sftp = conn.openSftp()
+        val sftp = conn.sharedSftp()
         try {
             val size = sftp.stat(path).size
             if (size <= 0) return@withContext emptyList()
@@ -39,19 +39,19 @@ class TranscriptLoader {
                 if (read < buf.size) {
                     // 文件在变长时可能短读；用实际读到的长度
                     val text = String(buf, 0, read, Charsets.UTF_8)
-                    return@withContext parse(text, dropFirstLine = start > 0, maxMessages = maxMessages)
+                    return@withContext parse(path, text, dropFirstLine = start > 0, maxMessages = maxMessages)
                 }
             }
-            parse(String(buf, Charsets.UTF_8), dropFirstLine = start > 0, maxMessages = maxMessages)
+            parse(path, String(buf, Charsets.UTF_8), dropFirstLine = start > 0, maxMessages = maxMessages)
         } finally {
-            runCatching { sftp.close() }
+            // 不关闭 SFTP：通道由 SshConnection 持有（关闭会导致整条连接被判死）
         }
     }
 
-    private fun parse(text: String, dropFirstLine: Boolean, maxMessages: Int): List<ChatMessage> {
+    private fun parse(path: String, text: String, dropFirstLine: Boolean, maxMessages: Int): List<ChatMessage> {
         var lines = text.split('\n')
         if (dropFirstLine && lines.isNotEmpty()) lines = lines.drop(1)
-        val messages = PiTranscriptParser.parse(lines.filter { it.isNotBlank() })
+        val messages = TranscriptParser.parse(path, lines.filter { it.isNotBlank() })
         return if (messages.size <= maxMessages) messages else messages.takeLast(maxMessages)
     }
 }

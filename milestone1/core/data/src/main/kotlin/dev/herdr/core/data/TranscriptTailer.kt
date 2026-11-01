@@ -1,7 +1,6 @@
 package dev.herdr.core.data
 
 import dev.herdr.core.herdr.JsonlChunker
-import dev.herdr.core.herdr.PiTranscriptParser
 import dev.herdr.core.ssh.SshConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -76,7 +75,7 @@ class TranscriptTailer(
         if (read <= 0) return@withContext 0
 
         val chunk = JsonlChunker.consume(start, buf, 0, read)
-        val messages = PiTranscriptParser.parse(chunk.lines)
+        val messages = dev.herdr.core.herdr.TranscriptParser.parse(path, chunk.lines)
         val added = store.append(hostId, path, messages)
         store.saveCursor(hostId, path, chunk.nextOffset, headHash)
         added
