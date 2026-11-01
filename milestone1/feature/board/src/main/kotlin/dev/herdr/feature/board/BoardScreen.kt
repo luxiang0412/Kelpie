@@ -308,7 +308,7 @@ private fun StatusLine(
         transportTrouble -> Banner(host.connText, palette.statusFg(AgentStatus.WORKING), onReconnect, "重试")
         // 4) 在线但数据过期：保留缓存内容并明确标注
         dataStale -> Banner(
-            "显示的是缓存内容 · 上次同步 ${timeAgo(state.board.updatedAtMs)}",
+            stringResource(R.string.board_cache_banner_prefix) + " · " + timeAgo(state.board.updatedAtMs),
             palette.statusFg(AgentStatus.UNKNOWN),
             null,
             "",
@@ -432,6 +432,7 @@ private fun AttentionCard(pane: Pane, onSelectAgent: (Pane) -> Unit) {
 @Composable
 private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pane) -> Unit) {
     val palette = LocalHerdrPalette.current
+    val statusLabel = StatusText.label(pane.status)
     Row(
         Modifier
             .fillMaxWidth()
@@ -440,7 +441,7 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
             .padding(horizontal = Space.s, vertical = Space.m)
             .semantics(mergeDescendants = true) {
                 contentDescription =
-                    "${StatusText.label(pane.status)}，agent ${pane.agent ?: ""}，${pane.title ?: pane.paneId}，${projectLine(pane)}"
+                    "$statusLabel，agent ${pane.agent ?: ""}，${pane.title ?: pane.paneId}，${projectLine(pane)}"
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -477,20 +478,22 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
 @Composable
 private fun StatusDot(status: AgentStatus) {
     val palette = LocalHerdrPalette.current
+    val statusLabel = StatusText.label(status)
     Box(
         Modifier
             .size(10.dp)
             .background(palette.statusFg(status), CircleShape)
-            .semantics { contentDescription = StatusText.label(status) },
+            .semantics { contentDescription = statusLabel },
     )
 }
 
 @Composable
 internal fun StatusChip(status: AgentStatus) {
     val palette = LocalHerdrPalette.current
+    val statusLabel = StatusText.label(status)
     Surface(color = palette.statusBg(status), shape = RoundedCornerShape(Radius.chip)) {
         Text(
-            StatusText.label(status),
+            statusLabel,
             color = palette.statusFg(status),
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.padding(horizontal = Space.m, vertical = 3.dp),

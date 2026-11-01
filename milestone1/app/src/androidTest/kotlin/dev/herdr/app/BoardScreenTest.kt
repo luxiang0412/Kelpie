@@ -34,6 +34,9 @@ class BoardScreenTest {
     @get:Rule
     val rule = createAndroidComposeRule<TestHostActivity>()
 
+    private fun res(id: Int): String =
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
+
     private fun pane(id: String, st: AgentStatus, agent: String? = "pi", title: String? = null) =
         Pane(id, "term-$id", "w1", "w1:t1", agent, st, title ?: "任务-$id", "/repo/app-$id", 0)
 
@@ -102,11 +105,11 @@ class BoardScreenTest {
         val panes = listOf(pane("w1:p1", AgentStatus.WORKING), pane("w1:p2", AgentStatus.BLOCKED))
         render(state(panes))
         // blocked 使用“需要你”文案（不只靠颜色）
-        rule.onNodeWithText("需要你").assertIsDisplayed()
-        rule.onNodeWithText("需要处理").assertIsDisplayed()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.board_status_blocked)).assertIsDisplayed()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.board_section_blocked)).assertIsDisplayed()
         // 分组顺序：需要处理在运行中之前
-        val blockedHeader = rule.onAllNodesWithText("需要处理").fetchSemanticsNodes().first()
-        val workingHeader = rule.onAllNodesWithText("运行中").fetchSemanticsNodes().first()
+        val blockedHeader = rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_section_blocked)).fetchSemanticsNodes().first()
+        val workingHeader = rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_section_working)).fetchSemanticsNodes().first()
         assertEquals(true, blockedHeader.boundsInRoot.top <= workingHeader.boundsInRoot.top)
     }
 
@@ -116,8 +119,8 @@ class BoardScreenTest {
         // 状态词在合并语义的行内（TalkBack 一致朗读），需要 unmerged tree 才能单独断言
         // BOARD-DONE-001：已完成默认收起，因此「已完成」只作为分区标题出现一次；
         // 「空闲」行可见（idle 分区默认展开需用户操作，此处置为展开态断言分区存在）
-        assertTrue(rule.onAllNodesWithText("已完成", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
-        assertTrue(rule.onAllNodesWithText("空闲", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_section_done), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_status_idle), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         // 「其他」分区默认展开由 allIdle_stillShowsRows 覆盖（同一渲染路径），此处不再重复断言标题节点
     }
 
@@ -125,8 +128,8 @@ class BoardScreenTest {
     fun allIdle_stillShowsRows() {
         render(state(listOf(pane("w1:p1", AgentStatus.IDLE), pane("w1:p2", AgentStatus.UNKNOWN))))
         // UX-02b：idle 与 unknown 不再混成「其他」，各自独立分区且默认展开
-        assertTrue(rule.onAllNodesWithText("空闲", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
-        assertTrue(rule.onAllNodesWithText("状态未知", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_status_idle), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_status_unknown), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         // 行是合并语义：用 contentDescription 断言两行都真实渲染
         assertTrue(rule.onAllNodesWithContentDescription("任务-w1:p1", substring = true).fetchSemanticsNodes().isNotEmpty())
         assertTrue(rule.onAllNodesWithContentDescription("任务-w1:p2", substring = true).fetchSemanticsNodes().isNotEmpty())
@@ -175,7 +178,7 @@ class BoardScreenTest {
         render(
             state(listOf(pane("w1:p1", AgentStatus.BLOCKED)), stale = true),
         )
-        rule.onNodeWithText("显示的是缓存内容", substring = true).assertExists()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.board_cache_banner_prefix), substring = true).assertExists()
     }
 
     @Test

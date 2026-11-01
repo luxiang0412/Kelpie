@@ -32,6 +32,9 @@ class BoardBannerTest {
     @get:Rule
     val rule = createAndroidComposeRule<TestHostActivity>()
 
+    private fun res(id: Int): String =
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
+
     private fun host(kind: HostConnectionManager.ConnKind, text: String) = HostsViewModel.HostState(
         cfg = HostRepository.HostConfig(id = "h1", label = "开发机", host = "192.168.5.8", user = "u", session = "test"),
         hasKey = true,
@@ -115,7 +118,7 @@ class BoardBannerTest {
     @Test
     fun staleData_isLabelledAsCache_onBoardBanner() {
         render(state(HostConnectionManager.ConnKind.CONNECTED, "已连接", stale = true))
-        rule.onNodeWithText("显示的是缓存内容", substring = true).assertIsDisplayed()
+        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.board_cache_banner_prefix), substring = true).assertIsDisplayed()
     }
 
     @Test

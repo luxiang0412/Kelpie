@@ -13,9 +13,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.herdr.core.herdr.AgentStatus
+import dev.herdr.feature.board.R
 
 /**
  * Quiet Command 设计系统（依据 HERDR-ANDROID-UX-DESIGN-REVIEW §4）。
@@ -129,21 +131,29 @@ object Motion {
 
 /** 状态文案（唯一来源；禁止在各页面各写一套）。 */
 object StatusText {
-    fun label(st: AgentStatus): String = when (st) {
-        AgentStatus.BLOCKED -> "需要你"
-        AgentStatus.WORKING -> "运行中"
-        AgentStatus.DONE -> "已完成"
-        AgentStatus.IDLE -> "空闲"
-        AgentStatus.UNKNOWN -> "状态未知"
-    }
+    /** 状态词（唯一来源，走 string 资源，支持 zh/en）。 */
+    @Composable
+    fun label(st: AgentStatus): String = stringResource(
+        when (st) {
+            AgentStatus.BLOCKED -> R.string.board_status_blocked
+            AgentStatus.WORKING -> R.string.board_status_working
+            AgentStatus.DONE -> R.string.board_status_done
+            AgentStatus.IDLE -> R.string.board_status_idle
+            AgentStatus.UNKNOWN -> R.string.board_status_unknown
+        },
+    )
 
-    fun section(st: AgentStatus): String = when (st) {
-        AgentStatus.BLOCKED -> "需要处理"
-        AgentStatus.WORKING -> "运行中"
-        AgentStatus.DONE -> "已完成"
-        AgentStatus.IDLE -> "空闲"
-        AgentStatus.UNKNOWN -> "其他"
-    }
+    /** 分区标题（与状态词区分：blocked 用「需要处理」而不是「需要你」）。 */
+    @Composable
+    fun section(st: AgentStatus): String = stringResource(
+        when (st) {
+            AgentStatus.BLOCKED -> R.string.board_section_blocked
+            AgentStatus.WORKING -> R.string.board_section_working
+            AgentStatus.DONE -> R.string.board_section_done
+            AgentStatus.IDLE -> R.string.board_section_idle
+            AgentStatus.UNKNOWN -> R.string.board_section_unknown
+        },
+    )
 }
 
 /** 等宽样式（路径、命令、tool 参数）。 */

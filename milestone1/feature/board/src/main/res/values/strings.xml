@@ -41,4 +41,5 @@
     <string name="nav_hosts">Hosts</string>
     <string name="board_host_settings">Host settings</string>
     <string name="board_host_all_problems">All problems</string>
+    <string name="board_cache_banner_prefix">Showing cached content</string>
 </resources>
