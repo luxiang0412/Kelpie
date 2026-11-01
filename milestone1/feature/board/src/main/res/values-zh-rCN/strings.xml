@@ -109,4 +109,9 @@
     <string name="hosts_key_input_label">私钥（可选）</string>
     <string name="hosts_key_input_hint">-----BEGIN OPENSSH PRIVATE KEY-----</string>
     <string name="hosts_key_input_note">粘贴完整 OpenSSH 私钥，仅写入本机 app 私有目录（0600），不外传。编辑时留空表示不修改已有私钥。</string>
+    <string name="hosts_group_connection">连接</string>
+    <string name="hosts_group_herdr">Herdr</string>
+    <string name="hosts_group_auth">认证</string>
+    <string name="hosts_herdr_bin">herdr 绝对路径</string>
+    <string name="hosts_key_pick_file">选择私钥文件…</string>
 </resources>

@@ -109,4 +109,9 @@
     <string name="hosts_key_input_label">Private key (optional)</string>
     <string name="hosts_key_input_hint">-----BEGIN OPENSSH PRIVATE KEY-----</string>
     <string name="hosts_key_input_note">Paste the full OpenSSH private key. Stored only in app-private storage (0600); never uploaded. Leave empty to keep the existing key.</string>
+    <string name="hosts_group_connection">Connection</string>
+    <string name="hosts_group_herdr">Herdr</string>
+    <string name="hosts_group_auth">Authentication</string>
+    <string name="hosts_herdr_bin">herdr absolute path</string>
+    <string name="hosts_key_pick_file">Choose key file…</string>
 </resources>
