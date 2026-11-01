@@ -155,7 +155,7 @@ fun ConversationScreen(
                     Column(Modifier.weight(1f)) {
                         Text(
                             title,
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleMedium,
                             color = palette.textPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -174,10 +174,13 @@ fun ConversationScreen(
                         contentDescription = stringResource(R.string.search_entry),
                         onClick = { searchOpen = true },
                     )
-                    TextButton(onClick = onOpenTechSheet, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.conversation_more), style = MaterialTheme.typography.labelLarge)
-                    }
+                    TouchTargetIconButton(
+                        iconRes = R.drawable.ic_more,
+                        contentDescription = stringResource(R.string.conversation_more),
+                        onClick = onOpenTechSheet,
+                    )
                 }
+                androidx.compose.material3.HorizontalDivider(color = palette.borderSubtle)
             }
         },
         bottomBar = {
@@ -1102,7 +1105,7 @@ private fun ComposerBar(
             ),
         ) {
             Row(
-                Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
@@ -1162,7 +1165,7 @@ private fun ComposerBar(
                     // 视觉圆面 40dp，落在 48dp 点击区中央（COMPOSER-SPEC §3.1）
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Box(
-                            Modifier.size(44.dp).background(
+                            Modifier.size(40.dp).background(
                                 if (canSend) palette.accent else palette.outline,
                                 androidx.compose.foundation.shape.CircleShape,
                             ),
