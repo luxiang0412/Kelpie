@@ -147,9 +147,11 @@ fun ConversationScreen(
                         .padding(start = Space.xs, end = Space.s, top = Space.xs, bottom = Space.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text(stringResource(R.string.conversation_back), style = MaterialTheme.typography.labelLarge)
-                    }
+                    TouchTargetIconButton(
+                        iconRes = R.drawable.ic_back,
+                        contentDescription = stringResource(R.string.conversation_back),
+                        onClick = onBack,
+                    )
                     Column(Modifier.weight(1f)) {
                         Text(
                             title,
@@ -158,17 +160,15 @@ fun ConversationScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (LocalDensity.current.fontScale <= 1.05f) {
-                            Text(
-                                projectLine(pane),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = palette.textSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        // 原型：副标题 = Agent · 主机 · 状态（状态用文字，不用彩色胶囊）
+                        Text(
+                            conversationSubtitle(pane, StatusText.label(pane.status)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    StatusChip(pane.status)
                     TouchTargetIconButton(
                         iconRes = R.drawable.ic_search,
                         contentDescription = stringResource(R.string.search_entry),
@@ -227,6 +227,13 @@ private fun BlockedNotice() {
             )
         }
     }
+}
+
+/** 对话副标题：Agent · 主机 · 状态（状态用真实文字）。 */
+private fun conversationSubtitle(pane: Pane, statusLabel: String): String {
+    val agent = pane.agent?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: "Agent"
+    val project = pane.cwd?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: pane.workspaceId
+    return "$agent · $project · $statusLabel"
 }
 
 /** UX-03e：阅读位置状态（真实手势驱动，不用 index 猜测）。 */
@@ -886,12 +893,23 @@ private fun AgentGroupHeader(pane: Pane) {
         // 已知 agent 名保留原样（pi / claude），但使用中性色，不再用状态绿当装饰
         it.replaceFirstChar { c -> c.uppercase() }
     } ?: "Agent"
-    Text(
-        name,
-        style = MaterialTheme.typography.labelSmall, // type.meta 13/19
-        color = palette.textSecondary,
-        modifier = Modifier.padding(top = Space.xs),
-    )
+    Row(
+        Modifier.padding(top = Space.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.foundation.Image(
+            painter = painterResource(R.drawable.ic_agent),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(palette.textSecondary),
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(Space.xs))
+        Text(
+            name,
+            style = MaterialTheme.typography.labelSmall, // type.meta 13/19
+            color = palette.textSecondary,
+        )
+    }
 }
 
 /** thinking / tool：默认折叠，一行摘要。 */
