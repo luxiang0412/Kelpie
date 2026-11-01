@@ -191,6 +191,7 @@ fun HostsScreen(
         HostEditorDialog(
             initial = editing,
             onDismiss = { editing = null; isNew = false },
+            onImportKey = onImportKey,
             onSave = { cfg ->
                 onSave(cfg)
                 editing = null
@@ -272,6 +273,7 @@ private fun HostCard(
 private fun HostEditorDialog(
     initial: HostRepository.HostConfig?,
     onDismiss: () -> Unit,
+    onImportKey: (String, String) -> Result<Unit>,
     onSave: (HostRepository.HostConfig) -> Unit,
 ) {
     var label by remember { mutableStateOf(initial?.label ?: "") }
@@ -280,6 +282,9 @@ private fun HostEditorDialog(
     var user by remember { mutableStateOf(initial?.user ?: "") }
     var session by remember { mutableStateOf(initial?.session ?: "test") }
     var herdrBin by remember { mutableStateOf(initial?.herdrBin ?: "/home/luxiang/.local/bin/herdr") }
+    // 一次配完：新增主机时可直接粘贴私钥；编辑时留空表示不修改已导入的私钥
+    var keyText by remember { mutableStateOf("") }
+    var keyError by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -298,22 +303,53 @@ private fun HostEditorDialog(
                 }
                 OutlinedTextField(session, { session = it }, label = { Text(stringResource(R.string.hosts_16)) }, singleLine = true)
                 OutlinedTextField(herdrBin, { herdrBin = it }, label = { Text("herdr 绝对路径") }, singleLine = true)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.hosts_key_input_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    stringResource(R.string.hosts_key_input_note),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    keyText,
+                    { keyText = it; keyError = null },
+                    placeholder = { Text(stringResource(R.string.hosts_key_input_hint), style = MaterialTheme.typography.labelSmall) },
+                    modifier = Modifier.heightIn(min = 72.dp),
+                    textStyle = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                )
+                keyError?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    onSave(
-                        HostRepository.HostConfig(
+                    val cfg = HostRepository.HostConfig(
                             id = initial?.id ?: java.util.UUID.randomUUID().toString().take(8),
                             label = label.trim().ifBlank { host.trim() },
                             host = host.trim(),
                             port = port.toIntOrNull() ?: 22,
                             user = user.trim(),
                             session = session.trim().ifBlank { "test" },
-                            herdrBin = herdrBin.trim(),
-                        ),
+                        herdrBin = herdrBin.trim(),
                     )
+                    // 有私钥内容就先导入，成功后再保存主机（避免出现"主机在、私钥没写成"的半状态）
+                    if (keyText.isNotBlank()) {
+                        val r = onImportKey(cfg.id, keyText)
+                        if (r.isFailure) {
+                            keyError = r.exceptionOrNull()?.message ?: "私钥导入失败"
+                            return@TextButton
+                        }
+                        onSave(cfg)
+                        return@TextButton
+                    }
+                    onSave(cfg)
                 },
                 enabled = host.isNotBlank() && user.isNotBlank(),
             ) { Text(stringResource(R.string.hosts_9)) }

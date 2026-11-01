@@ -106,4 +106,7 @@
     <string name="composer_draft_saved">草稿已保存</string>
     <string name="composer_long_done">完成编辑</string>
     <string name="composer_long_cancel">取消编辑</string>
+    <string name="hosts_key_input_label">私钥（可选）</string>
+    <string name="hosts_key_input_hint">-----BEGIN OPENSSH PRIVATE KEY-----</string>
+    <string name="hosts_key_input_note">粘贴完整 OpenSSH 私钥，仅写入本机 app 私有目录（0600），不外传。编辑时留空表示不修改已有私钥。</string>
 </resources>

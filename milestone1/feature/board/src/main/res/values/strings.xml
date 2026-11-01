@@ -106,4 +106,7 @@
     <string name="composer_draft_saved">Draft saved</string>
     <string name="composer_long_done">Done editing</string>
     <string name="composer_long_cancel">Cancel editing</string>
+    <string name="hosts_key_input_label">Private key (optional)</string>
+    <string name="hosts_key_input_hint">-----BEGIN OPENSSH PRIVATE KEY-----</string>
+    <string name="hosts_key_input_note">Paste the full OpenSSH private key. Stored only in app-private storage (0600); never uploaded. Leave empty to keep the existing key.</string>
 </resources>
