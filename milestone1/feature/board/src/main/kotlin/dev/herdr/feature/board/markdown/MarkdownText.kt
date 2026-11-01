@@ -72,6 +72,8 @@ fun MarkdownText(
     source: String,
     modifier: Modifier = Modifier,
     color: androidx.compose.ui.graphics.Color? = null,
+    /** UX-06：搜索命中高亮词（大小写不敏感）；null 表示不高亮。 */
+    highlight: String? = null,
 ) {
     // 短文本（绝大多数消息）同步解析：<2k 字符的解析是微秒级，
     // 异步反而会在滚动时闪出「原始 Markdown」（``` 与 * 直接可见）。
@@ -96,16 +98,16 @@ fun MarkdownText(
 
     // 段落间距 12dp（规格 10–14dp）；标题另有上下间距（见 RenderBlock）
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        parsed.forEach { block -> RenderBlock(block, color ?: palette.textPrimary) }
+        parsed.forEach { block -> RenderBlock(block, color ?: palette.textPrimary, highlight) }
     }
 }
 
 @Composable
-private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.Color) {
+private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.Color, highlight: String? = null) {
     val palette = LocalHerdrPalette.current
     when (block) {
         is MdBlock.Heading -> Text(
-            text = inline(block.spans),
+            text = inline(block.spans, highlight),
             modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
             style = when (block.level) {
                 1 -> MdH1Style
@@ -116,7 +118,7 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
         )
 
         is MdBlock.Paragraph -> Text(
-            text = inline(block.spans),
+            text = inline(block.spans, highlight),
             style = MaterialTheme.typography.bodyLarge,
             color = textColor,
         )
@@ -125,7 +127,7 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
             Box(Modifier.width(2.dp).fillMaxHeight().background(palette.borderSubtle))
             Spacer(Modifier.width(12.dp))
             Text(
-                text = inline(block.spans),
+                text = inline(block.spans, highlight),
                 style = MaterialTheme.typography.bodyMedium,
                 color = palette.textSecondary,
             )
@@ -259,7 +261,7 @@ private fun previewLines(code: String): String {
 
 /** 行内 span → AnnotatedString；不可信链接只做样式，不注册点击。 */
 @Composable
-private fun inline(spans: List<MdSpan>): AnnotatedString {
+private fun inline(spans: List<MdSpan>, highlight: String? = null): AnnotatedString {
     val palette = LocalHerdrPalette.current
     val mono = MonoStyle.fontFamily
     val codeBg = palette.surfaceRaised
@@ -268,7 +270,7 @@ private fun inline(spans: List<MdSpan>): AnnotatedString {
     fun build(builder: AnnotatedString.Builder, list: List<MdSpan>) {
         list.forEach { s ->
             when (s) {
-                is MdSpan.Text -> builder.append(s.text)
+                is MdSpan.Text -> appendWithHighlight(builder, s.text, highlight, palette)
                 is MdSpan.Bold -> builder.withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { build(builder, s.spans) }
                 is MdSpan.Italic -> builder.withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { build(builder, s.spans) }
                 // UX-01b：原实现用 " code " 的前后空格伪造 padding，会污染真实文本（复制/选区/搜索都会带上空格）。
@@ -297,4 +299,32 @@ private fun inline(spans: List<MdSpan>): AnnotatedString {
     }
 
     return buildAnnotatedString { build(this, spans) }
+}
+
+/** 把一段纯文本按命中词拆分：命中片段加背景色，其余原样（不改动字符内容）。 */
+private fun appendWithHighlight(
+    builder: AnnotatedString.Builder,
+    text: String,
+    highlight: String?,
+    palette: dev.herdr.feature.board.design.HerdrPalette,
+) {
+    val needle = highlight?.trim().orEmpty()
+    if (needle.isEmpty()) {
+        builder.append(text)
+        return
+    }
+    val bg = palette.statusBg(dev.herdr.core.herdr.AgentStatus.WORKING)
+    var index = 0
+    while (index < text.length) {
+        val hit = text.indexOf(needle, index, ignoreCase = true)
+        if (hit < 0) {
+            builder.append(text.substring(index))
+            break
+        }
+        if (hit > index) builder.append(text.substring(index, hit))
+        builder.withStyle(SpanStyle(background = bg)) {
+            builder.append(text.substring(hit, hit + needle.length))
+        }
+        index = hit + needle.length
+    }
 }

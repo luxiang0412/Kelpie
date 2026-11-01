@@ -240,6 +240,7 @@ private fun MessageList(
     searchOpen: Boolean,
     onCloseSearch: () -> Unit,
 ) {
+    var highlight by remember { mutableStateOf<String?>(null) }
     val palette = LocalHerdrPalette.current
     // 增量映射：分支解析 → 增量映射（历史条目复用；会话 key 变化时清空派生状态）
     val effective = remember(messages) { ConversationBranch.effective(messages) }
@@ -327,6 +328,7 @@ private fun MessageList(
         val q = query.trim()
         if (q.isEmpty()) {
             matches = emptyList()
+            highlight = null
             return@LaunchedEffect
         }
         kotlinx.coroutines.delay(250)   // 输入防抖
@@ -368,7 +370,7 @@ private fun MessageList(
                         scope.launch { listState.animateScrollToItem(matches[matchCursor]) }
                     }
                 },
-                onClose = { query = ""; matches = emptyList(); onCloseSearch() },
+                onClose = { query = ""; matches = emptyList(); highlight = null; onCloseSearch() },
             )
         }
 
@@ -683,7 +685,7 @@ private fun UserMessage(text: String) {
  * assistant 正文：Markdown 子集渲染 + 超长折叠；正文可长按系统选择；末尾常显「复制 / 更多」。
  */
 @Composable
-private fun AssistantMessage(text: String, onQuote: (String) -> Unit) {
+private fun AssistantMessage(text: String, onQuote: (String) -> Unit, highlight: String? = null) {
     val palette = LocalHerdrPalette.current
     val lineCount = remember(text) { text.count { it == '\n' } + 1 }
     val collapsible = text.length > 2500 || lineCount > 40
@@ -693,6 +695,7 @@ private fun AssistantMessage(text: String, onQuote: (String) -> Unit) {
             MarkdownText(
                 source = if (expanded || !collapsible) text else cutAtLine(text, 1200),
                 modifier = Modifier.fillMaxWidth(),
+                highlight = highlight,
             )
         }
         if (collapsible && !expanded) {
