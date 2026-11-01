@@ -36,6 +36,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import dev.herdr.feature.board.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -65,10 +67,10 @@ fun HostsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("主机") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
+                title = { Text(stringResource(R.string.hosts_0)) },
+                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.hosts_1)) } },
                 actions = {
-                    TextButton(onClick = { isNew = true; editing = null }) { Text("添加") }
+                    TextButton(onClick = { isNew = true; editing = null }) { Text(stringResource(R.string.hosts_2)) }
                 },
             )
         },
@@ -78,11 +80,11 @@ fun HostsScreen(
                 Modifier.padding(padding).fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text("还没有主机", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.hosts_4), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
-                Text("点右上角“添加”，填入主机 / 用户 / herdr 会话，并导入 OpenSSH 私钥。")
+                Text(stringResource(R.string.hosts_5))
                 Spacer(Modifier.height(16.dp))
-                Button(onClick = { isNew = true; editing = null }) { Text("添加主机") }
+                Button(onClick = { isNew = true; editing = null }) { Text(stringResource(R.string.hosts_3)) }
             }
         } else {
             // UX-08a：整页可滚动，否则空态会占满视口，设置项（语言/后台监控）在无主机时不可达
@@ -102,9 +104,9 @@ fun HostsScreen(
                     verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("后台监控（常驻通知）", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.hosts_25), style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            "切到后台也保持连接；agent 需要你处理或完成时发本地通知。受 Android 15 配额限制。",
+                            stringResource(R.string.hosts_26),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
                         )
@@ -214,20 +216,20 @@ private fun HostCard(
                 Text(host.lastError, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
             }
             Text(
-                if (host.hasKey) "私钥已导入" else "缺少私钥",
+                if (host.hasKey) stringResource(R.string.hosts_19) else stringResource(R.string.hosts_20),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (host.hasKey) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.IDLE || host.connKind == dev.herdr.core.data.HostConnectionManager.ConnKind.FAILED) {
-                    Button(onClick = onSelect) { Text("连接") }
+                    Button(onClick = onSelect) { Text(stringResource(R.string.hosts_11)) }
                 } else {
-                    OutlinedButton(onClick = onDisconnect) { Text("断开") }
+                    OutlinedButton(onClick = onDisconnect) { Text(stringResource(R.string.hosts_12)) }
                 }
-                OutlinedButton(onClick = onKey) { Text("私钥") }
-                OutlinedButton(onClick = onEdit) { Text("编辑") }
-                TextButton(onClick = onDelete) { Text("删除") }
+                OutlinedButton(onClick = onKey) { Text(stringResource(R.string.hosts_17)) }
+                OutlinedButton(onClick = onEdit) { Text(stringResource(R.string.hosts_6)) }
+                TextButton(onClick = onDelete) { Text(stringResource(R.string.hosts_8)) }
             }
         }
     }
@@ -248,20 +250,20 @@ private fun HostEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial == null) "添加主机" else "编辑主机") },
+        title = { Text(if (initial == null) stringResource(R.string.hosts_3) else stringResource(R.string.hosts_7)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(label, { label = it }, label = { Text("名称（可选）") }, singleLine = true)
-                OutlinedTextField(host, { host = it }, label = { Text("主机地址") }, singleLine = true)
+                OutlinedTextField(label, { label = it }, label = { Text(stringResource(R.string.hosts_24)) }, singleLine = true)
+                OutlinedTextField(host, { host = it }, label = { Text(stringResource(R.string.hosts_13)) }, singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        port, { port = it.filter(Char::isDigit) }, label = { Text("端口") }, singleLine = true,
+                        port, { port = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.hosts_15)) }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.width(110.dp),
                     )
-                    OutlinedTextField(user, { user = it }, label = { Text("用户名") }, singleLine = true)
+                    OutlinedTextField(user, { user = it }, label = { Text(stringResource(R.string.hosts_14)) }, singleLine = true)
                 }
-                OutlinedTextField(session, { session = it }, label = { Text("herdr 会话") }, singleLine = true)
+                OutlinedTextField(session, { session = it }, label = { Text(stringResource(R.string.hosts_16)) }, singleLine = true)
                 OutlinedTextField(herdrBin, { herdrBin = it }, label = { Text("herdr 绝对路径") }, singleLine = true)
             }
         },
@@ -281,9 +283,9 @@ private fun HostEditorDialog(
                     )
                 },
                 enabled = host.isNotBlank() && user.isNotBlank(),
-            ) { Text("保存") }
+            ) { Text(stringResource(R.string.hosts_9)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.hosts_10)) } },
     )
 }
 
@@ -298,16 +300,16 @@ private fun KeyDialog(
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("私钥 · ${host.cfg.label}") },
+        title = { Text(stringResource(R.string.hosts_key_label, host.cfg.label)) },
         text = {
             Column {
                 Text(
-                    "粘贴 OpenSSH 私钥（-----BEGIN OPENSSH PRIVATE KEY-----）。只写入本机 app 私有目录，不外传。",
+                    stringResource(R.string.hosts_23),
                     style = MaterialTheme.typography.labelSmall,
                 )
                 OutlinedTextField(
                     text, { text = it; error = null },
-                    label = { Text("私钥内容") },
+                    label = { Text(stringResource(R.string.hosts_18)) },
                     visualTransformation = PasswordVisualTransformation(),
                     textStyle = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                     modifier = Modifier.fillMaxWidth().height(140.dp),
@@ -319,12 +321,12 @@ private fun KeyDialog(
             TextButton(onClick = {
                 val r = onImport(text)
                 if (r.isSuccess) onDismiss() else error = r.exceptionOrNull()?.message
-            }) { Text("导入") }
+            }) { Text(stringResource(R.string.hosts_21)) }
         },
         dismissButton = {
             Row {
-                if (host.hasKey) TextButton(onClick = onDeleteKey) { Text("删除已有私钥") }
-                TextButton(onClick = onDismiss) { Text("取消") }
+                if (host.hasKey) TextButton(onClick = onDeleteKey) { Text(stringResource(R.string.hosts_22)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.hosts_10)) }
             }
         },
     )
@@ -334,7 +336,7 @@ private fun KeyDialog(
  * UX-05b：语言选择。
  * 只改 UI 语言，不翻译代码/命令/Agent transcript。
  * Android 13+ 走官方 `LocaleManager`（系统设置里也能看到本 App 的语言项）；
- * 13 以下不做 AppCompat 迁移（会牵动整个 Activity 基类），如实提示"跟随系统"。
+ * 13 以下不做 AppCompat 迁移（会牵动整个 Activity 基类），如实提示stringResource(R.string.hosts_28)。
  */
 @Composable
 private fun LanguageSection(context: android.content.Context) {
@@ -342,16 +344,16 @@ private fun LanguageSection(context: android.content.Context) {
     var current by remember { mutableStateOf(currentAppLanguage(context)) }
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("语言 / Language", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.hosts_27), style = MaterialTheme.typography.bodyMedium)
         Text(
-            if (isAtLeast33) "只影响界面文案，不翻译代码、命令与 Agent 回复。"
-            else "当前系统版本不支持应用内切换语言（需 Android 13+），将跟随系统。",
+            if (isAtLeast33) stringResource(R.string.hosts_30)
+            else stringResource(R.string.hosts_31),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
         )
         Spacer(Modifier.height(4.dp))
         Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-            listOf("" to "跟随系统", "zh-CN" to "简体中文", "en" to "English").forEach { (tag, label) ->
+            listOf("" to stringResource(R.string.hosts_28), "zh-CN" to stringResource(R.string.hosts_29), "en" to "English").forEach { (tag, label) ->
                 androidx.compose.material3.FilterChip(
                     selected = current == tag,
                     enabled = isAtLeast33,
