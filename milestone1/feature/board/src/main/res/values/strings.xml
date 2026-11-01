@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="board_title">Agent Console</string>
+    <string name="board_title">Agents</string>
     <string name="board_refresh">Refresh</string>
     <string name="board_refreshing">Refreshing</string>
     <string name="board_host_pick">Select host</string>

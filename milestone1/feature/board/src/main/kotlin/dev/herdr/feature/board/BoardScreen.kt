@@ -53,6 +53,7 @@ import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.Pane
 import dev.herdr.feature.board.design.DisclosureIndicator
 import dev.herdr.feature.board.design.ChevronAffordance
+import dev.herdr.feature.board.design.PageGutter
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.Motion
 import dev.herdr.feature.board.design.Radius
@@ -80,6 +81,7 @@ fun BoardScreen(
     onOpenPending: () -> Unit = {},
 ) {
     val palette = LocalHerdrPalette.current
+    val pageGutter = PageGutter.of(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp)
     val active = state.hosts.firstOrNull { it.cfg.id == state.activeId }
     var hostMenu by remember { mutableStateOf(false) }
     // BOARD-DONE-001（已批准）：已完成默认收起，仅用户主动展开
@@ -105,7 +107,7 @@ fun BoardScreen(
                     .fillMaxWidth()
                     .background(palette.background)
                     .statusBarsPadding()
-                    .padding(start = Space.page, end = Space.s, top = Space.s),
+                    .padding(start = pageGutter, end = Space.s, top = Space.s),
             ) {
                 // 窄屏/大字体下标题换行（而不是被省略成「Agent …」），高度由内容决定
                 val compactWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 360
@@ -192,8 +194,8 @@ fun BoardScreen(
             } else {
                 LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = Space.page, end = Space.page, bottom = Space.huge),
-                    verticalArrangement = Arrangement.spacedBy(Space.s),
+                    contentPadding = PaddingValues(start = pageGutter, end = pageGutter, bottom = Space.huge),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
                     // Attention First：blocked 前 2 条用卡片，其余紧凑；working 紧凑；done 默认收起。
                     if (blocked.isNotEmpty()) {
@@ -286,6 +288,7 @@ private fun StatusLine(
     onOpenPending: () -> Unit,
 ) {
     val palette = LocalHerdrPalette.current
+    val pageGutter = PageGutter.of(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp)
     val host = active ?: return
     val kind = host.connKind
     val transportTrouble = kind != HostConnectionManager.ConnKind.CONNECTED
@@ -318,7 +321,7 @@ private fun StatusLine(
 
     Surface(color = palette.surfaceRaised, modifier = Modifier.fillMaxWidth()) {
         Row(
-            Modifier.padding(horizontal = Space.page, vertical = Space.s),
+            Modifier.padding(horizontal = pageGutter, vertical = Space.s),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -340,7 +343,7 @@ private fun StatusLine(
 private fun SectionHeader(title: String, count: Int) {
     val palette = LocalHerdrPalette.current
     Row(
-        Modifier.fillMaxWidth().padding(top = Space.m, bottom = Space.xs),
+        Modifier.fillMaxWidth().padding(top = Space.xxl, bottom = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
@@ -373,7 +376,8 @@ private fun AttentionCard(pane: Pane, onSelectAgent: (Pane) -> Unit) {
     val palette = LocalHerdrPalette.current
     Surface(
         color = palette.surface,
-        shape = RoundedCornerShape(Radius.card),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, palette.borderSubtle),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onSelectAgent(pane) }
@@ -446,30 +450,32 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
+            // BOARD-SPEC §2.2 强弱顺序：任务标题 → 状态 → Agent/项目/主机
+            Text(
+                displayTitle(pane),
+                style = MaterialTheme.typography.titleSmall,
+                color = palette.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 状态必须同时有文字（不能只靠颜色点，色弱/强光下也能读）
+                // 状态必须有文字（不只靠颜色）；整行只保留这一处强语义色
                 Text(
-                    StatusText.label(pane.status),
-                    style = MaterialTheme.typography.labelSmall,
+                    statusLabel,
+                    style = MaterialTheme.typography.labelMedium,
                     color = palette.statusFg(pane.status),
-                    modifier = Modifier.padding(end = Space.s),
                 )
+                Spacer(Modifier.width(Space.s))
                 Text(
-                    displayTitle(pane),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = palette.textPrimary,
+                    projectLine(pane),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
             }
-            Text(
-                projectLine(pane),
-                style = MaterialTheme.typography.labelSmall,
-                color = palette.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
         ChevronAffordance()
     }

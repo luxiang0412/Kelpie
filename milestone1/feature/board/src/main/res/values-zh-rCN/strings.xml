@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="board_title">Agent 工作台</string>
+    <string name="board_title">工作台</string>
     <string name="board_refresh">刷新</string>
     <string name="board_refreshing">刷新中</string>
     <string name="board_host_pick">选择主机</string>
