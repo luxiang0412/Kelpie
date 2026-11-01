@@ -2,12 +2,17 @@ package dev.herdr.feature.board.design
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -112,4 +117,52 @@ object AppTextStyles {
     val meta: TextStyle @Composable get() = MaterialTheme.typography.labelSmall
     val labelAction: TextStyle @Composable get() = MaterialTheme.typography.labelLarge
     val code: TextStyle get() = MonoStyle
+}
+
+/**
+ * UX-08b：统一空态/异常态组件（DESIGN-SYSTEM §5）。
+ * 结构固定为「图标 + 标题 + 一句真实解释 + 一个真实可用动作」，不放大插画、不放假动作。
+ */
+@Composable
+fun EmptyState(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+    secondaryLabel: String? = null,
+    onSecondary: (() -> Unit)? = null,
+) {
+    val palette = LocalHerdrPalette.current
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                color = palette.textPrimary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = palette.textSecondary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            if (actionLabel != null && onAction != null) {
+                Spacer(Modifier.size(16.dp))
+                androidx.compose.material3.Button(onClick = onAction) { Text(actionLabel) }
+            }
+            if (secondaryLabel != null && onSecondary != null) {
+                Spacer(Modifier.size(4.dp))
+                androidx.compose.material3.TextButton(
+                    onClick = onSecondary,
+                    modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+                ) { Text(secondaryLabel) }
+            }
+        }
+    }
 }

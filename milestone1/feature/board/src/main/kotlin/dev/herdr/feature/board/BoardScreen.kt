@@ -191,7 +191,24 @@ fun BoardScreen(
             }
 
             if (panes.isEmpty()) {
-                EmptyState(active, state, onOpenHosts, onReconnect)
+                // UX-08b：统一空态组件（区分"无主机"与"主机在线但无 Agent"）
+                if (active == null) {
+                    dev.herdr.feature.board.design.EmptyState(
+                        title = stringResource(R.string.board_empty_no_agents),
+                        body = stringResource(R.string.board_empty_add_host),
+                        actionLabel = stringResource(R.string.board_host_settings),
+                        onAction = onOpenHosts,
+                        secondaryLabel = stringResource(R.string.label_retry),
+                        onSecondary = onReconnect,
+                    )
+                } else {
+                    dev.herdr.feature.board.design.EmptyState(
+                        title = stringResource(R.string.board_empty_no_agents),
+                        body = active.connText,
+                        actionLabel = stringResource(R.string.label_retry),
+                        onAction = onReconnect,
+                    )
+                }
             } else {
                 LazyColumn(
                     Modifier.fillMaxSize(),
