@@ -99,4 +99,6 @@
     <string name="search_entry">搜索</string>
     <string name="settings_group_appearance">外观与语言</string>
     <string name="settings_group_notifications">通知与后台</string>
+    <string name="sheet_pending_writes">待确认写操作（%1$d）</string>
+    <string name="sheet_pending_hint">这些操作结果未知，不会自动重发；确认前请先在会话里核对。</string>
 </resources>

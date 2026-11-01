@@ -99,4 +99,6 @@
     <string name="search_entry">Search</string>
     <string name="settings_group_appearance">Appearance and language</string>
     <string name="settings_group_notifications">Notifications and background</string>
+    <string name="sheet_pending_writes">Pending writes (%1$d)</string>
+    <string name="sheet_pending_hint">These results are unknown and will never be resent automatically. Check the session before acting.</string>
 </resources>

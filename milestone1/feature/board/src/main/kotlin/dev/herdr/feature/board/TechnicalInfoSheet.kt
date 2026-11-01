@@ -22,6 +22,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import dev.herdr.feature.board.R
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -58,12 +60,12 @@ fun TechnicalInfoSheet(
             if (pendingWrites.isNotEmpty()) {
                 Spacer(Modifier.height(Space.m))
                 Text(
-                    "待确认写操作（${pendingWrites.size}）",
+                    stringResource(R.string.sheet_pending_writes, pendingWrites.size),
                     style = MaterialTheme.typography.labelLarge,
                     color = palette.statusFg(AgentStatus.UNKNOWN),
                 )
                 Text(
-                    "这些操作结果未知，不会自动重发；确认前请先在会话里核对。",
+                    stringResource(R.string.sheet_pending_hint),
                     style = MaterialTheme.typography.labelSmall,
                     color = palette.textSecondary,
                 )
