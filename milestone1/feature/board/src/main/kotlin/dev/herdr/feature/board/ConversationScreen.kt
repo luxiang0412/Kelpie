@@ -68,6 +68,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.dp
 import dev.herdr.core.data.HostConnectionManager
 import dev.herdr.core.herdr.AgentStatus
@@ -116,6 +118,7 @@ fun ConversationScreen(
         Text("会话已不存在", Modifier.padding(Space.xxl))
         return
     }
+    var searchOpen by remember(pane.paneId) { mutableStateOf(false) }
     val hasTranscript = pane.agentSessionPath != null
     val title = displayTitle(pane)
 
@@ -159,6 +162,11 @@ fun ConversationScreen(
                         }
                     }
                     StatusChip(pane.status)
+                    TouchTargetIconButton(
+                        iconRes = R.drawable.ic_search,
+                        contentDescription = stringResource(R.string.search_entry),
+                        onClick = { searchOpen = true },
+                    )
                     TextButton(onClick = onOpenTechSheet, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text(stringResource(R.string.conversation_more), style = MaterialTheme.typography.labelLarge)
                     }
@@ -188,7 +196,7 @@ fun ConversationScreen(
                 transcript.loading -> LoadingBlock("读取会话…")
                 transcript.error != null -> ErrorBlock(transcript.error, onReload)
                 transcript.messages.isEmpty() -> EmptyBlock("还没有消息。发一句话开始。")
-                else -> MessageList(transcript.messages, pane, onQuote)
+                else -> MessageList(transcript.messages, pane, onQuote, searchOpen) { searchOpen = false }
             }
         }
     }
@@ -218,7 +226,13 @@ private fun BlockedNotice() {
 private enum class ReadMode { FollowingLatest, BrowsingHistory, RestoringAnchor, Empty }
 
 @Composable
-private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (String) -> Unit) {
+private fun MessageList(
+    messages: List<ChatMessage>,
+    pane: Pane,
+    onQuote: (String) -> Unit,
+    searchOpen: Boolean,
+    onCloseSearch: () -> Unit,
+) {
     val palette = LocalHerdrPalette.current
     // 增量映射：分支解析 → 增量映射（历史条目复用；会话 key 变化时清空派生状态）
     val effective = remember(messages) { ConversationBranch.effective(messages) }
@@ -296,6 +310,61 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (Strin
         }
     }
 
+    // UX-06：会话内搜索，边界明确为「仅搜索已加载消息」
+    var query by remember { mutableStateOf("") }
+    var matches by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var matchCursor by remember { mutableStateOf(0) }
+
+    LaunchedEffect(query, items) {
+        if (!searchOpen) return@LaunchedEffect
+        val q = query.trim()
+        if (q.isEmpty()) {
+            matches = emptyList()
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(250)   // 输入防抖
+        matches = withContext(Dispatchers.Default) {
+            items.mapIndexedNotNull { i, item ->
+                val text = when (item) {
+                    is ConversationItem.User -> item.text
+                    is ConversationItem.Assistant -> item.text
+                    is ConversationItem.Thinking -> item.text
+                    is ConversationItem.Tool -> item.argumentsSummary + "\n" + (item.result ?: "")
+                    is ConversationItem.Unknown -> item.text
+                }
+                if (text.contains(q, ignoreCase = true)) i else null
+            }
+        }
+        matchCursor = 0
+        matches.firstOrNull()?.let { idx ->
+            mode = ReadMode.BrowsingHistory
+            listState.animateScrollToItem(idx)
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        if (searchOpen) {
+            SearchBar(
+                query = query,
+                onQueryChange = { query = it },
+                matchCount = matches.size,
+                cursor = matchCursor,
+                onPrev = {
+                    if (matches.isNotEmpty()) {
+                        matchCursor = (matchCursor - 1 + matches.size) % matches.size
+                        scope.launch { listState.animateScrollToItem(matches[matchCursor]) }
+                    }
+                },
+                onNext = {
+                    if (matches.isNotEmpty()) {
+                        matchCursor = (matchCursor + 1) % matches.size
+                        scope.launch { listState.animateScrollToItem(matches[matchCursor]) }
+                    }
+                },
+                onClose = { query = ""; matches = emptyList(); onCloseSearch() },
+            )
+        }
+
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
@@ -348,6 +417,7 @@ private fun MessageList(messages: List<ChatMessage>, pane: Pane, onQuote: (Strin
                 )
             }
         }
+    }
     }
 }
 
@@ -701,6 +771,61 @@ private fun cutAtLine(text: String, max: Int): String {
     val fences = head.count { it == tick } / 3
     val suffix = if (fences % 2 == 1) "$nl$nl…$nl$tick$tick$tick" else "$nl$nl…"
     return head + suffix
+}
+
+/** UX-06：会话内搜索栏（仅搜索已加载消息；定位用稳定条目 key，不用序号）。 */
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    matchCount: Int,
+    cursor: Int,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val palette = LocalHerdrPalette.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(palette.surface)
+            .padding(horizontal = Space.page, vertical = Space.s),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(stringResource(R.string.search_placeholder), style = MaterialTheme.typography.bodyMedium) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.width(Space.s))
+            Text(
+                if (query.isBlank()) "" else if (matchCount == 0) stringResource(R.string.search_no_result) else "${cursor + 1}/$matchCount",
+                style = MaterialTheme.typography.labelMedium,
+                color = palette.textSecondary,
+            )
+            TouchTargetIconButton(
+                iconRes = R.drawable.ic_collapsed,
+                contentDescription = stringResource(R.string.search_prev),
+                onClick = onPrev,
+            )
+            TouchTargetIconButton(
+                iconRes = R.drawable.ic_chevron_right,
+                contentDescription = stringResource(R.string.search_next),
+                onClick = onNext,
+            )
+            TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.search_close), style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        Text(
+            stringResource(R.string.search_scope),
+            style = MaterialTheme.typography.labelSmall,
+            color = palette.textSecondary,
+        )
+    }
 }
 
 /** Unknown / 暂不支持的内容：中性说明 + 复制原文，不丢数据、不伪装成成功结果。 */

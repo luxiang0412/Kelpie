@@ -90,4 +90,11 @@
     <string name="hosts_30">只影响界面文案，不翻译代码、命令与 Agent 回复。</string>
     <string name="hosts_31">当前系统版本不支持应用内切换语言（需 Android 13+），将跟随系统。</string>
     <string name="hosts_key_label">私钥 · %1$s</string>
+    <string name="search_placeholder">搜索已加载的消息</string>
+    <string name="search_scope">仅搜索已加载的消息</string>
+    <string name="search_no_result">无匹配</string>
+    <string name="search_prev">上一处</string>
+    <string name="search_next">下一处</string>
+    <string name="search_close">关闭搜索</string>
+    <string name="search_entry">搜索</string>
 </resources>

@@ -90,4 +90,11 @@
     <string name="hosts_30">Applies to UI copy only; code, commands and agent messages are never translated.</string>
     <string name="hosts_31">In-app language switching requires Android 13+; this device will follow the system language.</string>
     <string name="hosts_key_label">Private key · %1$s</string>
+    <string name="search_placeholder">Search loaded messages</string>
+    <string name="search_scope">Only the loaded messages are searched</string>
+    <string name="search_no_result">No match</string>
+    <string name="search_prev">Previous match</string>
+    <string name="search_next">Next match</string>
+    <string name="search_close">Close search</string>
+    <string name="search_entry">Search</string>
 </resources>
