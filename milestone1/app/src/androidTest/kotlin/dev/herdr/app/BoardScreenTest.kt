@@ -170,7 +170,7 @@ class BoardScreenTest {
                 hosts = listOf(host(HostConnectionManager.ConnKind.AWAITING_HOST_KEY)),
             ),
         )
-        rule.onAllNodesWithText("等待确认主机指纹")[0].assertIsDisplayed()
+        rule.onAllNodesWithText("等待确认主机指纹", substring = true)[0].assertIsDisplayed()
     }
 
     @Test

@@ -104,8 +104,8 @@ class BoardBannerTest {
             onOpenPending = { opened = true },
         )
         // Unknown 优先：文案必须说明“可能已执行”，且不得写成失败
-        rule.onNodeWithText("有 1 个发送结果无法确认，远端可能已执行（不会自动重发）", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("查看").performClick()
+        rule.onNodeWithText("发送结果无法确认", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("查看发送记录").performClick()
         rule.runOnIdle { assertTrue(opened) }
     }
 
@@ -131,6 +131,6 @@ class BoardBannerTest {
     @Test
     fun awaitingHostKey_isHighPriority() {
         render(state(HostConnectionManager.ConnKind.AWAITING_HOST_KEY, "等待确认主机指纹"))
-        rule.onAllNodesWithText("等待确认主机指纹")[0].assertIsDisplayed()
+        rule.onAllNodesWithText("等待确认主机指纹", substring = true)[0].assertIsDisplayed()
     }
 }

@@ -13,7 +13,7 @@
 | FIX-01 未捕获 SSH 异常致崩溃 | PARTIAL | handler + runCatching 已加；**设备侧未复验** | `7cc5112` |
 | UX-02a 工作台顶栏/主机选择器/导航 | PASS | 主机选择器下移（BOARD-HOST-001，PROVISIONAL）；窄屏换行；真机 P1/P2 + AVD P5/P6 | `e19e731` |
 | UX-02b Attention First / done 折叠 | PASS | `BOARD-DONE-001` 落实；blocked 前 2 卡；单一语义色；idle/unknown 分区 | `309e3a1` |
-| UX-02c 单条 Banner / Unknown 入口 | PASS | 优先级 Banner；工作台可直接进 Unknown 详情；`BoardBannerTest` 5 项 | `8d4d3ee` |
+| UX-02c Banner 优先级（按 DESIGN-SYSTEM §3 重做） | PASS | 安全>Unknown>认证失败>连接>缓存；全部问题入口；Unknown 文案与「查看发送记录」 | 本轮 |
 | UX-03a 对话正文/身份头/气泡 | PASS | 分组表头、bodyReading 16/25、用户气泡 86%、围栏预览闭合、短文本同步解析 | `edfaf40` |
 | UX-03b Markdown/CodeBlock 视觉 | PASS | 引用 12dp、列表悬挂缩进、code 13/20、复制取源文 | `62d03a1` |
 | UX-03c Tool/Thinking/长输出 | PASS | 移除「失败」盲猜；状态仅 运行中/已返回；52dp 头部；不放假「查看全文」 | `62d03a1` |

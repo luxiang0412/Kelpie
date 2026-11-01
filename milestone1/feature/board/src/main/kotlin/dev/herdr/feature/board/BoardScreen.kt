@@ -277,7 +277,7 @@ private object Palette {
 
 @Composable
 /**
- * 单条主 Banner（UX-02c / §2.3 优先级）：
+ * 单条主 Banner（UX-02c / DESIGN-SYSTEM §3 优先级）：
  * 安全异常 > Unknown 写操作 > 鉴权失败 / 待确认指纹 > 离线或重连中 > 缓存过期 > 正常（不显示）。
  * 同屏只出现一条，避免多条横幅互相叠压；其余问题通过详情入口查看。
  */
@@ -291,34 +291,62 @@ private fun StatusLine(
     val palette = LocalHerdrPalette.current
     val pageGutter = PageGutter.of(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp)
     val host = active ?: return
+    var showAllIssues by remember { mutableStateOf<List<Pair<String, String>>?>(null) }
     val kind = host.connKind
     val transportTrouble = kind != HostConnectionManager.ConnKind.CONNECTED
     val dataStale = state.board.stale && state.board.updatedAtMs > 0
 
     data class Banner(val text: String, val color: androidx.compose.ui.graphics.Color, val action: (() -> Unit)?, val actionLabel: String)
 
-    val banner = when {
-        // 1) Unknown 写操作：必须能从工作台看到并进入（不能只藏在技术信息里）
-        pendingWrites.isNotEmpty() -> Banner(
-            "有 ${pendingWrites.size} 个发送结果无法确认，远端可能已执行（不会自动重发）",
+    // DESIGN-SYSTEM §3 优先级：安全阻断/主机身份 > Unknown 写操作 > 认证失败 > 连接/数据过期
+    val issues = ArrayList<Banner>()
+    if (kind == HostConnectionManager.ConnKind.AWAITING_HOST_KEY) {
+        issues += Banner("主机身份待确认：${host.connText}", palette.statusFg(AgentStatus.BLOCKED), onReconnect, "重试")
+    }
+    if (pendingWrites.isNotEmpty()) {
+        issues += Banner(
+            "发送结果无法确认（${pendingWrites.size}）：远端可能已执行，不会自动重发",
             palette.statusFg(AgentStatus.UNKNOWN),
             onOpenPending,
-            "查看",
+            "查看发送记录",
         )
-        // 2) 待确认主机指纹 / 鉴权失败
-        kind == HostConnectionManager.ConnKind.AWAITING_HOST_KEY || kind == HostConnectionManager.ConnKind.FAILED ->
-            Banner(host.connText, palette.statusFg(AgentStatus.BLOCKED), onReconnect, "重试")
-        // 3) 离线 / 重连中
-        transportTrouble -> Banner(host.connText, palette.statusFg(AgentStatus.WORKING), onReconnect, "重试")
-        // 4) 在线但数据过期：保留缓存内容并明确标注
-        dataStale -> Banner(
+    }
+    if (kind == HostConnectionManager.ConnKind.FAILED) {
+        issues += Banner(host.connText, palette.errorFg, onReconnect, "重试")
+    }
+    if (kind == HostConnectionManager.ConnKind.RECONNECTING || kind == HostConnectionManager.ConnKind.CONNECTING ||
+        kind == HostConnectionManager.ConnKind.IDLE || kind == HostConnectionManager.ConnKind.STALE
+    ) {
+        issues += Banner(host.connText, palette.statusFg(AgentStatus.WORKING), onReconnect, "重试")
+    }
+    if (dataStale) {
+        issues += Banner(
             stringResource(R.string.board_cache_banner_prefix) + " · " + timeAgo(state.board.updatedAtMs),
             palette.statusFg(AgentStatus.UNKNOWN),
             null,
             "",
         )
-        else -> null
-    } ?: return  // 一切正常：不占常驻横幅
+    }
+    val banner = issues.firstOrNull() ?: return  // 一切正常：不占常驻横幅
+
+    // 低优先级问题不丢：通过「全部问题」入口可查看
+    showAllIssues?.let { list ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showAllIssues = null },
+            title = { Text("全部问题（${list.size}）") },
+            text = {
+                Column {
+                    list.forEach { (text, _) ->
+                        Text(text, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(Space.s))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAllIssues = null }) { Text(stringResource(R.string.label_dismiss)) }
+            },
+        )
+    }
 
     Surface(color = palette.surfaceRaised, modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -331,6 +359,14 @@ private fun StatusLine(
                 color = banner.color,
                 modifier = Modifier.weight(1f),
             )
+            if (issues.size > 1) {
+                TextButton(
+                    onClick = { showAllIssues = issues.map { it.text to it.actionLabel } },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text("全部问题 ${issues.size}", style = MaterialTheme.typography.labelLarge)
+                }
+            }
             banner.action?.let { act ->
                 TextButton(onClick = act, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(banner.actionLabel, style = MaterialTheme.typography.labelLarge)
