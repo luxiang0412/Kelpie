@@ -678,7 +678,10 @@ private fun UserMessage(text: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
         Surface(
             color = palette.surfaceRaised,
-            shape = RoundedCornerShape(16.dp),
+            // §5.1：圆角 16dp，靠尾部一角 6dp 作为角色识别
+            shape = RoundedCornerShape(
+                topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 6.dp,
+            ),
             modifier = if (maxWidth == Dp.Unspecified) Modifier.fillMaxWidth(fraction) else Modifier.widthIn(max = maxWidth),
         ) {
             Text(
@@ -897,7 +900,9 @@ private fun AgentGroupHeader(pane: Pane) {
         it.replaceFirstChar { c -> c.uppercase() }
     } ?: "Agent"
     Row(
-        Modifier.padding(top = Space.xs),
+        Modifier
+            .padding(top = Space.xs)
+            .semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.foundation.Image(

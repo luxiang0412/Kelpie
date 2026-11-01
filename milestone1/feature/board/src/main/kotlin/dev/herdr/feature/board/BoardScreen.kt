@@ -437,8 +437,11 @@ private fun SectionHeader(title: String, count: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = SectionTitleStyle, color = palette.textPrimary)
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(Space.xs))
+        Text("·", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+        Spacer(Modifier.width(Space.xs))
         Text("$count", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+        Spacer(Modifier.weight(1f))
     }
 }
 
@@ -453,7 +456,9 @@ private fun CollapsibleHeader(title: String, count: Int, expanded: Boolean, onTo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = SectionTitleStyle, color = palette.textSecondary)
-        Spacer(Modifier.width(Space.s))
+        Spacer(Modifier.width(Space.xs))
+        Text("·", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+        Spacer(Modifier.width(Space.xs))
         Text("$count", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
         Spacer(Modifier.weight(1f))
         DisclosureIndicator(expanded = expanded, tint = palette.textSecondary)
