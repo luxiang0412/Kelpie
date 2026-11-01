@@ -56,4 +56,5 @@
     <string name="tool_collapse">Collapse</string>
     <string name="unknown_content_title">Preview unavailable</string>
     <string name="unknown_content_copy">Copy raw text</string>
+    <string name="composer_review_action">Review send record</string>
 </resources>

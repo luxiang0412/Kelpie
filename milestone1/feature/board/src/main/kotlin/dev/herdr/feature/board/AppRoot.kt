@@ -129,6 +129,7 @@ private fun AppContent(vm: HostsViewModel) {
                         if (!vm.quoteIntoDraft(quoted)) quoteTooLong = true
                     },
                     resyncing = activeHost?.connKind != dev.herdr.core.data.HostConnectionManager.ConnKind.CONNECTED,
+                    onOpenSendRecord = { pendingSheet = true },
                     onBack = {
                         vm.closeConversation()
                         screen = SCREEN_BOARD

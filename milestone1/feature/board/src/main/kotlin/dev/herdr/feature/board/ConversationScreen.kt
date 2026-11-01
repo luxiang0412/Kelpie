@@ -106,6 +106,8 @@ fun ConversationScreen(
     onOpenTechSheet: () -> Unit,
     onBack: () -> Unit,
     onQuote: (String) -> Unit = {},
+    /** UX-04b：打开「发送记录」（Pending/Unknown 的持久入口）。 */
+    onOpenSendRecord: () -> Unit = {},
     /** UX-03e：连接中断/重连中时为 true —— 保留缓存内容，但明确标注"正在重新同步"。 */
     resyncing: Boolean = false,
 ) {
@@ -164,7 +166,7 @@ fun ConversationScreen(
             }
         },
         bottomBar = {
-            ComposerBar(composer, pane, resyncing, onTextChange, onSend, onDismissOutcome)
+            ComposerBar(composer, pane, resyncing, onTextChange, onSend, onDismissOutcome, onOpenSendRecord)
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -845,6 +847,7 @@ private fun ComposerBar(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onDismissOutcome: () -> Unit,
+    onOpenSendRecord: () -> Unit,
 ) {
     val palette = LocalHerdrPalette.current
     // UX-04a（CMP-STYLE-001 暂定）：轻量双层 Surface —— 外层是页面底色，
@@ -903,6 +906,10 @@ private fun ComposerBar(
                     color = palette.statusFg(AgentStatus.UNKNOWN),
                     modifier = Modifier.weight(1f),
                 )
+                TextButton(
+                    onClick = onOpenSendRecord,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.composer_review_action)) }
                 TextButton(
                     onClick = { confirmResend = true },
                     modifier = Modifier.heightIn(min = 48.dp),
