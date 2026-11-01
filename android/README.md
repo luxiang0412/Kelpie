@@ -1,12 +1,15 @@
-# Milestone 1 — 只读看板（Android）
+# android/ — Herdr Android 客户端工程
+
+> 仓库总览与构建命令见根目录 `README.md`；本文件只描述各模块职责与技术基线。
+> 目录名历史上叫 `milestone1/`，已重命名（git 历史保留）。
 
 ```text
 android/
   app/            # Application / Activity / 手工 DI
   core/ssh/       # 指纹信任、sshj 初始化（BCAPP）、连接、通道限流
   core/herdr/     # NDJSON 编解码、HerdrApi、SessionReconciler、ConnectionSupervisor、分组
-  core/data/      # Room 缓存 + SettingsStore（主机设置/私钥）
-  feature/board/  # Compose：主机设置 / 看板 / Pane 详情
+  core/data/      # Room 缓存 + SettingsStore（主机设置/私钥）+ 草稿库 + 待确认写操作 + 审批 IPC
+  feature/board/  # Compose：主机设置 / 看板 / 会话 / Composer / Markdown 渲染
 ```
 
 ## 技术基线（照抄 DECISIONS，不重新发明）
