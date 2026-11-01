@@ -101,4 +101,9 @@
     <string name="settings_group_notifications">Notifications and background</string>
     <string name="sheet_pending_writes">Pending writes (%1$d)</string>
     <string name="sheet_pending_hint">These results are unknown and will never be resent automatically. Check the session before acting.</string>
+    <string name="composer_long_title">Edit long instruction</string>
+    <string name="composer_long_hint">Paste long code or stack traces here; review before sending.</string>
+    <string name="composer_draft_saved">Draft saved</string>
+    <string name="composer_long_done">Done editing</string>
+    <string name="composer_long_cancel">Cancel editing</string>
 </resources>

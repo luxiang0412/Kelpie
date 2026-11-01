@@ -1182,6 +1182,7 @@ private fun ComposerBar(
         var snapshot by remember { mutableStateOf(composer.text) }
         LongPromptEditor(
             text = composer.text,
+            pane = pane,
             onChange = onTextChange,
             onCancel = {
                 // UX-04b：取消回退到打开编辑前的草稿内容（不发送、不保留半成品）
@@ -1218,46 +1219,124 @@ private fun ComposerBar(
 @Composable
 private fun LongPromptEditor(
     text: String,
+    pane: Pane,
     onChange: (String) -> Unit,
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val palette = LocalHerdrPalette.current
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Surface(color = palette.background, modifier = Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().imePadding()) {
+                // 原型 focus-*.png：← 返回 + 标题 + 副标题（Agent · 项目 · 草稿已保存）+ 完成
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(start = Space.xs, end = Space.s, top = Space.xs, bottom = Space.xs),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TouchTargetIconButton(
+                        iconRes = R.drawable.ic_back,
+                        contentDescription = stringResource(R.string.composer_long_cancel),
+                        onClick = onCancel,
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.composer_long_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = palette.textPrimary,
+                        )
+                        Text(
+                            conversationSubtitle(pane, stringResource(R.string.composer_draft_saved)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = palette.textSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.composer_long_done), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                androidx.compose.material3.HorizontalDivider(color = palette.borderSubtle)
+                Text(
+                    stringResource(R.string.composer_long_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(horizontal = Space.page, vertical = Space.s),
+                )
+                Surface(
+                    color = palette.surface,
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, palette.borderSubtle),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = Space.page),
+                ) {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = onChange,
+                        modifier = Modifier.fillMaxSize(),
+                        textStyle = MaterialTheme.typography.bodyLarge,
+                        placeholder = {
+                            Text(
+                                stringResource(R.string.composer_long_hint),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                            unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Text,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Default,
+                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
+                        ),
+                    )
+                }
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = Space.page, vertical = Space.s),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onCancel, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.composer_cancel)) }
-                    Text(stringResource(R.string.composer_long_prompt), style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+                    Text(
+                        "${text.length} 字符",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = palette.textSecondary,
+                    )
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.composer_done)) }
+                    Text(
+                        stringResource(R.string.composer_draft_saved),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = palette.textSecondary,
+                    )
                 }
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = onChange,
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = Space.page),
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    placeholder = { Text("粘贴代码、错误堆栈或长指令…") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Text,
-                        imeAction = androidx.compose.ui.text.input.ImeAction.Default,
-                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.None,
-                    ),
-                )
+                // 与原型一致：底部只保留「完成编辑」主操作；**不提供发送**（完成 = 写回草稿）
+                Box(
+                    Modifier.fillMaxWidth().padding(Space.page),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    androidx.compose.material3.Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) { Text(stringResource(R.string.composer_long_done)) }
+                }
+
                 Text(
-                    "${text.length} 字符（草稿会自动保存）",
+                    "语音仅作为转文字草稿，绝不自动发送。",
                     style = MaterialTheme.typography.labelSmall,
                     color = palette.textSecondary,
-                    modifier = Modifier.padding(Space.page),
+                    modifier = Modifier.padding(horizontal = Space.page, vertical = Space.s),
                 )
             }
         }
     }
 }
-
 @Composable
 private fun LoadingBlock(text: String) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

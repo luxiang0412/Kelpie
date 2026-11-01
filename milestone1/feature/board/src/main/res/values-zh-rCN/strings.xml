@@ -101,4 +101,9 @@
     <string name="settings_group_notifications">通知与后台</string>
     <string name="sheet_pending_writes">待确认写操作（%1$d）</string>
     <string name="sheet_pending_hint">这些操作结果未知，不会自动重发；确认前请先在会话里核对。</string>
+    <string name="composer_long_title">长 Prompt 编辑</string>
+    <string name="composer_long_hint">在这里可以粘贴较长的代码或错误堆栈；确认无误后再发送。</string>
+    <string name="composer_draft_saved">草稿已保存</string>
+    <string name="composer_long_done">完成编辑</string>
+    <string name="composer_long_cancel">取消编辑</string>
 </resources>
