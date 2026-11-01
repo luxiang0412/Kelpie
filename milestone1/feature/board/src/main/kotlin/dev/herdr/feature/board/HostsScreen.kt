@@ -164,23 +164,25 @@ fun HostsScreen(
                         },
                     )
                 }
-                LazyColumn(
-                Modifier.padding(padding).fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(state.hosts, key = { it.cfg.id }) { h ->
-                    HostCard(
-                        host = h,
-                        active = h.cfg.id == state.activeId,
-                        onSelect = { onConnect(h.cfg.id) },
-                        onDisconnect = { onDisconnect(h.cfg.id) },
-                        onEdit = { isNew = false; editing = h.cfg },
-                        onDelete = { onDelete(h.cfg.id) },
-                        onKey = { keyTarget = h },
-                    )
+                // 修复：外层已是 verticalScroll，不能再嵌 LazyColumn（无限高度约束会崩）
+                Column(
+                    Modifier.fillMaxWidth().padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    state.hosts.forEach { h ->
+                        androidx.compose.runtime.key(h.cfg.id) {
+                                    HostCard(
+                                host = h,
+                                active = h.cfg.id == state.activeId,
+                                onSelect = { onConnect(h.cfg.id) },
+                                onDisconnect = { onDisconnect(h.cfg.id) },
+                                onEdit = { isNew = false; editing = h.cfg },
+                                onDelete = { onDelete(h.cfg.id) },
+                                onKey = { keyTarget = h },
+                            )
+                        }
+                    }
                 }
-            }
             }
         }
     }
