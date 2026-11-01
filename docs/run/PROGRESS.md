@@ -44,3 +44,12 @@
 ## 缺口补齐：GFM 表格（I-99）
 
 `MdBlock.Table` + `TableBlock`（表头/分隔线/列等分），`PARSER_VERSION` 2→3；单测 `MarkdownTableTest` 6 项，真机浅/深色截图（`docs/evidence/table1.png`、`table-dark.png`）。
+
+## 仓库重构（P0–P3）
+
+- **P0**：删临时文件、`local.properties` 出索引、删除重复文档（master plan / PI-START 各一份）、过期文档进 `archive/docs/`。
+- **P1**：`milestone1/ → android/`、`spike/ → archive/spike/`、`docs/design/ux-run → docs/run`、发版说明进 `docs/release/`；新增根 `README.md` 与 `tools/check_doc_links.py`。
+- **P2**：报告引用的 89 份证据 `git mv` 到 `docs/evidence/`（附 README 命名/来源规则），160 份未被引用的历史截图移出 git（本地留档）；跟踪 PNG 209 张/145 MB → 89 张/77 MB。
+- **P3**：`ConversationScreen.kt` 1411 行拆为 6 个文件：`ConversationScreen`(148) / `ConversationMessageList`(539) / `ConversationToolCard`… 实为 `ToolCard`(253) / `ConversationComposer`(400) / `ConversationStates`(122) / `ConversationSearchBar`(77)。
+
+验证：`:feature:board:testDebugUnitTest` 全绿、AVD Compose UI **28/28**、Fixture 页渲染对照（`docs/evidence/ux-p3-fixture-after.png`）。
