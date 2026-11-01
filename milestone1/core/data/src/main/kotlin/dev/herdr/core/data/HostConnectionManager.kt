@@ -117,6 +117,7 @@ class HostConnectionManager(
 
     private val runtimes = LinkedHashMap<String, Runtime>()
     private val writeLedger = WriteLedger(sink = pendingWriteSink)
+    private val claudeResolver = ClaudeSessionResolver()
     private var started = false
     private var ticker: Job? = null
 
@@ -371,6 +372,24 @@ class HostConnectionManager(
     }
 
     fun recentWrites() = writeLedger.recent()
+
+    /** 方案 C：为 Claude pane 按 cwd 定位会话文件（只读；失败返回原因，由 UI 降级）。 */
+    suspend fun locateClaudeSession(
+        hostId: String,
+        cwd: String?,
+        expectedSessionId: String?,
+    ): ClaudeSessionResolver.Result {
+        val conn = currentConnection(hostId)
+            ?: return ClaudeSessionResolver.Result.Failure("not_connected", "主机未连接")
+        return claudeResolver.resolve(conn, cwd, expectedSessionId)
+    }
+
+    /** 最近一次 Claude 会话定位结果（供技术信息页显示，避免静默降级）。 */
+    var lastClaudeLookup: ClaudeSessionResolver.Result? = null
+        private set
+
+    suspend fun locateClaudeSessionTracked(hostId: String, cwd: String?, sessionId: String?) =
+        locateClaudeSession(hostId, cwd, sessionId).also { lastClaudeLookup = it }
 
     /** 进程重建后恢复未确认（Pending/Unknown）写操作；不会自动重放。 */
     fun restorePendingWrites(records: List<dev.herdr.core.herdr.WriteRecord>) = writeLedger.restore(records)

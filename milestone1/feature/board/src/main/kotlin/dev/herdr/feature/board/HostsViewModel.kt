@@ -322,7 +322,31 @@ class HostsViewModel(
         selectPane(pane)   // 启动终端尾部轮询，作为兜底
         manager.setComposerTarget(_state.value.activeId, pane)
         loadDraft(pane)
-        if (pane.agentSessionPath != null) openTranscript(pane) else _transcript.value = TranscriptState()
+        if (pane.agentSessionPath != null) {
+            openTranscript(pane)
+        } else if (pane.agent?.contains("claude", ignoreCase = true) == true) {
+            // 方案 C：herdr 对 Claude 只给会话 id，按 cwd 定位会话文件；失败即降级为终端尾部
+            val hostId = _state.value.activeId
+            if (hostId != null) {
+                _transcript.value = TranscriptState(loading = true)
+                viewModelScope.launch {
+                    val r = manager.locateClaudeSessionTracked(hostId, pane.cwd, pane.agentSessionId)
+                    if (r is dev.herdr.core.data.ClaudeSessionResolver.Result.Found) {
+                        openTranscript(pane.copy(agentSessionPath = r.path))
+                    } else {
+                        val why = (r as? dev.herdr.core.data.ClaudeSessionResolver.Result.Failure)
+                            ?.message ?: "无法定位会话文件"
+                        _transcript.value = TranscriptState(
+                            error = "未能定位 Claude 会话文件（$why），已降级为终端输出",
+                        )
+                    }
+                }
+            } else {
+                _transcript.value = TranscriptState()
+            }
+        } else {
+            _transcript.value = TranscriptState()
+        }
     }
 
     fun closeConversation() {
