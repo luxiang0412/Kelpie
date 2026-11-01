@@ -2,6 +2,8 @@ package dev.herdr.feature.board
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -913,12 +915,22 @@ private fun ComposerBar(
                 Modifier.padding(start = Space.m, end = Space.xs, top = Space.xs, bottom = Space.xs),
                 verticalAlignment = Alignment.Bottom,
             ) {
+                var focused by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = composer.text,
                     onValueChange = onTextChange,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp, max = 140.dp)
+                        // stroke.focus 2dp（DESIGN-SYSTEM §2.3）：聚焦时用 Accent 环，不靠 borderSubtle
+                        .onFocusChanged { focused = it.isFocused }
+                        .then(
+                            if (focused) Modifier.border(
+                                width = 2.dp,
+                                color = palette.focusRing,
+                                shape = RoundedCornerShape(16.dp),
+                            ) else Modifier,
+                        )
                         .semantics {
                             contentDescription = "指令输入框"
                             stateDescription = when {
@@ -950,21 +962,28 @@ private fun ComposerBar(
                 )
                 Surface(
                     color = if (canSend) palette.accent else palette.outline,
-                    shape = RoundedCornerShape(Radius.chip),
+                    shape = androidx.compose.foundation.shape.CircleShape,
                     modifier = Modifier
                         .padding(Space.xs)
-                        .heightIn(min = 48.dp)
-                        .widthIn(min = 64.dp)
+                        .size(48.dp)          // 点击区 48dp
                         .clickable(enabled = canSend, onClick = onSend)
                         .semantics { contentDescription = if (composer.sending) "发送中，请稍候" else "发送" },
                 ) {
-                    Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            if (composer.sending) stringResource(R.string.composer_sending) else stringResource(R.string.composer_send),
-                            color = palette.accentOn,
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(horizontal = Space.m),
-                        )
+                    // 视觉圆面 40dp，落在 48dp 点击区中央（COMPOSER-SPEC §3.1）
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Box(
+                            Modifier.size(40.dp).background(
+                                if (canSend) palette.accent else palette.outline,
+                                androidx.compose.foundation.shape.CircleShape,
+                            ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "↑",
+                                color = palette.accentOn,
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                        }
                     }
                 }
             }

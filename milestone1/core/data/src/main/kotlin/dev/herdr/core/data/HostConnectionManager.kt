@@ -323,7 +323,7 @@ class HostConnectionManager(
         val snapshot = raw
         val rec = writeLedger.begin("agent.prompt", pane.paneId, text.toByteArray())
         _composer.value = _composer.value.copy(
-            sending = true, outcome = null, message = "发送中…", pendingActionId = rec.clientRequestId,
+            sending = true, outcome = null, message = "正在发送…", pendingActionId = rec.clientRequestId,
         )
         scope.launch {
             val api = HerdrApi(conn, cfg.herdrBin, cfg.session)

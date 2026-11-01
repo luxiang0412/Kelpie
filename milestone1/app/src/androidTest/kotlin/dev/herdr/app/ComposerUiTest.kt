@@ -145,8 +145,9 @@ class ComposerUiTest {
 
     @Test
     fun sendButton_isNotClickableWhileSending() {
-        render(HostConnectionManager.ComposerState(text = "x", sending = true, message = "发送中…"))
+        render(HostConnectionManager.ComposerState(text = "x", sending = true, message = "正在发送…"))
+        // 发送键变为处理中：语义可读，且不再接受点击
         rule.onNodeWithContentDescription("发送中，请稍候").assertExists()
-        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.composer_sending)).assertExists()
+        rule.onNodeWithText("正在发送…").assertExists()
     }
 }
