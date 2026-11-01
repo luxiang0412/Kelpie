@@ -12,7 +12,7 @@
     <string name="board_section_unknown">状态未知</string>
     <string name="board_expand">展开</string>
     <string name="board_collapse">收起</string>
-    <string name="board_status_blocked">需要你</string>
+    <string name="board_status_blocked">需要处理</string>
     <string name="board_status_working">运行中</string>
     <string name="board_status_done">已完成</string>
     <string name="board_status_idle">空闲</string>
@@ -25,7 +25,7 @@
     <string name="composer_send">发送</string>
     <string name="composer_sending">发送中</string>
     <string name="composer_no_agent">这个 pane 没有运行 agent</string>
-    <string name="composer_footnote">已接受（Accepted）只代表远端收到，不代表执行完成；结果未知（Unknown）不会自动重发。</string>
+    <string name="composer_footnote">「指令已接收」只代表远端收到，不代表执行完成；「发送结果无法确认」不会自动重发。</string>
     <string name="composer_long_prompt">长 Prompt</string>
     <string name="composer_done">完成</string>
     <string name="composer_cancel">取消</string>
@@ -37,7 +37,7 @@
     <string name="label_thinking">思考过程</string>
     <string name="label_retry">重试</string>
     <string name="label_dismiss">知道了</string>
-    <string name="nav_board">看板</string>
+    <string name="nav_board">工作台</string>
     <string name="nav_hosts">主机</string>
     <string name="board_host_settings">主机设置</string>
     <string name="board_host_all_problems">查看全部问题</string>

@@ -5,14 +5,14 @@
     <string name="board_refreshing">Refreshing</string>
     <string name="board_host_pick">Select host</string>
     <string name="board_host_manage">Manage hosts…</string>
-    <string name="board_section_blocked">Needs you</string>
+    <string name="board_section_blocked">Needs attention</string>
     <string name="board_section_working">Running</string>
     <string name="board_section_done">Completed</string>
     <string name="board_section_idle">Idle</string>
     <string name="board_section_unknown">Unknown</string>
     <string name="board_expand">Expand</string>
     <string name="board_collapse">Collapse</string>
-    <string name="board_status_blocked">Needs you</string>
+    <string name="board_status_blocked">Needs attention</string>
     <string name="board_status_working">Running</string>
     <string name="board_status_done">Completed</string>
     <string name="board_status_idle">Idle</string>
@@ -37,7 +37,7 @@
     <string name="label_thinking">Thinking</string>
     <string name="label_retry">Retry</string>
     <string name="label_dismiss">Got it</string>
-    <string name="nav_board">Board</string>
+    <string name="nav_board">Agents</string>
     <string name="nav_hosts">Hosts</string>
     <string name="board_host_settings">Host settings</string>
     <string name="board_host_all_problems">All problems</string>

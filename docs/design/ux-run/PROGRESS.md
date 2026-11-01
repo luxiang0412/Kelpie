@@ -22,7 +22,7 @@
 | UX-04a Composer 轻量双层 Surface | PASS | surface + 20/18dp 圆角 + 16/12dp 边距；无假 Mic/附件 | `017a24e` |
 | UX-04b 长 Prompt/草稿/发送异常 | PASS | 长编辑「取消」回退；完成只写草稿；三态不回归 | `8f580ce` |
 | UX-04c 引用消息 → Composer | PARTIAL | 追加式引用 + 8000 上限拒绝 + 不覆盖草稿；**光标处插入未做** | `8f580ce` |
-| UX-05a i18n（zh/en） | PARTIAL | 48 key 双语 + 三屏 + **StatusText 本地化** + 缓存 Banner + 测试全去中文化；仅剩 Hosts/Sheet/通知 | `63b0533` `87edec2` + 本轮 |
+| UX-05a i18n（zh/en） | PARTIAL | 术语对齐（需要处理/指令已接收/发送结果无法确认/工作台·Agents）；仍剩 Hosts/Sheet/通知与三态气泡文案 | 本轮 |
 | UX-05b App 内语言设置 | PARTIAL | API33+ `LocaleManager` 三档；<33 明确禁用；**切换生效与状态保留未验证** | `f03420f` |
 | UX-06 会话内搜索 | PARTIAL | 只交付数据边界审计 + 实施计划（`UX-06-PLAN.md`）；**未加搜索 UI** | `42b8c6b` |
 | UX-07a STT Spike | PASS | 研究结论：不实现；降级系统键盘语音；无 `RECORD_AUDIO` | `cc55234` |
