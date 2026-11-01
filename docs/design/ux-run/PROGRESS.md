@@ -9,7 +9,7 @@
 | UX-00 仓库审计与基线 | PASS | 设计→源码映射、基线环境、进度表 | `704365c` |
 | UX-01a 对话顶栏大字体裁剪（I-93） | PASS | 内容自适应头；真机 fontScale 1.3 截图 | `48a94b1` |
 | UX-01b InlineCode 保真 | PASS | 移除空格伪 padding；2 项 UI 断言 | `128632a` |
-| UX-00a Tokens/对比度/图标契约 | PASS | 色值对齐 §2.2；`ContrastTest` 34 断言；4 个矢量图标；字形图标清零 | `6b10196` `7cc5112` |
+| UX-00a Tokens（按 DESIGN-SYSTEM 重做） | PASS | error/focus token、attention+dark 全色值、字阶 4 项、mdH1–3、SectionTitle、card 16dp；对比度实测 5.86–8.76；UI 26/26 | 本轮 |
 | FIX-01 未捕获 SSH 异常致崩溃 | PARTIAL | handler + runCatching 已加；**设备侧未复验** | `7cc5112` |
 | UX-02a 工作台顶栏/主机选择器/导航 | PASS | 主机选择器下移（BOARD-HOST-001，PROVISIONAL）；窄屏换行；真机 P1/P2 + AVD P5/P6 | `e19e731` |
 | UX-02b Attention First / done 折叠 | PASS | `BOARD-DONE-001` 落实；blocked 前 2 卡；单一语义色；idle/unknown 分区 | `309e3a1` |

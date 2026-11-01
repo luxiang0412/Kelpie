@@ -47,6 +47,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import dev.herdr.feature.board.design.LocalHerdrPalette
+import dev.herdr.feature.board.design.MdH1Style
+import dev.herdr.feature.board.design.MdH2Style
+import dev.herdr.feature.board.design.MdH3Style
 import dev.herdr.feature.board.design.MonoStyle
 import dev.herdr.feature.board.design.Radius
 import dev.herdr.feature.board.design.Space
@@ -103,9 +106,9 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
         is MdBlock.Heading -> Text(
             text = inline(block.spans),
             style = when (block.level) {
-                1 -> MaterialTheme.typography.titleLarge
-                2 -> MaterialTheme.typography.titleMedium
-                else -> MaterialTheme.typography.titleSmall
+                1 -> MdH1Style
+                2 -> MdH2Style
+                else -> MdH3Style
             },
             color = textColor,
         )

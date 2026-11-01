@@ -36,6 +36,11 @@ data class HerdrPalette(
     val outline: Color,
     /** 轻分隔线（不可当作可点击边界）。 */
     val borderSubtle: Color,
+    /** 明确失败/认证错误/Rejected（DESIGN-SYSTEM §2.1.2 error）。 */
+    val errorFg: Color,
+    val errorBg: Color,
+    /** 输入焦点环（stroke.focus 2dp，需 ≥3:1）。 */
+    val focusRing: Color,
     val statusFg: (AgentStatus) -> Color,
     val statusBg: (AgentStatus) -> Color,
 )
@@ -50,9 +55,12 @@ internal val LightPalette = HerdrPalette(
     accentOn = Color(0xFFFFFFFF),
     outline = Color(0xFFDFE5ED),
     borderSubtle = Color(0xFFDFE5ED),
+    errorFg = Color(0xFFB42318),
+    errorBg = Color(0xFFFFF0EF),
+    focusRing = Color(0xFF3556CE),
     statusFg = { st ->
         when (st) {
-            AgentStatus.BLOCKED -> Color(0xFF98470B)
+            AgentStatus.BLOCKED -> Color(0xFF8B3E0A)
             AgentStatus.WORKING -> Color(0xFF12558A)
             AgentStatus.DONE -> Color(0xFF17683E)
             AgentStatus.IDLE -> Color(0xFF596374)
@@ -61,7 +69,7 @@ internal val LightPalette = HerdrPalette(
     },
     statusBg = { st ->
         when (st) {
-            AgentStatus.BLOCKED -> Color(0xFFFFF3EA)
+            AgentStatus.BLOCKED -> Color(0xFFFFF2E6)
             AgentStatus.WORKING -> Color(0xFFEAF4FF)
             AgentStatus.DONE -> Color(0xFFEAF8EF)
             AgentStatus.IDLE -> Color(0xFFF0F2F5)
@@ -80,22 +88,25 @@ internal val DarkPalette = HerdrPalette(
     accentOn = Color(0xFF10151D),
     outline = Color(0xFF344052),
     borderSubtle = Color(0xFF344052),
+    errorFg = Color(0xFFFFB4AB),
+    errorBg = Color(0xFF402524),
+    focusRing = Color(0xFF9BB0FF),
     statusFg = { st ->
         when (st) {
-            AgentStatus.BLOCKED -> Color(0xFFFFB86B)
-            AgentStatus.WORKING -> Color(0xFF8FC7FF)
-            AgentStatus.DONE -> Color(0xFF7FD1A0)
-            AgentStatus.IDLE -> Color(0xFFA0AAB8)
-            AgentStatus.UNKNOWN -> Color(0xFFE0C070)
+            AgentStatus.BLOCKED -> Color(0xFFFFC28A)
+            AgentStatus.WORKING -> Color(0xFF9FCEFF)
+            AgentStatus.DONE -> Color(0xFF8ED6B0)
+            AgentStatus.IDLE -> Color(0xFFBEC9D8)
+            AgentStatus.UNKNOWN -> Color(0xFFE9CF87)
         }
     },
     statusBg = { st ->
         when (st) {
-            AgentStatus.BLOCKED -> Color(0xFF3A2A18)
-            AgentStatus.WORKING -> Color(0xFF152A3E)
-            AgentStatus.DONE -> Color(0xFF15301F)
-            AgentStatus.IDLE -> Color(0xFF232A33)
-            AgentStatus.UNKNOWN -> Color(0xFF332C17)
+            AgentStatus.BLOCKED -> Color(0xFF3A2B23)
+            AgentStatus.WORKING -> Color(0xFF1E344A)
+            AgentStatus.DONE -> Color(0xFF1C352A)
+            AgentStatus.IDLE -> Color(0xFF2A323E)
+            AgentStatus.UNKNOWN -> Color(0xFF38321D)
         }
     },
 )
@@ -116,7 +127,7 @@ object Space {
 }
 
 object Radius {
-    val card = 18.dp
+    val card = 16.dp
     val chip = 999.dp
     val sheet = 24.dp
     val code = 12.dp
@@ -156,6 +167,18 @@ object StatusText {
     )
 }
 
+/** 分区标题（DESIGN-SYSTEM type.titleSection 14/20 SemiBold）。 */
+val SectionTitleStyle = TextStyle(
+    fontSize = 14.sp,
+    lineHeight = 20.sp,
+    fontWeight = FontWeight.SemiBold,
+)
+
+/** Markdown 标题（type.mdH1/H2/H3 = 21/29、18/26、16/24 SemiBold）。 */
+val MdH1Style = TextStyle(fontSize = 21.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold)
+val MdH2Style = TextStyle(fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold)
+val MdH3Style = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+
 /** 等宽样式（路径、命令、tool 参数）。 */
 val MonoStyle = TextStyle(
     fontFamily = FontFamily.Monospace,
@@ -167,12 +190,12 @@ private fun typography(): Typography {
     val base = Typography()
     return base.copy(
         titleLarge = base.titleLarge.copy(fontSize = 26.sp, lineHeight = 34.sp, fontWeight = FontWeight.SemiBold),
-        titleMedium = base.titleMedium.copy(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+        titleMedium = base.titleMedium.copy(fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
         titleSmall = base.titleSmall.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
         bodyLarge = base.bodyLarge.copy(fontSize = 16.sp, lineHeight = 25.sp),
-        bodyMedium = base.bodyMedium.copy(fontSize = 14.sp, lineHeight = 22.sp),
+        bodyMedium = base.bodyMedium.copy(fontSize = 14.sp, lineHeight = 21.sp),
         bodySmall = base.bodySmall.copy(fontSize = 13.sp, lineHeight = 20.sp),
-        labelLarge = base.labelLarge.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
+        labelLarge = base.labelLarge.copy(fontSize = 13.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
         labelMedium = base.labelMedium.copy(fontSize = 13.sp, lineHeight = 19.sp),
         labelSmall = base.labelSmall.copy(fontSize = 13.sp, lineHeight = 19.sp),
     )

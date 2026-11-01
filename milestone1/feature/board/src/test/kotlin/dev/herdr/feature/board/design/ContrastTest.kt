@@ -68,6 +68,15 @@ class ContrastTest {
     }
 
     @Test
+    fun errorAndFocusTokens_areReadable() {
+        check("light errorFg/errorBg", LightPalette.errorFg, LightPalette.errorBg, 4.5)
+        check("dark errorFg/errorBg", DarkPalette.errorFg, DarkPalette.errorBg, 4.5)
+        // focus ring 必须能与 canvas 明显区分（≥3:1）
+        check("light focusRing/canvas", LightPalette.focusRing, LightPalette.background, 3.0)
+        check("dark focusRing/canvas", DarkPalette.focusRing, DarkPalette.background, 3.0)
+    }
+
+    @Test
     fun accentPair_isReadable() {
         check("light accent/onAccent", LightPalette.accent, LightPalette.accentOn, 4.5)
         check("dark accent/onAccent", DarkPalette.accent, DarkPalette.accentOn, 4.5)

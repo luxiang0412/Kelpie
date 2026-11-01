@@ -54,6 +54,7 @@ import dev.herdr.core.herdr.Pane
 import dev.herdr.feature.board.design.DisclosureIndicator
 import dev.herdr.feature.board.design.ChevronAffordance
 import dev.herdr.feature.board.design.PageGutter
+import dev.herdr.feature.board.design.SectionTitleStyle
 import dev.herdr.feature.board.design.LocalHerdrPalette
 import dev.herdr.feature.board.design.Motion
 import dev.herdr.feature.board.design.Radius
@@ -346,7 +347,7 @@ private fun SectionHeader(title: String, count: Int) {
         Modifier.fillMaxWidth().padding(top = Space.xxl, bottom = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = palette.textPrimary)
+        Text(title, style = SectionTitleStyle, color = palette.textPrimary)
         Spacer(Modifier.width(Space.s))
         Text("$count", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
     }
@@ -362,7 +363,7 @@ private fun CollapsibleHeader(title: String, count: Int, expanded: Boolean, onTo
             .padding(top = Space.m, bottom = Space.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = palette.textSecondary)
+        Text(title, style = SectionTitleStyle, color = palette.textSecondary)
         Spacer(Modifier.width(Space.s))
         Text("$count", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
         Spacer(Modifier.weight(1f))
