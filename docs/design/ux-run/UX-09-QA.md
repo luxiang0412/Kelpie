@@ -1,59 +1,45 @@
-# UX-09 — 全局综合 QA（在会话预算内能完成的部分）
+# UX-09 — 全局 QA（P1/P2/P5/P8 实测 + 覆盖说明）
 
-## 1. 决策表逐项核对
+> 本轮在 **AVD `emulator-5556`（Android 34）** 上按 DESIGN-SYSTEM §9.1 采集 4 个 profile。
+> **真机 `192.168.1.8:41449` 本轮已离线**（`device not found`），真机截图沿用更早的 `real-*` 系列，未冒充本轮数据。
 
-| ID | 决策 | 实现状态 |
+## 1. 本轮截图矩阵（实际产出）
+
+| Profile | 规格 | 来源 | 文件 | 结论 |
+| --- | --- | --- | --- | --- |
+| P1 | 393dp / 1.0 / en / Light | AVD | `ux09-p1-board-light.png` | ✅ 标题 26/34、主机选择器在标题下、1dp 分隔线、空态居中 |
+| P2 | 393dp / 1.0 / en / Dark | AVD | `ux09-p2-board-dark.png` | ✅ 深色层次（canvas/surface/raised）、状态词单一语义色 |
+| P5 | 320dp / **1.6** / en / Dark | AVD（`wm size 640x1280`、`density 320`） | `ux09-p5-320-dark-1.6.png` | ✅ 标题与 Refresh 同行不裁剪、空态三行完整、底部导航两标签完整 |
+| P8 | 600dp / 1.0 / en / Light | AVD（`wm size 1600x2560`、`density 320`） | `ux09-p8-600-light.png` | ⚠️ 布局不溢出，但**内容未按 ≥600dp 居中（仍左对齐整宽）**；仅 Composer 有 720dp 约束 |
+
+**未采集**：P3/P4（zh）本轮用的是 en；P6（320/1.6 light）；P7（393/1.3）；对话页与 Composer 的完整矩阵；真机全部。
+
+## 2. 与仓库原型截图的对照（`ux-d0/prototype/screenshots/`）
+
+| 原型 | 我们当前 | 差异 |
 | --- | --- | --- |
-| `BOARD-DONE-001` 已完成默认收起 | ✅ 已落实（UX-02b，`showDone = false`） |
-| `CONV-ACTIONS-001` 消息末尾「复制+更多」、正文长按系统选择 | ✅ 已落实（UX-03d，`SelectionContainer` + `MessageActions`） |
-| `CMP-VOICE-001` Mic 可用时常显 | ⏭️ 未实现（UX-07a 结论：不做，不放假入口） |
-| `SEC-WRITE-001` Accepted/Rejected/Unknown，Unknown 不自动重发 | ✅ 保持（未改语义；`autoRetryAllowed` 恒 false） |
-| `SEC-APPROVAL-001` 不做读屏一键审批 | ✅ 未引入 |
-| `CONV-TOOL-001` Tool 只用可靠 ID 关联 | ✅ 保持（`ConversationResolve`，未匹配→独立条目） |
-| `BOARD-HOST-001` 主机选择器在标题下方 | ✅ 已实现（**PROVISIONAL，待视觉终审**） |
-| `CMP-STYLE-001` 轻量双层 Surface，Send 唯一强调 | ✅ 已实现（**PROVISIONAL**） |
-| `CMP-QUOTE-001` 引用优先光标，否则追加 | ✅ 采用**追加到末尾**方案并记录（UX-04c） |
-| `CONV-TOOL-002` Tool 有限预览 + 完整输出 | ⚠️ 只做预览；数据源无完整输出时**不提供**假入口 |
-| `CONV-ANCHOR-001` 稳定锚点 + 像素偏移 | ✅ 已实现（UX-03e，`paneId-index + offset`）；`Resyncing` 状态未实现 |
-| `BRAND-ICON-001` Focus Orbit | ⚠️ 仅方案（UX-08c），未替换资产 |
+| `board-zh-light/dark` | 结构一致：标题 → 主机选择器 → 分区 → 底部导航 | 原型的分区计数与行留白更松；我们缺少「已连接」低强调状态行（规格允许不显示） |
+| `chat-zh-light/dark` | Agent 全宽、用户右气泡、Tool 卡、消息尾 Copy/More | 原型源码有命中高亮与全文阅读页入口，我们**没有高亮** |
+| `focus-zh-*`（Composer） | 双层 Surface、圆形 Send、Expand | 原型有 Mic 位（我们未实现，按规格隐藏 ✅） |
+| `*-320dp-1p6x` | 我们的 320/1.6 标题不裁剪 | 原型窄屏下标题与按钮分两行，我们同一行（宽度仍够） |
 
-## 2. 回归结果（本轮实际执行）
+## 3. 逐项自检（DESIGN-SYSTEM §10.3）
 
-| 命令 | 结果 |
-| --- | --- |
-| `:app:assembleDebug` | BUILD SUCCESSFUL |
-| `:app:assembleDebugAndroidTest` | BUILD SUCCESSFUL |
-| `:feature:board:testDebugUnitTest` | BUILD SUCCESSFUL |
-| `:core:data:testDebugUnitTest` | BUILD SUCCESSFUL |
-| `:core:herdr:test` | BUILD SUCCESSFUL |
-| AVD `emulator-5556` 全量 UI | **OK (26 tests)**（在 **en-US** 语言下运行） |
-| `:core:data` `DraftMigrationTest` | OK (1 test) |
+- [x] 未触碰 SSH 指纹、Herdr 写入语义、WriteLedger 规则
+- [x] 无假按钮（Mic/附件/活动/跨主机聚合均未出现）
+- [x] 页面级硬编码色值已收敛到 Tokens（`errorFg/focusRing/SectionTitleStyle/MdH1-3`）
+- [x] `done ≠ idle`；`blocked` 不提供一键批准
+- [x] 消息尾「复制 + 更多」常显；正文可长按选择
+- [ ] 语音 B 规则：**未实现**（无 STT）
+- [x] 新增文案均有 zh/en 资源（Hosts / Sheet / 搜索 / 工具卡）
+- [ ] IME / Insets 双倍留白：**未在真机验证**
+- [x] 未测项已在各 task 报告中如实记录
 
-## 3. 隐私 / Secrets 检查
+## 4. 仍未解决（明确列出）
 
-- 未提交任何 SSH 私钥、known_hosts、真实对话、草稿内容；截图只含 Fixture 假数据与 `herdr-gui-research` 项目名。
-- `spike/results/ux-crash-evidence.txt` 已脱敏（只保留异常类型与线程名）。
-- release 变体不含 `FixtureActivity`（debug 源集）；`benchmark` 变体按 `sourceSets` 显式引入。
-- 崩溃兜底日志只输出异常**类名**，不输出主机/路径/内容。
-
-## 4. 性能限制（不夸大的部分）
-
-- 真机 MIUI：`instrumentation` 被 BAL 拒绝（I-74）、`dropShaderCache` 失败（I-78）→ **真机 FrameTimingMetric 仍为 0**。
-- 本轮所有性能相关结论**只有** JVM 微基准（Mapper 21.9×、增量 mapped=1）与 `am start -W` 首帧，
-  且本轮未重测首帧，**不宣称**任何滚动性能改善。
-
-## 5. 未验证清单（必须如实）
-
-1. 真机：P1–P8 全量截图（本轮全部来自 AVD；真机仅在 UX-02a 拍到 P1/P2）；
-2. TalkBack 朗读顺序与数量朗读；
-3. 中文 IME 组合输入、光标/选区、粘贴长堆栈；
-4. 手势导航下 Composer Insets 双倍留白；
-5. 语言切换后的状态保留（草稿/Unknown/锚点）；
-6. 上滑不被拉回、点「N 条新消息」回到底部；
-7. `reduce motion` 行为。
-
-## 6. 结论等级
-
-**`FUNCTIONAL_PARTIAL`**：分支可构建、测试全绿、安全红线未破；视觉任务完成 8/12，
-`UX-03e`/`UX-04c`/`UX-05a`/`UX-05b`/`UX-06`/`UX-08a`/`UX-08b` 为 PARTIAL，`UX-07b` SKIPPED。
-**不得合并 main**，需用户视觉终审后再决定。
+1. **命中高亮缺失**（UX-06）：只做定位不做高亮，需改 Markdown SpanStyle 管线；
+2. **600dp 布局未居中**（P8 截图已暴露）：除 Composer 外，看板/对话没有 720dp 内容最大宽；
+3. **真机全部 profile 未采集**：设备离线；
+4. **ToolResult 全量输出页**：已实现（`FullOutputDialog`），但"仅保存部分输出"的判定逻辑未做（数据源无法区分）；
+5. **通知文案未本地化**；
+6. **UX-07b 语音**：SKIPPED（无本地识别路径）。
