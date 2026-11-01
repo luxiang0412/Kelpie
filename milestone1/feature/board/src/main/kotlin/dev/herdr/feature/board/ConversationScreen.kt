@@ -161,7 +161,7 @@ fun ConversationScreen(
             }
         },
         bottomBar = {
-            ComposerBar(composer, pane, onTextChange, onSend, onDismissOutcome)
+            ComposerBar(composer, pane, resyncing, onTextChange, onSend, onDismissOutcome)
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -797,6 +797,7 @@ private fun TerminalFallback(output: String, onReload: () -> Unit) {
 private fun ComposerBar(
     composer: HostConnectionManager.ComposerState,
     pane: Pane,
+    offline: Boolean,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
     onDismissOutcome: () -> Unit,
@@ -810,7 +811,8 @@ private fun ComposerBar(
     var longEditor by remember(pane.paneId) { mutableStateOf(false) }
     var confirmResend by remember { mutableStateOf(false) }
     val hasAgent = pane.agent != null
-    val canSend = hasAgent && !composer.sending && composer.text.isNotBlank()
+    // COMPOSER-SPEC §5.1 OfflineDraft：离线/不可写时 Send 直接禁用（不让用户点了才被拒）
+    val canSend = hasAgent && !composer.sending && composer.text.isNotBlank() && !offline
 
     Column(
         Modifier
@@ -819,6 +821,15 @@ private fun ComposerBar(
             .navigationBarsPadding()
             .padding(horizontal = gutter, vertical = Space.s),
     ) {
+        if (offline) {
+            Text(
+                "已离线，可继续编辑草稿（不会排队发送）",
+                style = MaterialTheme.typography.labelSmall,
+                color = palette.textSecondary,
+                modifier = Modifier.padding(bottom = Space.xs),
+            )
+        }
+
         // 发送结果：Accepted / Rejected / Unknown 三态文案不同，TalkBack 也读得到
         composer.message?.let { msg ->
             val color = when (composer.outcome) {

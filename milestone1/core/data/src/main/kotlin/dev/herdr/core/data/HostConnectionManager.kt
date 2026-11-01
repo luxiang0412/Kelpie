@@ -360,9 +360,10 @@ class HostConnectionManager(
                 pendingActionId = if (outcome is WriteOutcome.Unknown) rec.clientRequestId else null,
                 pendingText = if (outcome is WriteOutcome.Unknown) snapshot else null,
                 message = when (outcome) {
-                    is WriteOutcome.Accepted -> "已接受（Accepted）：远端已收到，未代表执行完成"
-                    is WriteOutcome.Rejected -> "被拒绝：${outcome.code}（内容已保留，可修改后重发）"
-                    is WriteOutcome.Unknown -> "结果未知（Unknown）：不会自动重发，请稍后在会话里确认"
+                    // COMPOSER-SPEC v0.2 §5.3：文案必须区分「已接收」/「被拒绝」/「无法确认」
+                    is WriteOutcome.Accepted -> "指令已接收（远端已收到，不代表执行完成）"
+                    is WriteOutcome.Rejected -> "发送被拒绝：${outcome.code}（内容已保留，可修改后重发）"
+                    is WriteOutcome.Unknown -> "发送结果无法确认，远端可能已执行；不会自动重发"
                     else -> null
                 },
             )
