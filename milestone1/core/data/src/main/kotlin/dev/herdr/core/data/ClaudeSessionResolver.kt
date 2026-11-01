@@ -35,12 +35,17 @@ class ClaudeSessionResolver {
             return@withContext Result.Failure("no_session_id", "herdr 未提供会话 id，无法对账")
         }
         val slug = ClaudeSessionLocator.slugFor(cwd)
-        val dir = "${homeDir.trimEnd('/')}/.claude/projects/$slug"
         val sftp = try {
             conn.sharedSftp()
         } catch (e: Throwable) {
             return@withContext Result.Failure("no_sftp", e.message ?: "SFTP 不可用")
         }
+        // home 目录：优先用调用方给的，否则用 SFTP canonicalize(".") 取登录用户 home
+        val home = homeDir.trim().ifEmpty {
+            runCatching { sftp.canonicalize(".") }.getOrNull().orEmpty()
+        }.trimEnd('/')
+        if (home.isEmpty()) return@withContext Result.Failure("no_home", "无法确定远端 home 目录")
+        val dir = "$home/.claude/projects/$slug"
         val candidates = try {
             sftp.ls(dir)
                 .filter { it.isRegularFile && it.name.endsWith(".jsonl") }

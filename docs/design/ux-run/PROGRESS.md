@@ -34,3 +34,9 @@
 - `:app:assembleDebug`、`:app:assembleDebugAndroidTest` BUILD SUCCESSFUL
 - AVD `emulator-5556` Compose UI：**OK (26 tests)**
 - `:feature:board` / `:core:data` / `:core:herdr` JVM：全绿（含 ContrastTest 38 断言）
+
+## Claude 适配（方案 B + C）
+
+- 方案 B（`5a53ae7`）：`ClaudeTranscriptParser` + 按路径分发。
+- 方案 C（`da5afca`）：`ClaudeSessionLocator`（纯逻辑）+ `ClaudeSessionResolver`（只读 SFTP 定位）。
+- **真机 E2E 首发通过**：`docs/design/ux-run/ADAPT-CLAUDE-E2E.md`。修复 C-1（缓存丢 `agentSessionId`）、C-2（`hasTranscript` 判据）、C-3（回填窗口切掉首条 user 消息）。

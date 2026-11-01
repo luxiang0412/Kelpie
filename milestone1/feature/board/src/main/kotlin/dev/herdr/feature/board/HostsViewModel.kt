@@ -52,6 +52,10 @@ class HostsViewModel(
         val loading: Boolean = false,
         val messages: List<ChatMessage> = emptyList(),
         val error: String? = null,
+        /** 是否走结构化对话（Claude 的路径由方案 C 定位得到，pane 上没有路径）。 */
+        val structured: Boolean = false,
+        /** 会话文件过大，只加载了最近一段（更早消息未加载）。 */
+        val truncated: Boolean = false,
     )
 
     data class UiState(
@@ -322,6 +326,7 @@ class HostsViewModel(
         selectPane(pane)   // 启动终端尾部轮询，作为兜底
         manager.setComposerTarget(_state.value.activeId, pane)
         loadDraft(pane)
+        android.util.Log.i("HerdrConv", "open agent=${pane.agent} path=${pane.agentSessionPath} sid=${pane.agentSessionId} cwd=${pane.cwd}")
         if (pane.agentSessionPath != null) {
             openTranscript(pane)
         } else if (pane.agent?.contains("claude", ignoreCase = true) == true) {
@@ -331,13 +336,14 @@ class HostsViewModel(
                 _transcript.value = TranscriptState(loading = true)
                 viewModelScope.launch {
                     val r = manager.locateClaudeSessionTracked(hostId, pane.cwd, pane.agentSessionId)
+                    android.util.Log.i("HerdrConv", "claude lookup -> $r")
                     if (r is dev.herdr.core.data.ClaudeSessionResolver.Result.Found) {
-                        openTranscript(pane.copy(agentSessionPath = r.path))
+                        openTranscript(pane.copy(agentSessionPath = r.path), structuredOverride = true)
                     } else {
                         val why = (r as? dev.herdr.core.data.ClaudeSessionResolver.Result.Failure)
                             ?.message ?: "无法定位会话文件"
                         _transcript.value = TranscriptState(
-                            error = "未能定位 Claude 会话文件（$why），已降级为终端输出",
+                            error = "claude_lookup_failed: $why",
                         )
                     }
                 }
@@ -363,7 +369,7 @@ class HostsViewModel(
         viewModelScope.launch { manager.readPane(hostId, p.paneId)?.let { _paneOutput.value = it } }
     }
 
-    fun openTranscript(pane: Pane) {
+    fun openTranscript(pane: Pane, structuredOverride: Boolean = false) {
         val path = pane.agentSessionPath
         val hostId = _state.value.activeId
         if (path == null || hostId == null) {
@@ -372,11 +378,11 @@ class HostsViewModel(
         }
         val tailer = manager.openTranscript(hostId, path)
         if (tailer == null) {
-            _transcript.value = TranscriptState(path = path, error = "主机未连接")
+            _transcript.value = TranscriptState(path = path, error = "主机未连接", structured = true)
             return
         }
         closeTranscriptInternal()
-        _transcript.value = TranscriptState(path = path, loading = true)
+        _transcript.value = TranscriptState(path = path, loading = true, structured = true)
         transcriptTailer = tailer
 
         transcriptObserve = viewModelScope.launch {
@@ -390,7 +396,11 @@ class HostsViewModel(
             while (true) {
                 val r = runCatching { tailer.sync() }
                 if (first) {
-                    _transcript.value = _transcript.value.copy(loading = false, error = r.exceptionOrNull()?.message)
+                    _transcript.value = _transcript.value.copy(
+                        loading = false,
+                        error = r.exceptionOrNull()?.message,
+                        truncated = tailer.backfillTruncated,
+                    )
                     first = false
                 }
                 kotlinx.coroutines.delay(1_500)

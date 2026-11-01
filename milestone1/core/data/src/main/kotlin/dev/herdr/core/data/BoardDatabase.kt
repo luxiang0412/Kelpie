@@ -28,6 +28,8 @@ data class PaneEntity(
     val cwd: String?,
     val revision: Long,
     val agentSessionPath: String? = null,
+    /** Claude 只上报会话 id（没有路径）；必须持久化，否则缓存往返后丢失（方案 C 依赖它）。 */
+    val agentSessionId: String? = null,
     val updatedAtMs: Long,
 )
 
@@ -124,7 +126,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {

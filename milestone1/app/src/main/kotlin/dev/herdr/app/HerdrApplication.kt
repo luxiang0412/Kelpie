@@ -29,6 +29,12 @@ class AppContainer(app: Application) {
     val prefs = AppPrefs(app)
     val hosts = HostRepository(app)
     val database: BoardDatabase = Room.databaseBuilder(app, BoardDatabase::class.java, "herdr.db")
+        // 3→4：panes 增加 agentSessionId（Claude 会话 id）；只加列，不清表
+        .addMigrations(object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE panes ADD COLUMN agentSessionId TEXT")
+            }
+        })
         .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
     val boards = BoardRepository(database.boardDao())

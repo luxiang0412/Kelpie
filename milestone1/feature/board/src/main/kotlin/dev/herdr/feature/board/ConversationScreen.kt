@@ -72,6 +72,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.Dispatchers
@@ -126,7 +127,9 @@ fun ConversationScreen(
         return
     }
     var searchOpen by remember(pane.paneId) { mutableStateOf(false) }
-    val hasTranscript = pane.agentSessionPath != null
+    // Claude 的会话文件由方案 C 定位，pane 上没有路径；以 transcript 状态为准
+    val hasTranscript = pane.agentSessionPath != null || transcript.structured
+    val truncatedStart = transcript.truncated
     val title = displayTitle(pane)
 
     Scaffold(
@@ -202,11 +205,14 @@ fun ConversationScreen(
                 }
             }
             when {
-                !hasTranscript -> TerminalFallback(output, onReload)
+                !hasTranscript -> TerminalFallback(output, onReload, transcript.error, pane.agentSessionId != null)
                 transcript.loading -> LoadingBlock("读取会话…")
                 transcript.error != null -> ErrorBlock(transcript.error, onReload)
                 transcript.messages.isEmpty() -> EmptyBlock("还没有消息。发一句话开始。")
-                else -> MessageList(transcript.messages, pane, onQuote, searchOpen) { searchOpen = false }
+                else -> MessageList(
+                    transcript.messages, pane, onQuote, searchOpen, { searchOpen = false },
+                    truncatedStart = truncatedStart,
+                )
             }
         }
     }
@@ -249,6 +255,7 @@ private fun MessageList(
     onQuote: (String) -> Unit,
     searchOpen: Boolean,
     onCloseSearch: () -> Unit,
+    truncatedStart: Boolean = false,
 ) {
     var highlight by remember { mutableStateOf<String?>(null) }
     val palette = LocalHerdrPalette.current
@@ -394,6 +401,18 @@ private fun MessageList(
             contentPadding = PaddingValues(horizontal = Space.page, vertical = Space.m),
             verticalArrangement = Arrangement.spacedBy(Space.m),
         ) {
+            if (truncatedStart) {
+                // 会话文件超过回填上限：如实说明只加载了最近一段，而不是假装完整
+                item(key = "truncated-notice") {
+                    Text(
+                        "只加载了最近的消息（更早的对话未下载）",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = palette.textSecondary,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = Space.s),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
             itemsIndexed(
                 items = items,
                 key = { _, it -> "${pane.paneId}-${it.index}" },
@@ -974,7 +993,12 @@ private fun CollapsibleRow(title: String, body: String, mono: Boolean = false, m
 }
 
 @Composable
-private fun TerminalFallback(output: String, onReload: () -> Unit) {
+private fun TerminalFallback(
+    output: String,
+    onReload: () -> Unit,
+    reason: String? = null,
+    hasSessionId: Boolean = false,
+) {
     val palette = LocalHerdrPalette.current
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -982,7 +1006,11 @@ private fun TerminalFallback(output: String, onReload: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "没有结构化会话（agent_session 未上报），下面是终端输出",
+                when {
+                    reason != null -> "未使用结构化对话：$reason"
+                    hasSessionId -> "未使用结构化对话（未定位到会话文件），下面是终端输出"
+                    else -> "没有结构化会话（agent_session 未上报），下面是终端输出"
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = palette.textSecondary,
                 modifier = Modifier.weight(1f),

@@ -24,11 +24,15 @@ class TranscriptTailer(
     private val store: TranscriptStore,
     private val hostId: String,
     private val path: String,
-    private val backfillBytes: Int = 256 * 1024,
-    private val maxDeltaBytes: Int = 1024 * 1024,
+    private val backfillBytes: Int = DEFAULT_BACKFILL,
+    private val maxDeltaBytes: Int = 2 * 1024 * 1024,
 ) : Closeable {
 
     private var sftp: SFTPClient? = null
+
+    /** 首次回填是否从文件中间开始（更早的消息没有加载）—— 用于 UI 如实提示。 */
+    var backfillTruncated: Boolean = false
+        private set
 
     /** 返回本次新增的消息条数；异常向上抛（调用方决定是否显示错误）。 */
     suspend fun sync(): Int = withContext(Dispatchers.IO) {
@@ -41,7 +45,10 @@ class TranscriptTailer(
 
         if (cursor == null) {
             // 首次：只回填尾部，避免把整个大文件拉下来
-            start = maxOf(0L, size - backfillBytes)
+            start = initialStart(size, backfillBytes)
+            // 从中间起读时必须跳到下一行行首，避免把半行 JSON 当数据
+            if (start > 0) start = skipToLineStart(client, start, size)
+            backfillTruncated = start > 0
             reset = true
         } else {
             if (size < start) reset = true
@@ -79,6 +86,34 @@ class TranscriptTailer(
         val added = store.append(hostId, path, messages)
         store.saveCursor(hostId, path, chunk.nextOffset, headHash)
         added
+    }
+
+    companion object {
+        /** 首次回填的起始偏移：默认只看尾部 [backfillBytes]，文件更小则从头读。 */
+        fun initialStart(size: Long, backfillBytes: Int = DEFAULT_BACKFILL): Long =
+            if (size <= backfillBytes) 0L else size - backfillBytes
+
+        const val DEFAULT_BACKFILL: Int = 1024 * 1024
+    }
+
+    /** 从 [offset] 起找到下一个 '
+' 之后的位置（最多探 8KB）。 */
+    private fun skipToLineStart(client: SFTPClient, offset: Long, size: Long): Long {
+        val probe = minOf(8L * 1024, size - offset).toInt()
+        if (probe <= 0) return size
+        val b = ByteArray(probe)
+        var read = 0
+        client.open(path, EnumSet.of(OpenMode.READ)).use { f ->
+            while (read < probe) {
+                val n = f.read(offset + read, b, read, probe - read)
+                if (n <= 0) break
+                read += n
+            }
+        }
+        for (i in 0 until read) {
+            if (b[i] == 0x0A.toByte()) return offset + i + 1
+        }
+        return size
     }
 
     private fun readHeadHash(client: SFTPClient, size: Long): String? {
