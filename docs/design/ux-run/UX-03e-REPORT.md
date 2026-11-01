@@ -19,3 +19,15 @@
   - **未实现**：`Resyncing` 显式状态；跨分支锚点失效时的用户可见说明（当前静默回退到最新）
   - **已知问题**：`DisposableEffect` 的 `onDispose` 里读取 `listState` 属于离开瞬间快照，可能与最后一帧略有偏差
 - commit：见提交
+
+
+---
+
+## 补充：`Resyncing` 状态已实现
+
+- `ConversationScreen` 新增参数 `resyncing: Boolean = false`；为 true 时在消息区顶部显示
+  一行低强调提示「重新同步中 · 下面显示的是已缓存内容」（保留缓存，不隐藏内容）
+- `AppRoot` 传入 `activeHost?.connKind != CONNECTED` —— 即连接非 CONNECTED（重连中/离线/失败）时为 true
+- 效果：断线重连期间**既不清空历史，也不假装是最新**
+- 验证：`:app:assembleDebug` OK；AVD 全量 UI **OK (26 tests)** 无回归
+- 仍未验证：真实断网重连时的视觉与滚动锚点（需要设备侧网络操作，且上次误关 WiFi 导致离线，已改用更安全方式）

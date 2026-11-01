@@ -101,6 +101,8 @@ fun ConversationScreen(
     onOpenTechSheet: () -> Unit,
     onBack: () -> Unit,
     onQuote: (String) -> Unit = {},
+    /** UX-03e：连接中断/重连中时为 true —— 保留缓存内容，但明确标注"正在重新同步"。 */
+    resyncing: Boolean = false,
 ) {
     val palette = LocalHerdrPalette.current
     if (pane == null) {
@@ -163,6 +165,16 @@ fun ConversationScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (pane.status == AgentStatus.BLOCKED) {
                 BlockedNotice()
+            }
+            if (resyncing) {
+                Surface(color = palette.surfaceRaised, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "重新同步中 · 下面显示的是已缓存内容",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = palette.textSecondary,
+                        modifier = Modifier.padding(horizontal = Space.page, vertical = Space.xs),
+                    )
+                }
             }
             when {
                 !hasTranscript -> TerminalFallback(output, onReload)

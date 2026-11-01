@@ -18,7 +18,7 @@
 | UX-03b Markdown/CodeBlock 视觉 | PASS | 引用 12dp、列表悬挂缩进、code 13/20、复制取源文 | `62d03a1` |
 | UX-03c Tool/Thinking/长输出 | PASS | 移除「失败」盲猜；状态仅 运行中/已返回；52dp 头部；不放假「查看全文」 | `62d03a1` |
 | UX-03d 复制/系统选择/更多 | PASS | `SelectionContainer` + 复制/更多操作条（CONV-ACTIONS-001）；3 项 UI 测试 | `ddb2fb8` |
-| UX-03e 阅读位置/新消息入口 | PARTIAL | 四状态 + 锚点(paneId-index+offset) + 未读；**`Resyncing` 未做、手势未实测** | `22c7a35` |
+| UX-03e 阅读位置/新消息入口 | PARTIAL | 五状态齐（含 Resyncing 提示）+ 锚点 + 未读；**手势未实测** | `22c7a35` + 本轮 |
 | UX-04a Composer 轻量双层 Surface | PASS | surface + 20/18dp 圆角 + 16/12dp 边距；无假 Mic/附件 | `017a24e` |
 | UX-04b 长 Prompt/草稿/发送异常 | PASS | 长编辑「取消」回退；完成只写草稿；三态不回归 | `8f580ce` |
 | UX-04c 引用消息 → Composer | PARTIAL | 追加式引用 + 8000 上限拒绝 + 不覆盖草稿；**光标处插入未做** | `8f580ce` |
