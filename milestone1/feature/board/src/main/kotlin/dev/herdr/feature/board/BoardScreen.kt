@@ -48,6 +48,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import dev.herdr.core.data.HostConnectionManager
 import dev.herdr.core.herdr.AgentStatus
@@ -92,6 +93,7 @@ fun BoardScreen(
     var showIdle by remember { mutableStateOf(true) }
     var showUnknown by remember { mutableStateOf(true) }
 
+    val hostLabel = active?.cfg?.label?.ifBlank { active.cfg.host } ?: "-"
     val panes = state.board.panes
     val blocked = panes.filter { it.status == AgentStatus.BLOCKED }
     val working = panes.filter { it.status == AgentStatus.WORKING }
@@ -102,16 +104,21 @@ fun BoardScreen(
     Scaffold(
         containerColor = palette.background,
         topBar = {
-            // UX-02a（BOARD-HOST-001）：主机选择器放到主标题**下方**，不再与标题抢横向空间；
-            // 高度由内容决定，320dp / fontScale 1.6 自动换行，不用固定高度 TopAppBar。
+            // 依据 ux-d0 原型 board-*.png 与 DESIGN-SYSTEM §4.1：
+            // 品牌小标 → 标题行 → 主机胶囊 + 右侧低强调连接摘要 → 1dp 分隔线
             Column(
                 Modifier
                     .fillMaxWidth()
                     .background(palette.background)
                     .statusBarsPadding()
-                    .padding(start = pageGutter, end = Space.s, top = Space.s),
+                    .padding(start = pageGutter, end = pageGutter, top = Space.s),
             ) {
-                // 窄屏/大字体下标题换行（而不是被省略成「Agent …」），高度由内容决定
+                Text(
+                    "HERDR",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = palette.textSecondary,
+                    letterSpacing = 2.sp,
+                )
                 val compactWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 360
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -129,55 +136,80 @@ fun BoardScreen(
                         modifier = Modifier.heightIn(min = 48.dp),
                     ) {
                         Text(
-                            if (state.board.refreshing) stringResource(R.string.board_refreshing) else stringResource(R.string.board_refresh),
+                            if (state.board.refreshing) stringResource(R.string.board_refreshing)
+                            else stringResource(R.string.board_refresh),
                             style = MaterialTheme.typography.labelLarge,
                         )
                     }
                 }
-                // 主机选择器：显示真实主机名（单主机也不伪装成“全部主机”）
-                Box {
-                    Row(
-                        Modifier
-                            .heightIn(min = 48.dp)
-                            .clip(RoundedCornerShape(Radius.chip))
-                            .clickable { hostMenu = true }
-                            .semantics {
-                                contentDescription =
-                                    "当前主机 ${active?.cfg?.label?.ifBlank { active.cfg.host } ?: "未选择"}，点击切换"
+                Spacer(Modifier.height(Space.xs))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box {
+                        Row(
+                            Modifier
+                                .heightIn(min = 40.dp)
+                                .clip(RoundedCornerShape(Radius.chip))
+                                .background(palette.surfaceRaised)
+                                .clickable { hostMenu = true }
+                                .semantics {
+                                    contentDescription = "当前主机 " +
+                                        (active?.cfg?.label?.ifBlank { active.cfg.host } ?: "未选择") + "，点击切换"
+                                }
+                                .padding(horizontal = Space.m, vertical = Space.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                active?.cfg?.label?.ifBlank { active.cfg.host }
+                                    ?: stringResource(R.string.board_host_pick),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = palette.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.width(Space.xs))
+                            DisclosureIndicator(expanded = false, tint = palette.textSecondary)
+                        }
+                        DropdownMenu(expanded = hostMenu, onDismissRequest = { hostMenu = false }) {
+                            state.hosts.forEach { h ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "${h.cfg.label.ifBlank { h.cfg.host }}  ·  ${connLabel(h.connKind)}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    },
+                                    onClick = { hostMenu = false; onSelectHost(h.cfg.id) },
+                                )
                             }
-                            .padding(horizontal = Space.s, vertical = Space.xs),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.board_host_manage), style = MaterialTheme.typography.bodyMedium) },
+                                onClick = { hostMenu = false; onOpenHosts() },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    // 右侧：低强调连接摘要（不是永久成功横幅，只在有主机时一行）
+                    if (active != null) {
+                        val connected = active.connKind == HostConnectionManager.ConnKind.CONNECTED
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .background(
+                                    if (connected) palette.statusFg(AgentStatus.DONE) else palette.statusFg(AgentStatus.WORKING),
+                                    CircleShape,
+                                ),
+                        )
+                        Spacer(Modifier.width(Space.xs))
                         Text(
-                            active?.cfg?.label?.ifBlank { active.cfg.host } ?: stringResource(R.string.board_host_pick),
+                            if (connected) "${active.paneCount} 个 Agent" else active.connText,
                             style = MaterialTheme.typography.labelSmall,
                             color = palette.textSecondary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        Spacer(Modifier.width(Space.xs))
-                        DisclosureIndicator(expanded = false, tint = palette.textSecondary)
-                    }
-                    DropdownMenu(expanded = hostMenu, onDismissRequest = { hostMenu = false }) {
-                        state.hosts.forEach { h ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        "${h.cfg.label.ifBlank { h.cfg.host }}  ·  ${connLabel(h.connKind)}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                },
-                                onClick = { hostMenu = false; onSelectHost(h.cfg.id) },
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.board_host_manage), style = MaterialTheme.typography.bodyMedium) },
-                            onClick = { hostMenu = false; onOpenHosts() },
                         )
                     }
                 }
-                Spacer(Modifier.height(Space.xs))
+                Spacer(Modifier.height(Space.s))
                 HorizontalDivider(color = palette.borderSubtle)
             }
         },
@@ -223,18 +255,18 @@ fun BoardScreen(
                     if (blocked.isNotEmpty()) {
                         item(key = "sec-blocked") { SectionHeader(StatusText.section(AgentStatus.BLOCKED), blocked.size) }
                         items(blocked.take(2), key = { "b-${it.paneId}" }) { pane ->
-                            AttentionCard(pane, onSelectAgent)
+                            AttentionCard(pane, hostLabel, onSelectAgent)
                         }
                         if (blocked.size > 2) {
                             items(blocked.drop(2), key = { "bc-${it.paneId}" }) { pane ->
-                                CompactAgentRow(pane, Palette.blocked, onSelectAgent)
+                                CompactAgentRow(pane, hostLabel, onSelectAgent)
                             }
                         }
                     }
                     if (working.isNotEmpty()) {
                         item(key = "sec-working") { SectionHeader(StatusText.section(AgentStatus.WORKING), working.size) }
                         items(working, key = { "w-${it.paneId}" }) { pane ->
-                            CompactAgentRow(pane, Palette.working, onSelectAgent)
+                            CompactAgentRow(pane, hostLabel, onSelectAgent)
                         }
                     }
                     if (done.isNotEmpty()) {
@@ -245,7 +277,7 @@ fun BoardScreen(
                         }
                         if (showDone) {
                             items(done, key = { "d-${it.paneId}" }) { pane ->
-                                CompactAgentRow(pane, Palette.done, onSelectAgent)
+                                CompactAgentRow(pane, hostLabel, onSelectAgent)
                             }
                         }
                     }
@@ -258,7 +290,7 @@ fun BoardScreen(
                         }
                         if (showIdle) {
                             items(idle, key = { "i-${it.paneId}" }) { pane ->
-                                CompactAgentRow(pane, Palette.muted, onSelectAgent)
+                                CompactAgentRow(pane, hostLabel, onSelectAgent)
                             }
                         }
                     }
@@ -270,7 +302,7 @@ fun BoardScreen(
                         }
                         if (showUnknown) {
                             items(unknown, key = { "u-${it.paneId}" }) { pane ->
-                                CompactAgentRow(pane, Palette.muted, onSelectAgent)
+                                CompactAgentRow(pane, hostLabel, onSelectAgent)
                             }
                         }
                     }
@@ -405,7 +437,7 @@ private fun SectionHeader(title: String, count: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = SectionTitleStyle, color = palette.textPrimary)
-        Spacer(Modifier.width(Space.s))
+        Spacer(Modifier.weight(1f))
         Text("$count", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
     }
 }
@@ -424,75 +456,79 @@ private fun CollapsibleHeader(title: String, count: Int, expanded: Boolean, onTo
         Spacer(Modifier.width(Space.s))
         Text("$count", style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
         Spacer(Modifier.weight(1f))
-        Text(if (expanded) stringResource(R.string.board_collapse) else stringResource(R.string.board_expand), style = MaterialTheme.typography.labelMedium, color = palette.textSecondary)
+        DisclosureIndicator(expanded = expanded, tint = palette.textSecondary)
     }
 }
 
-/** blocked 卡片：可读的内容区，而不是密集列表行。 */
+/**
+ * blocked 卡片（ux-d0 原型 board-*.png + BOARD-SPEC §4）：
+ * eyebrow（真实状态词）+ 任务标题 + meta（Agent · 项目 · 主机），右上角是 Agent 名。
+ * 没有可靠的"等待原因/等待时长"字段，因此**不编造摘要**。
+ */
 @Composable
-private fun AttentionCard(pane: Pane, onSelectAgent: (Pane) -> Unit) {
+private fun AttentionCard(pane: Pane, hostLabel: String, onSelectAgent: (Pane) -> Unit) {
     val palette = LocalHerdrPalette.current
+    val statusLabel = StatusText.label(pane.status)
     Surface(
-        color = palette.surface,
+        color = palette.statusBg(AgentStatus.BLOCKED),
         shape = RoundedCornerShape(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, palette.borderSubtle),
+        border = androidx.compose.foundation.BorderStroke(1.dp, palette.statusFg(AgentStatus.BLOCKED).copy(alpha = 0.35f)),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onSelectAgent(pane) }
             .semantics {
-                contentDescription =
-                    "需要你处理的 agent ${pane.agent ?: ""}，${pane.title ?: pane.paneId}，点击进入对话"
+                contentDescription = "$statusLabel，${pane.agent ?: ""}，${pane.title ?: pane.paneId}，点击进入对话"
             },
     ) {
-        Row(Modifier.padding(Space.l), verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(Space.l)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "需要你",
-                        style = MaterialTheme.typography.labelMedium,
+                        statusLabel,
+                        style = MaterialTheme.typography.labelSmall,
                         color = palette.statusFg(AgentStatus.BLOCKED),
                         fontWeight = FontWeight.SemiBold,
                     )
-                    Spacer(Modifier.width(Space.s))
+                    Spacer(Modifier.height(Space.xs))
                     Text(
-                        "等待时间未知",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = palette.textSecondary,
+                        displayTitle(pane),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = palette.textPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.height(Space.xs))
                 Text(
-                    displayTitle(pane),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = palette.textPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(Space.xs))
-                Text(
-                    "正在等待下一步指令",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = palette.textSecondary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(Space.s))
-                Text(
-                    projectLine(pane),
+                    (pane.agent ?: "agent").replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.labelSmall,
                     color = palette.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            ChevronAffordance()
+            Spacer(Modifier.height(Space.s))
+            Text(
+                metaLine(pane, hostLabel),
+                style = MaterialTheme.typography.labelSmall,
+                color = palette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
-/** 其余状态：紧凑行，一屏尽量多。 */
+/** Agent · 项目 · 主机（全部来自真实字段）。 */
+internal fun metaLine(pane: Pane, hostLabel: String): String {
+    val agent = pane.agent?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: "Agent"
+    val project = pane.cwd?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: pane.workspaceId
+    return listOf(agent, project, hostLabel).filter { it.isNotBlank() }.joinToString(" · ")
+}
+
+/**
+ * 紧凑行（ux-d0 原型 board-*.png）：40dp 圆角图标块 + 任务标题 + meta（Agent · 项目 · 主机）+ chevron。
+ * 状态只用一处语义色（文字），图标块与 chevron 保持中性。
+ */
 @Composable
-private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pane) -> Unit) {
+private fun CompactAgentRow(pane: Pane, hostLabel: String, onSelectAgent: (Pane) -> Unit) {
     val palette = LocalHerdrPalette.current
     val statusLabel = StatusText.label(pane.status)
     Row(
@@ -500,15 +536,28 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
             .fillMaxWidth()
             .clickable { onSelectAgent(pane) }
             .heightIn(min = 64.dp)
-            .padding(horizontal = Space.s, vertical = Space.m)
+            .padding(vertical = Space.s)
             .semantics(mergeDescendants = true) {
-                contentDescription =
-                    "$statusLabel，agent ${pane.agent ?: ""}，${pane.title ?: pane.paneId}，${projectLine(pane)}"
+                contentDescription = "$statusLabel，${pane.agent ?: ""}，${pane.title ?: pane.paneId}，${metaLine(pane, hostLabel)}"
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(palette.surfaceRaised),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_tool),
+                contentDescription = null,
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(palette.textSecondary),
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(Space.m))
         Column(Modifier.weight(1f)) {
-            // BOARD-SPEC §2.2 强弱顺序：任务标题 → 状态 → Agent/项目/主机
             Text(
                 displayTitle(pane),
                 style = MaterialTheme.typography.titleSmall,
@@ -517,38 +566,17 @@ private fun CompactAgentRow(pane: Pane, status: AgentStatus, onSelectAgent: (Pan
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // 状态必须有文字（不只靠颜色）；整行只保留这一处强语义色
-                Text(
-                    statusLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = palette.statusFg(pane.status),
-                )
-                Spacer(Modifier.width(Space.s))
-                Text(
-                    projectLine(pane),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = palette.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-            }
+            Text(
+                metaLine(pane, hostLabel),
+                style = MaterialTheme.typography.labelSmall,
+                color = palette.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
+        Spacer(Modifier.width(Space.s))
         ChevronAffordance()
     }
-}
-
-@Composable
-private fun StatusDot(status: AgentStatus) {
-    val palette = LocalHerdrPalette.current
-    val statusLabel = StatusText.label(status)
-    Box(
-        Modifier
-            .size(10.dp)
-            .background(palette.statusFg(status), CircleShape)
-            .semantics { contentDescription = statusLabel },
-    )
 }
 
 @Composable

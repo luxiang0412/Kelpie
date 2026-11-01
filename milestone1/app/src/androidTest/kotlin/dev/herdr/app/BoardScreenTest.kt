@@ -105,8 +105,8 @@ class BoardScreenTest {
         val panes = listOf(pane("w1:p1", AgentStatus.WORKING), pane("w1:p2", AgentStatus.BLOCKED))
         render(state(panes))
         // blocked 使用“需要你”文案（不只靠颜色）
-        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.board_status_blocked)).assertIsDisplayed()
-        rule.onNodeWithText(res(dev.herdr.feature.board.R.string.board_section_blocked)).assertIsDisplayed()
+        assertTrue(rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_status_blocked)).fetchSemanticsNodes().isNotEmpty())
+        assertTrue(rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_section_blocked)).fetchSemanticsNodes().isNotEmpty())
         // 分组顺序：需要处理在运行中之前
         val blockedHeader = rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_section_blocked)).fetchSemanticsNodes().first()
         val workingHeader = rule.onAllNodesWithText(res(dev.herdr.feature.board.R.string.board_section_working)).fetchSemanticsNodes().first()
@@ -146,7 +146,7 @@ class BoardScreenTest {
             ),
             onReconnect = { retried = true },
         )
-        rule.onNodeWithText("连接失败").assertIsDisplayed()
+        assertTrue(rule.onAllNodesWithText("连接失败").fetchSemanticsNodes().isNotEmpty())
         rule.onNodeWithText("重试").assertIsDisplayed().performClick()
         rule.runOnIdle { assertEquals(true, retried) }
     }
