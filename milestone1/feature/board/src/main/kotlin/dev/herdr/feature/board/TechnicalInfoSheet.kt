@@ -88,6 +88,13 @@ fun TechnicalInfoSheet(
                 }
             }
             Spacer(Modifier.height(Space.s))
+            // 原 Composer 常驻的安全说明移到这里（COMPOSER-SPEC §2.1：默认不占屏）
+            Text(
+                stringResource(R.string.composer_footnote),
+                style = MaterialTheme.typography.labelSmall,
+                color = palette.textSecondary,
+            )
+            Spacer(Modifier.height(Space.s))
             Text("状态：${StatusText.label(pane.status)}", style = MaterialTheme.typography.bodyMedium, color = palette.textSecondary)
             Text("主机：$hostLabel", style = MaterialTheme.typography.bodyMedium, color = palette.textSecondary)
             Text(

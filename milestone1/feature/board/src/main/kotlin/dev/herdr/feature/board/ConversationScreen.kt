@@ -1184,14 +1184,8 @@ private fun ComposerBar(
                 }
             }
         }
-        Text(
-            stringResource(R.string.composer_footnote),
-            style = MaterialTheme.typography.labelSmall,
-            color = palette.textSecondary,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
-        )
+        // COMPOSER-SPEC §2.1：默认不显示常驻说明文案（高频无效信息）。
+        // 安全说明移到「技术信息」页常驻，发送结果相关文案仍按状态临时出现。
         }
     }
 
