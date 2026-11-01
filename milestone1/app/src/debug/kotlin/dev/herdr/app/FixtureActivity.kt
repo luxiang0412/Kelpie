@@ -105,9 +105,16 @@ object Fixtures {
                 4 -> ChatMessage(ChatMessage.Kind.ASSISTANT, "继续看第 $i 条的 *边界情况*，顺便验证链接 [不安全示例](javascript:alert(1)) 不会被点击。")
                 5 -> ChatMessage(
                     ChatMessage.Kind.TOOL_RESULT,
-                    "src/module$i/Main.kt:3:import kotlinx.coroutines.*\nsrc/module$i/Util.kt:9:import java.io.File\n".repeat(3) +
-                        "Error: 第 $i 条里有一个警告\n",
-                    toolCallId = "call-$i",
+                    // 每 20 条里有一条**超过 12 行**的输出，用于验证「查看完整输出」页
+                    if (i % 20 == 5) {
+                        (1..20).joinToString("") { n ->
+                            "src/module$i/File$n.kt:$n: import kotlinx.coroutines.*  // 第 $n 行输出\n"
+                        } + "Error: 第 $i 条里有一个警告（长输出，用于验证完整输出页）\n"
+                    } else {
+                        "src/module$i/Main.kt:3:import kotlinx.coroutines.*\nsrc/module$i/Util.kt:9:import java.io.File\n".repeat(3) +
+                            "Error: 第 $i 条里有一个警告\n"
+                    },
+                    toolCallId = "call-${i - 2}",
                 )
                 6 -> ChatMessage(ChatMessage.Kind.ASSISTANT, LONG_TEXT)
                 7 -> ChatMessage(ChatMessage.Kind.ASSISTANT, "```kotlin\n$LONG_CODE\n```")
