@@ -15,11 +15,13 @@
 
 ## 安装与使用
 
-1. 装 `dist/kelpie-<版本>.apk`（自己构建见下面；需要 Android 8.0+）。
-2. 在每台开发机上运行配对脚本，手机扫二维码添加主机，见 [`companion/README.md`](companion/README.md)。
-3. 想在手机上批准 agent 的命令：装审批 hook，见同一份文档（目前还没有安装脚本）。
+没有单独的服务端：手机直接用 SSH 连开发机，调用 herdr 自带的接口。
 
-开发机要能用 SSH 从手机连到，并且装好 herdr（默认找 `~/.local/bin/herdr`）。
+1. **开发机**：SSH 能从手机连到；装 herdr 0.9.5（协议 22），会话一直开着，agent 在 herdr 里启动；装 herdr 的 claude / codex / pi 集成。
+2. **手机**：装 `dist/kelpie-<版本>.apk`（Android 8.0+），在开发机上运行配对脚本，手机扫码添加主机。
+3. 可选：装审批 hook，就能在手机上批准 agent 运行命令（目前还没有安装脚本）。
+
+每一步的具体做法、自查清单和常见问题见 [`docs/setup.md`](docs/setup.md)。
 
 ## 快速开始（开发）
 

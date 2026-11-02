@@ -2,6 +2,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [setup.md](setup.md) | 安装与配置：开发机要准备什么（SSH、herdr、集成）、手机设置、常见问题 |
 | [development.md](development.md) | 开发指南：构建、测试、发版与签名、调试技巧、多语言、性能数据 |
 | [design-spec.md](design-spec.md) | 设计规范：信息架构、视觉 token、各页面规格 |
 | [herdr-api.md](herdr-api.md) | 客户端用到的 herdr 远程接口，以及还缺什么 |
