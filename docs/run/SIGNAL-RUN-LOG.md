@@ -184,3 +184,32 @@ OpenRouter 用量：0.1115 → 0.1220 美元。沙箱 pane `w8:p2` 暂时保留�
 5. 手机息屏时间现在是“永不”（夜里 00:30 时还是 30 分钟）。我没改过这个设置，如果不是你改的请看一下。
 
 **资源：** OpenRouter 用量 0.1115 → 0.1256 美元（整夜约 1.4 美分）。.2 的 `test` 会话里新建的沙箱 tab `w8:t2` 已关闭；`~/spike-sandbox/.claude-signal`（隔离配置，含 hook）保留着，以后还能接着实验，不要了可以直接删。没碰过 `~/.claude`、authorized_keys、herdr 配置和其他会话。
+
+## Codex 适配（2026-11-03 06:00–06:35，用户确认后进行）
+
+用户 06:1x 确认：可以在 `test` 会话新开 1 个沙箱 pane；Codex 用 OpenRouter 登录（不复制 `~/.codex/auth.json`）。
+
+**提交：** ec15f78、0c31ffd、10e3e71（读 Codex 会话文件）、3061534（Codex 手机审批），以及本条文档。
+
+### 远端操作（.2）
+
+| 时间 | 目标 | 操作 |
+|---|---|---|
+| 06:0x | `~/.codex` | 只读：统计 `sessions/` 下的 rollout 格式；读 `hooks.json`、`config.toml` 前 20 行、herdr 的 `herdr-agent-state.sh`；`strings` 查 codex 二进制里的 hook schema。复制 30 个 rollout 到本机 scratchpad 做解析测试，测完已删除 |
+| 06:18 | `~/spike-sandbox/.codex-signal`、`~/spike-sandbox/codex-work` | 新建隔离 CODEX_HOME：config.toml（OpenRouter，key 从环境变量读）、hooks.json（PermissionRequest → signal_approve.py；SessionStart → 引用 herdr 现有脚本，不改它）、run-codex.sh |
+| 06:18 | 无头 | `codex exec "reply with just KEY-OK"`（第一次报 `untrusted` 不再支持，改 `on-request` 后通过） |
+| 06:18:56 | `test` 会话 | **新建 tab `w8:t3`（pane `w8:p3`）**，cwd ~/spike-sandbox/codex-work，标签 signal-codex |
+| 06:19 | w8:p3 | 启动 run-codex.sh；“Hooks need review”选“Trust all and continue”（只是沙箱里的两个 hook） |
+| 06:19–06:29 | w8:p3 | 发 6 条提示词，都是“运行 touch <文件>”；Esc ×4（取消等待中的请求 / 拒绝终端确认框） |
+| 06:20 | 手机 | 允许 `touch hello.txt`（创建了，空文件）；拒绝 `touch denied.txt` |
+| 06:25 | approvals | 手动删除 Esc 测试遗留的 `0643c927c3f8d96d.req`（修复前的 bug） |
+| 06:26 | 沙箱 | 用修复后的 signal_approve.py 覆盖沙箱里的副本 |
+| 06:32:20 | w8:p3 | Codex `/exit`；**关闭 tab `w8:t3`** |
+| 06:32 | 进程 | 沙箱 Codex 自己拉起的 app-server 守护进程（2 个，CODEX_HOME 指向沙箱）发 SIGTERM 停掉；你自己的 Codex 守护进程（pid 3682734）没动 |
+| 06:33 | 沙箱 | 删除 `~/spike-sandbox/.codex-signal/packages`（Codex 下载的 517 MB 程序副本；再运行会重新下载） |
+
+**本机：** 06:1x 本地测试 hook 时没有清掉 `HERDR_*` 环境变量，hook 往我自己所在的本地 herdr pane（`wB5:p1`）写了一个 `sa_…` token，随后又自己清掉了。之后的本地测试都先 `unset HERDR_*`。
+
+OpenRouter 用量：0.1256 → 0.1400 美元。
+
+**留在 .2 上的：** `~/spike-sandbox/.codex-signal`（214 MB，配置、hook、会话记录、日志库）、`~/spike-sandbox/codex-work/hello.txt`。不要了可以直接删。
