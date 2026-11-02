@@ -255,3 +255,4 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
   两台的指纹和本机 `known_hosts` 里早先核对过的一致（.2 `lfFYDn…G0T8`，.3 `I70h1U…Mx2is`），才在界面上点了信任。
 - 发现调试导入的 bug：几台主机共用一个密钥文件时，导入第一台就删了文件，第二台没有密钥。改成全部导入完再删，重装后验证 .3 拿到了密钥。
 - 首页“Kelpie”标题、两台主机在线；Codex 对话（wA）正常显示。旧的 Herdr Signal 几个包还装在手机上，没有卸载。
+- 07:3x 用户要求：卸载了手机上所有旧包（`dev.herdr.signal` / `.debug` / `.min`、`dev.herdr.app`、几个测试包），只剩 `io.github.luxiang0412.kelpie.min`。
