@@ -82,4 +82,28 @@ class WriteLedgerPersistTest {
         restored.restore(listOf(rec.copy(outcome = WriteOutcome.Accepted)))
         assertEquals(null, restored.get(rec.clientRequestId))
     }
+
+    @Test
+    fun pendingAtRestartBecomesUnknownNeverReplayed() {
+        val l = WriteLedger()
+        val rec = l.begin("agent.prompt", "h1/w1:p1", "hi".toByteArray())
+        val restored = WriteLedger()
+        restored.restore(listOf(rec), "closed while sending")
+        assertEquals(WriteOutcome.Unknown("closed while sending"), restored.get(rec.clientRequestId)!!.outcome)
+        assertEquals(false, restored.autoRetryAllowed(rec.clientRequestId))
+    }
+
+    @Test
+    fun acknowledgedUnknownIsDroppedFromPersistence() {
+        val sink = FakeSink()
+        val l = WriteLedger(sink = sink)
+        val a = l.begin("agent.prompt", "h1/w1:p1", "a".toByteArray())
+        val b = l.begin("agent.prompt", "h1/w1:p2", "b".toByteArray())
+        l.markUnknown(a.clientRequestId, "timeout")
+        l.acknowledge(b.clientRequestId) // Pending：还在等网络结果，不能丢
+        assertEquals(setOf(a.clientRequestId, b.clientRequestId), sink.pending.map { it.clientRequestId }.toSet())
+        l.acknowledge(a.clientRequestId)
+        assertEquals(listOf(b.clientRequestId), sink.pending.map { it.clientRequestId })
+        assertEquals(null, l.get(a.clientRequestId))
+    }
 }

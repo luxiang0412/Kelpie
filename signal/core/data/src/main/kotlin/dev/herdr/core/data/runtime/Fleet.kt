@@ -15,6 +15,7 @@ import dev.herdr.core.ssh.SshConnection
 import dev.herdr.core.ssh.SshConnector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,9 +51,14 @@ class Fleet(
 ) {
     data class Transition(val key: AgentKey, val hostLabel: String, val pane: Pane, val toBlocked: Boolean, val completed: Boolean)
 
-    private val runtimes = LinkedHashMap<String, HostRuntime>()
-    private val watchers = HashMap<String, Job>()
+    /**
+     * 主机表：只在 [lock] 里整体替换成新的只读 Map，读的一方（10 秒对账、界面线程、Sender 等）
+     * 拿到的永远是完整的一版，不会撞上“改了一半”的 HashMap。
+     */
+    @Volatile private var runtimes: Map<String, HostRuntime> = emptyMap()
+    private val watchers = HashMap<String, Job>() // 只在 lock 里 / stop() 里动
     private val inputs = MutableStateFlow<Map<String, HostInput>>(emptyMap())
+    /** 各主机的收集协程会同时更新它：所有访问都在 synchronized(tracker) 里。 */
     private val tracker = AttentionTracker()
     private val lock = Mutex()
 
@@ -91,9 +97,10 @@ class Fleet(
 
     fun stop() {
         ticker?.cancel(); ticker = null
-        runtimes.values.forEach { it.stop() }
-        watchers.values.forEach { it.cancel() }
-        runtimes.clear(); watchers.clear()
+        val rts = runtimes
+        runtimes = emptyMap()
+        rts.values.forEach { it.stop() }
+        synchronized(watchers) { watchers.values.forEach { it.cancel() }; watchers.clear() }
         started = false
     }
 
@@ -120,11 +127,13 @@ class Fleet(
 
     private suspend fun sync(list: List<HostRepository.HostConfig>) = lock.withLock {
         val ids = list.map { it.id }.toSet()
+        val next = LinkedHashMap(runtimes)
         // 删除 / 配置变化的主机：停掉
-        runtimes.entries.removeAll { (id, rt) ->
+        next.entries.removeAll { (id, rt) ->
             val gone = id !in ids || list.first { it.id == id } != rt.cfg
             if (gone) {
-                rt.stop(); watchers.remove(id)?.cancel(); tracker.forgetHost(id)
+                rt.stop(); synchronized(watchers) { watchers.remove(id)?.cancel() }
+                synchronized(tracker) { tracker.forgetHost(id) }
                 hostKeyQueue.update { it - id }
                 inputs.update { it - id }
                 _links.update { it - id }
@@ -132,13 +141,14 @@ class Fleet(
             gone
         }
         list.forEach { cfg ->
-            if (cfg.id in runtimes) return@forEach
+            if (cfg.id in next) return@forEach
             val rt = HostRuntime(cfg, hosts, connectorFor(cfg.id), scope) { prompt ->
                 hostKeyQueue.update { q -> if (prompt != null) q + (cfg.id to prompt) else q - cfg.id }
             }
-            runtimes[cfg.id] = rt
-            watchers[cfg.id] = scope.launch { watch(rt) }
+            next[cfg.id] = rt
+            synchronized(watchers) { watchers[cfg.id] = scope.launch { watch(rt) } }
         }
+        runtimes = next
         recompute()
     }
 
@@ -150,7 +160,10 @@ class Fleet(
         recompute()
 
         rt.start()
-        scope.launch {
+        // 两个收集都是本 watcher 的子协程：主机被删除 / 配置变化时 watcher 一取消，它们一起停，
+        // 不会有旧连接的状态写进同一个主机 id
+        coroutineScope {
+        launch {
             rt.state.collect { st ->
                 val link = HostRuntime.link(st, hosts.hasKey(id))
                 _links.update { it + (id to link) }
@@ -162,12 +175,12 @@ class Fleet(
             }
         }
         // supervisor.start() 之后 reconciler 才可用
-        val rec = rt.reconciler ?: return
+        val rec = rt.reconciler ?: return@coroutineScope
         rec.state.collect { rs ->
             if (rs.fetchedAtMs <= 0) return@collect
             val now = clock()
             val reach = _links.value[id]?.reach ?: HostReach.Online
-            val trs = if (!rs.stale) tracker.update(id, rs.panes, now) else emptyList()
+            val trs = if (!rs.stale) synchronized(tracker) { tracker.update(id, rs.panes, now) } else emptyList()
             inputs.update { it + (id to HostInput(id, rt.cfg.label, if (rs.stale) HostReach.Unreachable else reach, rs.panes, rs.fetchedAtMs)) }
             recompute()
             trs.forEach { t ->
@@ -179,12 +192,14 @@ class Fleet(
                 boards.replace(id, rt.cfg.session, rs.panes, rs.version, rs.protocol, rs.fetchedAtMs, rs.stale, rs.lastError)
             }.onFailure { Log.w(TAG, "persist failed: ${it.message}") }
         }
+        }
     }
 
     private fun recompute() {
         val order = runtimes.keys.toList()
         val list = order.mapNotNull { inputs.value[it] }
-        _home.value = HomeDerivation.derive(list, tracker.snapshot(), clock())
+        val snap = synchronized(tracker) { tracker.snapshot() }
+        _home.value = HomeDerivation.derive(list, snap, clock())
     }
 
     /** 单测 / 调试：直接读派生输入。 */

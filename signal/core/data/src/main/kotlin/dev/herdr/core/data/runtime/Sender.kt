@@ -7,6 +7,7 @@ import dev.herdr.core.data.drafts.DraftKey
 import dev.herdr.core.data.drafts.SendTargetCheck
 import dev.herdr.core.herdr.PendingWriteSink
 import dev.herdr.core.herdr.WriteLedger
+import dev.herdr.core.herdr.WriteOutcome
 import dev.herdr.core.herdr.WriteRecord
 import dev.herdr.core.ssh.SshFailure
 import kotlinx.coroutines.CoroutineScope
@@ -57,7 +58,21 @@ class Sender(
     /** 每个 pane 最近一次发送。 */
     val records: StateFlow<Map<AgentKey, SendRecord>> = _records.asStateFlow()
 
-    fun restore(pending: List<WriteRecord>) = ledger.restore(pending)
+    /**
+     * 进程重建后：未确认的写操作回到账本，**也回到界面**（首页“结果未知”），否则用户看不到。
+     * 目标写成 `<hostId>/<paneId>`；旧格式（只有 paneId）找不到主机，只留在账本里。
+     */
+    fun restore(pending: List<WriteRecord>) {
+        ledger.restore(pending, t("发送时 App 被关闭", "The app was closed while sending"))
+        val restored = pending.mapNotNull { ledger.get(it.clientRequestId) }
+            .filter { it.outcome is WriteOutcome.Unknown }
+            .mapNotNull { r ->
+                val key = targetKey(r.target) ?: return@mapNotNull null
+                SendRecord(r.clientRequestId, key, "", Receipt.Unknown((r.outcome as WriteOutcome.Unknown).reason), r.sentAtMs)
+            }
+            .groupBy { it.key }.mapValues { (_, v) -> v.maxBy { it.atMs } }
+        if (restored.isNotEmpty()) _records.update { cur -> restored + cur } // 已有的（这次进程里发的）优先
+    }
 
     /**
      * 校验目标；通过才真正发送。
@@ -82,7 +97,7 @@ class Sender(
         }
         val api = fleet.runtime(key.hostId)?.api() ?: return SendBlocked("not_connected", t("主机未连接", "Host not connected"), false)
 
-        val rec = ledger.begin("agent.prompt", key.paneId, body.toByteArray())
+        val rec = ledger.begin("agent.prompt", target(key), body.toByteArray())
         val id = rec.clientRequestId
         put(SendRecord(id, key, body, Receipt.Sending, clock()))
         scope.launch {
@@ -98,7 +113,11 @@ class Sender(
         return null
     }
 
-    fun dismiss(key: AgentKey) = _records.update { it - key }
+    /** 用户关掉了回执（含“结果未知”）：Unknown 同时从账本确认掉，重启后不再出现。 */
+    fun dismiss(key: AgentKey) {
+        _records.value[key]?.let { if (it.receipt is Receipt.Unknown) ledger.acknowledge(it.id) }
+        _records.update { it - key }
+    }
 
     private fun classify(id: String, e: Throwable): Receipt = when (e) {
         is SshFailure.Protocol -> {
@@ -114,9 +133,20 @@ class Sender(
         }
     }
 
-    private fun put(r: SendRecord) = _records.update { it + (r.key to r) }
+    private fun put(r: SendRecord) {
+        // 对同一个 agent 发了新消息 = 用户已经处理过上一条“结果未知”
+        _records.value[r.key]?.let { old -> if (old.id != r.id && old.receipt is Receipt.Unknown) ledger.acknowledge(old.id) }
+        _records.update { it + (r.key to r) }
+    }
 
     companion object {
+        fun target(key: AgentKey) = "${key.hostId}/${key.paneId}"
+        fun targetKey(target: String): AgentKey? {
+            val i = target.indexOf('/')
+            if (i <= 0 || i == target.length - 1) return null
+            return AgentKey(target.substring(0, i), target.substring(i + 1))
+        }
+
         fun occupancyOf(p: dev.herdr.core.herdr.Pane?) = p?.let { DraftKey.occupancyFingerprint(it) }
     }
 }

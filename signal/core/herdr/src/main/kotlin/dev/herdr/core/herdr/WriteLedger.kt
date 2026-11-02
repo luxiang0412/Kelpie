@@ -46,12 +46,26 @@ class WriteLedger(
     private val records = LinkedHashMap<String, WriteRecord>()
 
     /** 进程重建后恢复未确认的写操作（不会被自动重放）。 */
-    fun restore(pending: List<WriteRecord>) {
+    fun restore(pending: List<WriteRecord>, restartReason: String = "app restarted while sending") {
         pending.forEach { rec ->
-            if (rec.outcome is WriteOutcome.Pending || rec.outcome is WriteOutcome.Unknown) {
-                records[rec.clientRequestId] = rec
+            when (rec.outcome) {
+                is WriteOutcome.Unknown -> records[rec.clientRequestId] = rec
+                // 进程被杀时还在发送：远端可能已经执行，只能算 Unknown，绝不重放
+                is WriteOutcome.Pending -> records[rec.clientRequestId] = rec.copy(outcome = WriteOutcome.Unknown(restartReason))
+                else -> Unit
             }
         }
+        notifySink()
+    }
+
+    /**
+     * 用户已经知道这条写操作的结果未知并自行处理了（关掉提示、或者已经对同一个目标发了新消息）：
+     * 从账本里移除，不再落盘，进程重建后也不会再提示。只对 Unknown 有效；Pending 还在等网络结果，不能丢。
+     */
+    fun acknowledge(id: String) {
+        val r = records[id] ?: return
+        if (r.outcome !is WriteOutcome.Unknown) return
+        records.remove(id)
         notifySink()
     }
 
