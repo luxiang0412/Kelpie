@@ -35,6 +35,11 @@ data class Pane(
     /** herdr 的单调序号：完成一次 turn 就 +1（用于“完成”提醒，避免采样漏掉 done→working→done）。 */
     val completionSeq: Long? = null,
     val stateChangeSeq: Long? = null,
+    /**
+     * 审批 hook（Herdr Signal 的 signal_approve.py）挂在 pane 上的待批准请求 id：
+     * pane `tokens` 里以 `sa_` 开头的键的值。用来立刻发现新请求，并判断目录里的请求是否已经失效。
+     */
+    val pendingApprovals: Set<String> = emptySet(),
 )
 
 data class SessionSnapshot(

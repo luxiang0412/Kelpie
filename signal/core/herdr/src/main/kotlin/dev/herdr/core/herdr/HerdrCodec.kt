@@ -101,6 +101,10 @@ object HerdrCodec {
                 revision = p["revision"]?.jsonPrimitive?.longOrNull ?: 0L,
                 completionSeq = agentMeta[paneId]?.completionSeq,
                 stateChangeSeq = agentMeta[paneId]?.stateSeq,
+                pendingApprovals = (p["tokens"] as? JsonObject)
+                    ?.filterKeys { it.startsWith("sa_") }
+                    ?.values?.mapNotNull { runCatching { it.jsonPrimitive.contentOrNullSafe() }.getOrNull() }
+                    ?.toSet() ?: emptySet(),
                 agentSessionPath = sessionByPane[paneId]
                     ?: p["agent_session"]?.jsonObject?.let { sess ->
                         val kind = sess["kind"]?.jsonPrimitive?.contentOrNullSafe()

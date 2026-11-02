@@ -46,6 +46,13 @@ class ApprovalCenter(
     fun setActive(active: Boolean) {
         if (active && job?.isActive != true) {
             job = scope.launch {
+                // snapshot 里出现新的审批 token（hook 刚写了请求）：立刻读，不等下一个 3 秒
+                launch {
+                    fleet.home
+                        .map { h -> h.hosts.flatMap { host -> host.panes.flatMap { p -> p.pendingApprovals.map { "${host.hostId}/$it" } } }.toSet() }
+                        .distinctUntilChanged()
+                        .collect { if (it.isNotEmpty()) pollOnce() else pruneByTokens() }
+                }
                 // 冷启动时第一次轮询往往早于 SSH 连上：有主机新上线就立刻补一次，不等下一个 3 秒
                 launch {
                     fleet.links
@@ -71,14 +78,35 @@ class ApprovalCenter(
      */
     suspend fun pollOnce() = pollLock.withLock {
         val previous = _items.value.groupBy { it.hostId }
+        val gone = synchronized(answered) { answered.toSet() }
         val all = fleet.home.value.hosts.flatMap { h ->
-            val kept = previous[h.hostId].orEmpty().filter { !it.request.expired }
+            val kept = previous[h.hostId].orEmpty().filter { !it.request.expired && "${h.hostId}/${it.request.requestId}" !in gone }
             val cfg = fleet.config(h.hostId) ?: return@flatMap emptyList()
             val conn = fleet.connection(h.hostId) ?: return@flatMap kept
             val fresh = runCatching { Approvals(conn, dirFor(cfg.user)).poll() }.getOrNull() ?: return@flatMap kept
-            fresh.filter { !it.expired }.map { ApprovalItem(h.hostId, h.label, it.copy(hostId = h.hostId)) }
+            fresh.filter { !it.expired && "${h.hostId}/${it.requestId}" !in gone }
+                .map { ApprovalItem(h.hostId, h.label, it.copy(hostId = h.hostId)) }
         }
-        _items.value = all
+        _items.value = all.filter { stillPending(it) }
+    }
+
+    /** token 消失（hook 已结束：被回答、取消或超时）时，不等下一次读目录就先把卡片拿掉。 */
+    private suspend fun pruneByTokens() = pollLock.withLock {
+        _items.value = _items.value.filter { stillPending(it) }
+    }
+
+    /**
+     * 请求带了 pane_id，而那台主机在线、snapshot 里这个 pane 也在，但 pane 上没有这个请求的 token：
+     * 说明 hook 已经不在等了（进程被杀、超时），文件只是还没清理。旧格式请求（没有 pane_id）不受影响。
+     * 注意 hook 是先写文件、后挂 token：刚出现的请求给 5 秒宽限。
+     */
+    private fun stillPending(item: ApprovalItem): Boolean {
+        val paneId = item.request.paneId ?: return true
+        if (System.currentTimeMillis() - item.request.createdAtMs < 5_000) return true
+        val host = fleet.home.value.hosts.firstOrNull { it.hostId == item.hostId } ?: return true
+        if (host.reach != dev.herdr.core.data.attention.HostReach.Online) return true
+        val pane = host.panes.firstOrNull { it.paneId == paneId } ?: return false
+        return item.request.requestId in pane.pendingApprovals
     }
 
     suspend fun answer(item: ApprovalItem, allow: Boolean): ApprovalOutcome {
@@ -97,7 +125,21 @@ class ApprovalCenter(
         return if (ok) ApprovalOutcome.Written(allow) else ApprovalOutcome.Failed(t("回答写入失败", "Failed to write the answer"))
     }
 
-    private fun drop(item: ApprovalItem) =
+    /**
+     * 已回答 / 已过期丢弃的请求：请求方清理文件前可能还会被轮询读到一次（轮询和回答并发），
+     * 记下来避免卡片在批准后又冒出来。只保留最近 200 个。
+     */
+    private val answered = LinkedHashSet<String>()
+
+    private fun drop(item: ApprovalItem) {
+        synchronized(answered) {
+            answered += "${item.hostId}/${item.request.requestId}"
+            while (answered.size > 200) answered.remove(answered.first())
+        }
+        dropNow(item)
+    }
+
+    private fun dropNow(item: ApprovalItem) =
         _items.update { l -> l.filterNot { it.hostId == item.hostId && it.request.requestId == item.request.requestId } }
 
     companion object { const val POLL_MS = 3_000L }

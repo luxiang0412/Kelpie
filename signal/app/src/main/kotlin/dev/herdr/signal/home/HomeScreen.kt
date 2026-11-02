@@ -189,7 +189,7 @@ private fun HomeTopBar(attention: Boolean, onSettings: () -> Unit) {
 private fun Header(ui: HomeUi) {
     val c = Signal.colors
     val s = ui.state
-    val n = ui.entries.size
+    val n = ui.waitingAgents
     val title = when {
         s.noHosts -> t("还没有主机", "No hosts yet")
         s.loading -> t("正在连接…", "Connecting…")

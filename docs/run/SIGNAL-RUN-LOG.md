@@ -12,6 +12,7 @@
 | 23:24 | .2 | ~/spike-sandbox/approvals | 同上，手机上拒绝 | `.answer` 为 deny；测试文件已删 |
 | 23:29–23:36 | .2 | w8:p1（沙箱 Pi） | 从电脑上通过 bridge 发 `agent.prompt` "reply with just NOTIFY-OK[-2…6]"，共 6 次，用来在 App 处于后台时触发“完成” | 每次都回复对应文本；第 6 次时后台通知送达 |
 | 00:02–00:15 | .2 | ~/spike-sandbox/approvals | 手工放一条长命令的 `ls -la … && cat README.md \| head -50` 请求（`layoutcheck0001`），只用来检查卡片和审批弹层在不同宽度 / 字号下的排版；**没有回答** | 检查完已删除 |
+| 00:32 | .2 | ~/spike-sandbox（无头，不经 herdr） | 新建隔离配置目录 `~/spike-sandbox/.claude-signal`；`claude -p "reply with just KEY-OK"`，OpenRouter + anthropic/claude-haiku-5.5，key 只从 .2 环境变量读取 | 回复 KEY-OK；`~/.claude` 未改动 |
 
 仓库目录下的 agent（w7 / w9 / wA / wB）全程只读。
 
@@ -103,3 +104,23 @@
 - 正式发布密钥（`signal/keystore.properties`）。
 - 非 MIUI 设备 / 模拟器上补：TalkBack 实操、"手机没网"、Macrobenchmark。
 - 支线：herdr 远程端点审计、Claude 审批 hook 身份实验，本轮都没有开始。
+
+## 夜间批次（2026-11-03）
+
+用户授权（00:2x）：OpenRouter key 用 .2 环境变量里的 `OPENROUTER_API_KEY`（禁止复制 `~/.claude/.credentials.json`）；允许在 .2 `test` 会话里新建 1 个沙箱 pane（用完关闭）；发布密钥由我生成；模拟器镜像随意下载。费用自限：OpenRouter 整晚 ≤ 2 美元（起点 usage = 0.1115）。
+
+### 审批实验期间的远端写操作（.2，全部在 ~/spike-sandbox 或新建的沙箱 pane）
+
+| 时间 | 目标 | 操作 | 结果 |
+|---|---|---|---|
+| 00:35 | ~/spike-sandbox/.claude-signal | 写 `settings.json`（PreToolUse → `signal_approve.py`；SessionStart → 引用 herdr 现有集成脚本，不改它）、`signal_approve.py`、`run-claude.sh` | — |
+| 00:35 | 无头 claude | `claude -p` 让它跑 `pwd`；手机按住允许 | 执行，输出沙箱路径 |
+| 00:37:34 | `test` 会话 | **新建 tab `w8:t2`（pane `w8:p2`）**，cwd ~/spike-sandbox，标签 signal-claude（授权的 1 个沙箱 pane） | — |
+| 00:37–00:38 | w8:p2 | `pane.send_text` 启动 `run-claude.sh`；首次引导按键（Enter×3、Down+Enter 选"信任此目录"；第一次误回车到"No, exit"后重启） | Claude 就绪 |
+| 00:38–00:54 | w8:p2 | `agent.prompt` 共 8 次，内容都是"用 Bash 运行 pwd / 并发运行 pwd 和 ls"之类 | 见实验文档 |
+| 00:38–00:54 | approvals | 手机回答：允许 pwd ×3、拒绝 pwd ×1、允许 pwd + 拒绝 ls（并发） | Claude 均按回答执行 / 不执行 |
+| 00:41、00:45、00:52 | w8:p2 | `pane.send_keys Escape`（取消等待中的审批 / 取消终端确认框） | — |
+| 00:44 | w8:p2 | 超时退回终端后 `send_keys Enter`（选 Yes，命令是 pwd） | 执行 |
+| 00:45 | approvals | 手工写一个 nonce 错误的 `.answer`（伪造回答测试） | 被拒收，退回终端 |
+
+OpenRouter 用量：0.1115 → 0.1220 美元。沙箱 pane `w8:p2` 暂时保留给后面的实验，结束时关闭。

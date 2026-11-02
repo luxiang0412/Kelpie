@@ -43,6 +43,8 @@ sealed interface Banner {
 
 data class HomeUi(
     val state: HomeState,
+    /** 等你处理的 agent 数（不是卡片数）。 */
+    val waitingAgents: Int,
     val entries: List<AttentionEntry>,
     val unknownSends: List<Pair<SendRecord, String>>,
     val banner: Banner?,
@@ -84,16 +86,28 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             phoneOnline: Boolean,
             now: Long,
         ): HomeUi {
-            // 结构化请求能对上 pane 的，替换掉那张“问题卡”；对不上的单独成卡
-            val byPane = approvals.filter { it.request.paneId != null }
-                .associateBy { AgentKey(it.hostId, it.request.paneId!!) }
+            // 结构化请求能对上 pane 的：替换掉那张“问题卡”，并从“工作中 / 完成 / 空闲”里拿走这个 agent（它现在在等你批准）。
+            // 一个 pane 可以同时有多个请求（并发工具调用），每个请求一张卡。对不上 pane 的单独成卡。
+            val all = home.needsYou + home.working + home.recentlyDone + home.quiet
+            val itemByKey = all.associateBy { it.key }
+            val byPane = approvals.filter { it.request.paneId != null }.groupBy { AgentKey(it.hostId, it.request.paneId!!) }
             val entries = ArrayList<AttentionEntry>()
             home.needsYou.forEach { item ->
-                val a = byPane[item.key]
-                entries += if (a != null) AttentionEntry.Permission(a, item) else AttentionEntry.Question(item, previews[item.key])
+                val list = byPane[item.key]
+                if (list.isNullOrEmpty()) entries += AttentionEntry.Question(item, previews[item.key])
+                else list.forEach { entries += AttentionEntry.Permission(it, item) }
             }
-            approvals.filter { a -> a.request.paneId == null || home.needsYou.none { it.key == AgentKey(a.hostId, a.request.paneId!!) } }
-                .forEach { entries += AttentionEntry.Permission(it, null) }
+            val needsKeys = home.needsYou.map { it.key }.toSet()
+            byPane.filterKeys { it !in needsKeys }.forEach { (k, list) -> list.forEach { entries += AttentionEntry.Permission(it, itemByKey[k]) } }
+            approvals.filter { it.request.paneId == null }.forEach { entries += AttentionEntry.Permission(it, null) }
+            val approvalKeys = byPane.keys
+            val shown = home.copy(
+                working = home.working.filterNot { it.key in approvalKeys },
+                recentlyDone = home.recentlyDone.filterNot { it.key in approvalKeys },
+                quiet = home.quiet.filterNot { it.key in approvalKeys },
+            )
+            // 标题按 agent 计数：同一个 agent 的多个请求只算一次
+            val waitingAgents = (needsKeys + approvalKeys).size + approvals.count { it.request.paneId == null }
 
             val titles = (home.needsYou + home.working + home.recentlyDone + home.quiet).associate { it.key to it.title }
             val unknown = sends.values.filter { it.receipt is Receipt.Unknown }
@@ -112,7 +126,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
                 else -> null
             }
             return HomeUi(
-                state = home,
+                state = shown,
+                waitingAgents = waitingAgents,
                 entries = entries,
                 unknownSends = unknown,
                 banner = banner,
