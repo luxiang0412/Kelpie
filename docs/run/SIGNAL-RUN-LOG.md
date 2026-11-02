@@ -150,3 +150,37 @@ OpenRouter 用量：0.1115 → 0.1220 美元。沙箱 pane `w8:p2` 暂时保留�
 - 会话文件预览会拿**上一轮**的助手回复充当问题（Claude 弹权限框时这一轮通常没有正文）→ 只看最后一条用户消息之后；待批准的工具调用显示工具名 + 命令。
 - 读屏预览只取最后 8 行，Claude 确认框里有用的内容被“1. Yes / 2. No / Esc to cancel”挤掉 → 识别 Claude 确认框，只保留标题（如 “Bash command”）和框内容。
 - 卡片右上角“等了 等待中”→ 只知道下限且不到 1 分钟时显示“刚发现”。
+
+### 模拟器（01:33–02:05）
+
+在本机 AVD（API 36.1）上：用 `luxiang_rsa` 配置两台主机（指纹人工核对：.2 `lfFYDn…G0T8`、.3 `I70h1U…x2is`），测完卸载 debug 包、关闭模拟器。TalkBack 打开过，已恢复（enabled_accessibility_services 为空）。
+
+- 手机断网横幅：飞行模式 → 几秒内出现横幅、列表变“最后看到”；关闭飞行模式 15 秒内恢复在线。
+- 无障碍：uiautomator 节点树审计（首页、对话、对话菜单、设置、添加主机）。修了添加主机页 5 个无名输入框。adb 注入的手势 / 快捷键都不被 TalkBack 当作导航，**真人 TalkBack 手势走查没做**。
+- Macrobenchmark（minified 包，模拟器软件渲染，只看趋势）：冷启动 TTID 中位数 395 ms（无基线配置）→ 365 ms（带基线配置）；2000 条长对话滑动帧 CPU p50 14 ms / p90 21 ms / p99 31 ms。
+
+## 早报（2026-11-03 02:10）
+
+夜里的清单全部做完了，每项都提交在 main 上（没有推送）：
+
+| # | 事项 | 结果 | 提交 |
+|---|---|---|---|
+| 1 | herdr 远程端点审计 | `docs/run/SIGNAL-HERDR-AUDIT.md`：现有 bridge 足够，缺的“给 pane 挂结构化信息”herdr 已有（`pane.report_metadata` tokens + `HERDR_PANE_ID`） | 4cb9145 |
+| 2 | Claude 手机审批 | 端到端可用：允许 / 拒绝 / 并发两个调用 / 电脑上 Esc / 120 秒超时退回终端 / 伪造回答被拒。实验和待决定事项见 `SIGNAL-APPROVAL-EXPERIMENTS.md` | 4cb9145 |
+| 3 | 发布签名 + CI | 自己生成了发布密钥；`.github/workflows/signal.yml`（测试、lint、截图对比、构建、i18n 检查），没推送所以没跑过 | 2ec53f7 |
+| 4 | 对话页“更多” | 对话内搜索（计数 + 上下跳转）、复制会话路径 / 工作目录、工具完整输出（可选中、可复制） | 2fd03d4 |
+| 5 | 推送方案 | `SIGNAL-PUSH-OPTIONS.md`：建议先 ntfy、以后 UnifiedPush，不用 FCM（MIUI 国行） | 2fd03d4 |
+| 6 | 扫码配对 | `signal/companion/pair/signal_pair.py`（纯标准库，自带 QR 编码器）+ App 扫码 / 相册识别 / 深链，统一进确认页 | b4a5c20 |
+| 7 | Claude 阻塞预览 | 修了：不再拿上一轮回复当问题；能认出 Claude 确认框，显示“等待批准 · Bash command”+ 命令 | be0d75c |
+| 8 | Roborazzi | 能用（需 1.76 + Robolectric 4.17），首页 5 张基准图，第一次对比就抓到一个文案问题 | 3ea5b11 |
+| 9 | 模拟器三项 | 断网横幅 ✅、无障碍审计 ✅（真人 TalkBack 走查 ❌）、Macrobenchmark ✅ | 6d8066c, ab879ba |
+
+**需要你做 / 决定的：**
+
+1. **备份发布密钥**：`signal/signal-release.jks` + `signal/keystore.properties`（都被 gitignore，只在这台电脑上）。丢了就没法再发同签名的升级。手机上现有的 `dev.herdr.signal` 是 debug 签名的，换正式签名要先卸载（会清数据），我没动。
+2. **审批要不要装到真实的 Claude 上**：现在只在隔离配置里。需要在 `~/.claude/settings.json` 加 PreToolUse；还要定“拦哪些工具”“离开电脑时才启用？”“电脑前的人怎么自己批”——见实验文档结论部分。
+3. **推送**：要不要搭 ntfy，放哪台机器。
+4. **真人 TalkBack 走查**：手机上开 TalkBack，把首页 → 对话 → 审批弹层 → 设置走一遍，大约 5 分钟。
+5. 手机息屏时间现在是“永不”（夜里 00:30 时还是 30 分钟）。我没改过这个设置，如果不是你改的请看一下。
+
+**资源：** OpenRouter 用量 0.1115 → 0.1256 美元（整夜约 1.4 美分）。.2 的 `test` 会话里新建的沙箱 tab `w8:t2` 已关闭；`~/spike-sandbox/.claude-signal`（隔离配置，含 hook）保留着，以后还能接着实验，不要了可以直接删。没碰过 `~/.claude`、authorized_keys、herdr 配置和其他会话。
