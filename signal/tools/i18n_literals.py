@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """找出 Kotlin 源码里含中文的字符串字面量（跳过注释、处理 ${} 嵌套）。
 extract：打印 JSON 列表 [{file,start,end,text}]
+check：有未包 t() 的中文字面量就退出码 1（CI 用）
 apply <map.json>：把 "中文" 换成 t("中文", "English")（map: 中文原文 -> 英文原文，原文都是字面量内部的源码文本）"""
 import json, re, sys, pathlib
 CJK = re.compile(r'[一-鿿]')
@@ -47,7 +48,7 @@ def files():
 
 SKIP_LINE = re.compile(r'Log\.(i|w|d|e)\(|require\(|const val')
 
-def extract():
+def extract_list():
     seen, res = set(), []
     for p in dict.fromkeys(files()):
         s = p.read_text()
@@ -56,7 +57,13 @@ def extract():
             line = s[s.rfind('\n', 0, a) + 1: s.find('\n', b)]
             if SKIP_LINE.search(line) or 't("' in line[max(0, a - s.rfind(chr(10), 0, a) - 4):a - s.rfind(chr(10), 0, a)]: continue
             res.append({'file': str(p), 'text': t})
-    print(json.dumps(res, ensure_ascii=False, indent=0))
+    return res
+
+def check():
+    res = extract_list()
+    for r in res:
+        print(f"{r['file']}: 未翻译的中文字面量: {r['text'][:60]}", file=sys.stderr)
+    sys.exit(1 if res else 0)
 
 def apply(mp):
     m = json.load(open(mp))
@@ -74,5 +81,6 @@ def apply(mp):
                 s2 = re.sub(r'(\npackage [^\n]+\n)', r'\1\n' + pkg_imp, '\n' + s2, count=1)[1:]
             p.write_text(s2); print('updated', p)
 
-if sys.argv[1] == 'extract': extract()
+if sys.argv[1] == 'extract': print(json.dumps(extract_list(), ensure_ascii=False, indent=0))
+elif sys.argv[1] in ('check', '--check'): check()
 else: apply(sys.argv[2])

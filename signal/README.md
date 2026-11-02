@@ -41,8 +41,12 @@ cd signal
 ./gradlew test                      # 全部单元测试
 ```
 
-发布签名：在 `signal/keystore.properties` 写 `storeFile / storePassword / keyAlias / keyPassword`（已在 .gitignore）。
-0.2.0 目前是 **debug 签名**，因为仓库里还没有正式的发布密钥。
+发布签名：`signal/keystore.properties`（`storeFile / storePassword / keyAlias / keyPassword`）+ `signal/signal-release.jks`，两者都在 .gitignore 里，**只存在于本机，需要另外备份**。
+证书 SHA-256：`FE:8D:7D:EA:A2:F7:C7:6C:41:D2:42:6B:38:4D:9C:88:44:68:25:63:11:7A:1B:E5:80:03:11:A3:95:76:D2:EA`。
+没有这两个文件时 release 退回 debug 签名（0.2.0 就是这样发的；从 debug 签名的包升级到正式签名需要先卸载）。
+
+CI：`.github/workflows/signal.yml`（单元测试、lint、debug + release 构建、`tools/i18n_literals.py --check`）。
+要在 CI 里签正式包，把 jks 的 base64 放进 secret `SIGNAL_KEYSTORE_BASE64`、密码放进 `SIGNAL_KEYSTORE_PASSWORD`。
 
 ### 调试包快速配置主机（免去在手机上粘贴私钥）
 

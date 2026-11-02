@@ -77,7 +77,7 @@ import dev.herdr.signal.ui.BackTopBar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: () -> Unit, vm: ConversationViewModel = viewModel()) {
-    remember(hostId, paneId) { vm.start(hostId, paneId, prefill) } // 幂等；必须在读取下面的 flow 之前
+    remember(hostId, paneId) { vm.start(hostId, paneId, prefill); paneId } // 幂等；必须在读取下面的 flow 之前（同步执行，所以不用 LaunchedEffect）
     val item by vm.item.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
     val source by vm.source.collectAsStateWithLifecycle()
