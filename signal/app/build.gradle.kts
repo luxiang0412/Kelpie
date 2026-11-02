@@ -47,7 +47,10 @@ android {
         signingConfig = signingConfigs.getByName("debug")
         matchingFallbacks += listOf("release")
     }
-    sourceSets.getByName("minified") { kotlin.srcDir("src/debug/kotlin") }
+    sourceSets.getByName("minified") {
+        kotlin.srcDir("src/debug/kotlin")
+        manifest.srcFile("src/debug/AndroidManifest.xml")
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     packaging {
         resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/*.kotlin_module")
@@ -70,6 +73,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    implementation("androidx.metrics:metrics-performance:1.0.0-beta01")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
     testImplementation("junit:junit:4.13.2")

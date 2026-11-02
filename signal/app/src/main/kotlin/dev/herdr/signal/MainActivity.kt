@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
         val c = container
         handleIntent(intent)
         maybeAskNotificationPermission()
+        JankMonitor.attach(this, "home")
         setContent {
             val mode by c.prefs.theme.collectAsStateWithLifecycle()
             SignalTheme(mode) {

@@ -163,7 +163,7 @@ private fun statusLine(it: AgentItem, now: Long): String {
 }
 
 @Composable
-private fun MessageList(
+internal fun MessageList(
     items: List<ConversationItem>,
     agent: AgentItem?,
     receipt: SendRecord?,

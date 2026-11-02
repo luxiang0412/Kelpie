@@ -59,3 +59,11 @@
 - 冷启动 verify vs speed-profile 各 5 次：307–374 vs 308–343 ms，基本持平（这个体量下主要是进程创建）。
 - 首次打开对话后快速滑动（2 轮）：janky 2.96% / 2.76% → 1.17% / 1.17%，p99 20 / 22 → 14 / 16 ms。
 - 截图测试：Roborazzi / Paparazzi 依赖 Robolectric / layoutlib，目前对 compileSdk 37 + AGP 9.2 的支持不确定，本轮不引入；视觉回归继续用 `signal/tools/shots.sh` 在真机上截取关键页面（日 / 夜）人工对照。
+
+### P5 长对话 + JankStats
+- 新增 `FixtureActivity`（debug / minified）：确定性 500 / 2000 条消息（Markdown、长代码、表格、工具、思考、超长路径），直接渲染对话页的 `MessageList`。
+- 新增 `JankMonitor`（JankStats）：按界面（home / conversation / settings / host-edit / fixture）分桶，Activity 停止时 logcat 打一行汇总，tag `SignalJank`。
+- minified + speed-profile，上翻 10 次再下翻 10 次：
+  - 500 条：1046 帧，gfxinfo janky 2.20%，p50 7 / p90 11 / p99 16 ms；JankStats 0 帧
+  - 2000 条：1080 帧，gfxinfo janky 2.87%，p50 7 / p90 10 / p99 19 ms；JankStats 1 帧（0.1%）
+- 结论：2000 条下 p99 仍在 120 Hz 两帧以内，没有需要专门优化的点。P5 完成。

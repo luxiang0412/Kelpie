@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- 仅 debug / minified：长对话性能 Fixture，需要能从 adb 启动 -->
+        <activity android:name="dev.herdr.signal.FixtureActivity" android:exported="true" android:theme="@style/Theme.Signal" />
+    </application>
+</manifest>

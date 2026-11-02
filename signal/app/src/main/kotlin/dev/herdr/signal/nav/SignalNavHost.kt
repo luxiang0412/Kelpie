@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import dev.herdr.signal.conversation.ConversationRoute
@@ -39,6 +40,19 @@ fun SignalNavHost(pendingOpen: kotlinx.coroutines.flow.MutableStateFlow<dev.herd
         val k = open ?: return@LaunchedEffect
         pendingOpen.value = null
         nav.navigate(Routes.Conversation(k.hostId, k.paneId)) { popUpTo(Routes.Home) }
+    }
+    // 掉帧统计按界面分桶
+    val entry by nav.currentBackStackEntryAsState()
+    LaunchedEffect(entry) {
+        val r = entry?.destination?.route.orEmpty()
+        dev.herdr.signal.JankMonitor.screen(
+            when {
+                "Conversation" in r -> "conversation"
+                "HostEdit" in r -> "host-edit"
+                "Settings" in r -> "settings"
+                else -> "home"
+            },
+        )
     }
     val reduce = dev.herdr.signal.designsystem.rememberReduceMotion()
     val d = if (reduce) 0 else 260
