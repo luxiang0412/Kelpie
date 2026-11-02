@@ -251,3 +251,7 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 本机签名文件改名为 `kelpie-release.jks`（`keystore.properties` 同步改），证书不变。
 - 截图基准图重录：只有首页标题从“Herdr”变成“Kelpie”（逐张算了差异区域，都只在标题处）。
 - 真机：MIUI 拦截了新包名的 adb 安装（`INSTALL_FAILED_USER_RESTRICTED`），要在手机上确认。安装前推上去的 provision.json 和私钥已立即从 `/sdcard/Android/data/io.github.luxiang0412.kelpie.min/` 删除。
+- 07:23 用户在手机上允许安装后，minified 包装上；用调试导入添加 .2 / .3，导入后 provision.json 和私钥都被 App 删除（`ls` 确认目录为空）。
+  两台的指纹和本机 `known_hosts` 里早先核对过的一致（.2 `lfFYDn…G0T8`，.3 `I70h1U…Mx2is`），才在界面上点了信任。
+- 发现调试导入的 bug：几台主机共用一个密钥文件时，导入第一台就删了文件，第二台没有密钥。改成全部导入完再删，重装后验证 .3 拿到了密钥。
+- 首页“Kelpie”标题、两台主机在线；Codex 对话（wA）正常显示。旧的 Herdr Signal 几个包还装在手机上，没有卸载。

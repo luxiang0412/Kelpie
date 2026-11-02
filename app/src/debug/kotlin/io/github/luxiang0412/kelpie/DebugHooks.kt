@@ -20,6 +20,7 @@ object DebugHooks {
         val dir = app.getExternalFilesDir(null) ?: return
         val f = File(dir, "provision.json")
         if (!f.exists()) return
+        val usedKeys = mutableSetOf<File>()
         runCatching {
             val arr = JSONObject(f.readText()).getJSONArray("hosts")
             for (i in 0 until arr.length()) {
@@ -38,12 +39,13 @@ object DebugHooks {
                     val k = File(dir, name)
                     if (k.exists()) {
                         container.hosts.importKey(cfg.id, k.readText()).onFailure { Log.w("Provision", "key ${cfg.id}: ${it.message}") }
-                        k.delete()
+                        usedKeys += k // 几台主机可以共用一个密钥文件，全部导入完再删
                     }
                 }
                 Log.i("Provision", "imported host ${cfg.id} (${cfg.label})")
             }
         }.onFailure { Log.w("Provision", "failed: ${it.message}") }
+        usedKeys.forEach { it.delete() }
         f.delete()
     }
 }
