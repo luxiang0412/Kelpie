@@ -1,6 +1,6 @@
 # 手机审批（Claude Code / Codex）：实验记录与结论
 
-> Codex 部分见文末「Codex（2026-11-03 06:18–06:32）」。
+> Codex 部分见文末「Codex（2026-11-03 06:18–06:32）」。手动配置方法见「怎么配置（手动）」。
 
 日期：2026-11-03 00:32–00:55。环境：.2，`test` 会话；隔离配置 `~/spike-sandbox/.claude-signal`（不碰 `~/.claude`）；Claude Code 2.1.316 经 OpenRouter（`anthropic/claude-haiku-5.5`，key 只从 .2 的环境变量读）；手机 MIUI 真机 + Kelpie debug 包。全部命令是 `pwd` / `ls`。
 
@@ -84,3 +84,62 @@ herdr 0.9.5 对 Codex 上报的是会话 **id**（`agent_session.kind = "id"`）
 ### 要用在你自己的 Codex 上
 
 需要在 `~/.codex/hooks.json` 里加一条 `PermissionRequest`，并在下次启动 Codex 时确认信任。和 Claude 不同，不用决定“拦哪些工具”。Claude 结论里的第 3、4、5 条（电脑前的人想自己批、请求目录、时钟偏差）同样适用。
+
+## 怎么配置（手动）
+
+还没有安装脚本。下面是实验时在 .2 上实际用的配置，路径换成你自己的。**先在隔离的配置目录里试**（Claude 用 `CLAUDE_CONFIG_DIR`，Codex 用 `CODEX_HOME`），确认没问题再考虑改真实的 `~/.claude`、`~/.codex`。
+
+1. 把 `companion/hooks/kelpie_approve.py` 复制到开发机，例如 `~/.local/share/kelpie/kelpie_approve.py`。
+2. 请求目录：App 目前只读 `/home/<用户>/spike-sandbox/approvals`（写死的，见“结论”第 4 条），hook 的 `KELPIE_APPROVALS_DIR` 必须指向它（默认值就是它）。
+3. hook 的超时要比等待时间长：`KELPIE_APPROVAL_TTL` 默认 120 秒，下面的 `timeout` 用 200 / 180。
+
+Claude Code（`settings.json`，只拦 Bash）：
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "python3 /home/<用户>/.local/share/kelpie/kelpie_approve.py", "timeout": 200 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+herdr 的 Claude 集成自己也有一条 `SessionStart` hook（上报会话 id），保留它，不要覆盖。
+
+Codex（`$CODEX_HOME/hooks.json`）：
+
+```json
+{
+  "hooks": {
+    "PermissionRequest": [
+      { "hooks": [ { "type": "command", "command": "python3 /home/<用户>/.local/share/kelpie/kelpie_approve.py", "timeout": 180 } ] }
+    ]
+  }
+}
+```
+
+Codex 还需要在 `config.toml` 里打开 hooks，并让它在需要时问人：
+
+```toml
+approval_policy = "on-request"
+
+[features]
+hooks = true
+```
+
+同样保留 herdr 集成的 `SessionStart`。改完后下一次启动 Codex 会提示新的 hook 需要确认（Hooks need review），选信任。
+
+环境变量：
+
+| 变量 | 默认 | 作用 |
+| --- | --- | --- |
+| `KELPIE_APPROVALS_DIR` | `~/spike-sandbox/approvals` | 请求目录，必须和 App 读的一致 |
+| `KELPIE_APPROVAL_TTL` | `120` | 等手机回答的秒数，超时退回终端确认 |
+| `KELPIE_APPROVAL_TOOLS` | `Bash` | 只对 Claude Code 生效：哪些工具要手机批准，逗号分隔 |
+| `KELPIE_HOOK_LOG` | 不设 | 设了就把每次的原始 hook 输入追加到这个文件（调试用） |

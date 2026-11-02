@@ -40,4 +40,4 @@ Claude Code 和 Codex 用的审批 hook：agent 要运行命令时，请求出�
 - 没有回答（默认 120 秒）、回答校验失败、hook 出错，都退回 agent 自己的终端确认，绝不放行。
 - 请求目录用 `KELPIE_APPROVALS_DIR` 指定，默认 `~/spike-sandbox/approvals`，这是实验时的约定，App 里也是读这个目录。
 
-目前只在隔离配置里验证过，**还没有安装脚本**。配置示例、实验结果、启用前要决定的事见 [`docs/approvals.md`](../docs/approvals.md)。
+目前只在隔离配置里验证过，**还没有安装脚本**。配置示例（文末「怎么配置（手动）」）、实验结果、启用前要决定的事见 [`docs/approvals.md`](../docs/approvals.md)。

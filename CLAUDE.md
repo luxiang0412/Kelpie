@@ -87,7 +87,8 @@ There is no server component. Everything goes over SSH (sshj, `core:ssh`) to eac
   - Codex: as a PermissionRequest hook.
 - The hook writes `<id>.req` (with a nonce) into the approvals dir and puts an `sa_*` token on its herdr pane. The app sees the token (or polls the dir over SFTP) and writes `<id>.answer`; the hook checks request id + nonce.
 - If there is no answer, the answer fails validation or the hook errors, the agent falls back to its own terminal prompt. It never auto-allows.
-- See `docs/approvals.md`.
+- The approvals dir is hardcoded in the app (`ApprovalCenter`) as `/home/<user>/spike-sandbox/approvals`; the hook's `KELPIE_APPROVALS_DIR` must match.
+- See `docs/approvals.md` (manual config examples at the end).
 
 ### Pairing
 
@@ -125,4 +126,4 @@ UI copy is written inline as `t("中文", "English")` and `plural(n, "agent")` f
 - **Test targets**: only use herdr sessions named `test`, on `ssh://luxiang@10.144.144.2` (Claude / Codex / Pi) and `ssh://luxiang@10.144.144.3` (Pi). Treat agents running in this repo's cwd as read-only.
 - **Agent configs on the dev machines**: never modify the real `~/.claude` or `~/.codex` there, and never copy credentials such as `~/.claude/.credentials.json` or `~/.codex/auth.json`. Hook experiments use isolated config dirs under `~/spike-sandbox/`.
 - **Test phone**: `adb -s 10.144.144.6:42407` (MIUI). The first adb install of a new package name needs approval on the phone. Restore any device settings you change.
-- Docs live in `docs/`, indexed in `docs/README.md`. `docs/development.md` is the full developer guide; `docs/setup.md` covers dev-machine and phone setup.
+- Docs live in `docs/`, indexed in `docs/README.md`. `docs/architecture.md` is the Chinese architecture overview, `docs/development.md` the full developer guide; `docs/setup.md` covers dev-machine and phone setup.

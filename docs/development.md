@@ -2,12 +2,9 @@
 
 构建、测试、发版、调试。项目介绍和目录结构见根目录 [README](../README.md)。
 
-## 模块细节
+## 架构
 
-- `core/ssh/`、`core/herdr/`、`core/markdown/` 最初从旧版客户端复制，后来各自演进。
-- `core/data/runtime/`：`Fleet`（每台主机一个 `HostRuntime`）、`Sender`（四态回执）、`Previews`、`ApprovalCenter`。
-- `core/data/attention/`：`AttentionTracker` + `HomeDerivation`（纯 Kotlin，首页的排序和时长都在这里算）。
-- `core/designsystem/` 的 `ContrastTest` 覆盖日夜两套配色。
+模块划分、连接和状态、对话记录、发送、审批、存储、测试分层见 [architecture.md](architecture.md)。开发机和手机的准备见 [setup.md](setup.md)。
 
 ## Gradle 结构
 

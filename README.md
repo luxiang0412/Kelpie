@@ -57,4 +57,4 @@ art/                    # 标志源文件
 
 ## 文档
 
-见 [`docs/README.md`](docs/README.md)。
+架构见 [`docs/architecture.md`](docs/architecture.md)，安装配置见 [`docs/setup.md`](docs/setup.md)，其余文档的索引见 [`docs/README.md`](docs/README.md)。
