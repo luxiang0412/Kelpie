@@ -1,13 +1,20 @@
 # companion/ —— 装在开发机上的脚本
 
-都只依赖 Python 3 标准库，复制到开发机上就能用。
+都只依赖 Python 3 标准库，复制到开发机上就能用。例如：
+
+```bash
+scp companion/pair/kelpie_pair.py user@devbox:~/
+ssh -t user@devbox python3 ~/kelpie_pair.py --session test --host <手机能连到的地址>
+```
+
+`-t` 不能省：脚本要在终端里问你问题、画二维码。
 
 ## pair/kelpie_pair.py：扫码添加主机
 
 在**要添加的那台开发机**上运行（还需要 `ssh-keygen`）：
 
 ```bash
-python3 companion/pair/kelpie_pair.py --session test --host <手机能连到的地址>
+python3 kelpie_pair.py --session test --host <手机能连到的地址>
 ```
 
 脚本会：

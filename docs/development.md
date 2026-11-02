@@ -51,7 +51,7 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :benchmark:connectedMinifiedAndroidTest  
 
 发版步骤：改 `app/build.gradle.kts` 的 `versionCode` / `versionName` → 在 `CHANGELOG.md` 写更新说明 →
 `./gradlew test :app:verifyRoborazziDebug :app:lintDebug :app:assembleRelease` → 提交 → `git tag kelpie-v<版本>`。
-产物：`app/build/outputs/apk/release/app-release.apk`（不入库）。
+产物：`app/build/outputs/apk/release/app-release.apk`，复制一份到 `dist/kelpie-<版本>.apk`（`dist/` 不入库）。
 
 CI：`.github/workflows/android.yml`（单元测试、截图回归、lint、debug + release 构建、`tools/i18n_literals.py --check`）。
 要在 CI 里签正式包，把 jks 的 base64 放进 secret `KELPIE_KEYSTORE_BASE64`、密码放进 `KELPIE_KEYSTORE_PASSWORD`；没配时 CI 显式用 debug 签名构建。
@@ -62,13 +62,19 @@ CI：`.github/workflows/android.yml`（单元测试、截图回归、lint、debu
 
 ### 调试包快速配置主机（免去在手机上粘贴私钥）
 
+先启动一次 App，让它建好目录，再推送文件（minified 包把 `.debug` 换成 `.min`）：
+
 ```bash
 D=/sdcard/Android/data/io.github.luxiang0412.kelpie.debug/files
 adb push provision.json $D/provision.json   # {"hosts":[{"id","label","host","port","user","session","herdrBin","keyFile"}]}
 adb push ~/.ssh/id_xxx  $D/<keyFile>
 ```
 
-App 启动时导入并删除这两个文件；指纹仍要在界面上确认。只在 debug / minified 包里存在。
+App 下次启动时导入，然后删除 provision.json 和密钥文件（几台主机可以共用一个 `keyFile`，全部导入完才删）。
+指纹仍要在界面上确认：先在电脑上 `ssh-keygen -F <地址> -l` 或 `ssh-keyscan <地址> | ssh-keygen -lf -` 对照，一致再点信任。
+只在 debug / minified 包里存在；正式包里没有这个入口。
+
+MIUI 第一次用 adb 安装一个新包名时会拦截（`INSTALL_FAILED_USER_RESTRICTED`），要在手机上点允许。
 
 ## 工具
 

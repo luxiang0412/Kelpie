@@ -13,7 +13,15 @@
 
 当前版本 **0.4.0**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-## 快速开始
+## 安装与使用
+
+1. 装 `dist/kelpie-<版本>.apk`（自己构建见下面；需要 Android 8.0+）。
+2. 在每台开发机上运行配对脚本，手机扫二维码添加主机，见 [`companion/README.md`](companion/README.md)。
+3. 想在手机上批准 agent 的命令：装审批 hook，见同一份文档（目前还没有安装脚本）。
+
+开发机要能用 SSH 从手机连到，并且装好 herdr（默认找 `~/.local/bin/herdr`）。
+
+## 快速开始（开发）
 
 需要 JDK 17、Android SDK（compileSdk 37），`local.properties` 里写 `sdk.dir`。
 
