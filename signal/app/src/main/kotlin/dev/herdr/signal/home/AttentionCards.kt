@@ -62,7 +62,11 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
                 icon = if (e.preview?.pendingTool != null) SignalIcons.Terminal else SignalIcons.Spark,
                 title = item.title,
                 sub = "${item.agentName} · ${item.hostLabel}",
-                trailing = if (stale) t("最后看到", "Last seen") else t("等了 $waited", "waiting $waited"),
+                trailing = when {
+                    stale -> t("最后看到", "Last seen")
+                    waited == Durations.JUST_NOTICED() -> waited
+                    else -> t("等了 $waited", "waiting $waited")
+                },
             )
             PreviewBody(e.preview, stale)
         }
@@ -88,14 +92,19 @@ private fun PreviewBody(p: BlockedPreview?, stale: Boolean) {
             if (stale) t("离线前它在等你回复。", "It was waiting for your reply before going offline.") else t("正在读取它问了什么…", "Reading what it asked…"),
             style = Signal.type.bodyCard, color = c.attentionOnContainerMeta,
         )
-        p.source == BlockedPreview.Source.Screen -> Text(
-            p.text, style = Signal.type.code, color = c.attentionOnContainerBody, maxLines = 8, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(SignalRadius.m)).background(c.attentionContainerInner).padding(horizontal = 12.dp, vertical = 10.dp),
-        )
         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stripMarkdown(p.text), style = Signal.type.bodyCard, color = c.attentionOnContainerBody, maxLines = 6, overflow = TextOverflow.Ellipsis)
             if (p.pendingTool != null) {
                 Text(t("等待批准 · ${p.pendingTool}", "Waiting for approval · ${p.pendingTool}"), style = Signal.type.metaStrong, color = c.attentionText)
+            }
+            if (p.source == BlockedPreview.Source.Transcript && p.text.isNotBlank()) {
+                Text(stripMarkdown(p.text), style = Signal.type.bodyCard, color = c.attentionOnContainerBody, maxLines = if (p.pendingArgs != null) 3 else 6, overflow = TextOverflow.Ellipsis)
+            }
+            val code = if (p.source == BlockedPreview.Source.Screen) p.text else p.pendingArgs
+            if (!code.isNullOrBlank()) {
+                Text(
+                    code, style = Signal.type.code, color = c.attentionOnContainerBody, maxLines = 8, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(SignalRadius.m)).background(c.attentionContainerInner).padding(horizontal = 12.dp, vertical = 10.dp),
+                )
             }
         }
     }

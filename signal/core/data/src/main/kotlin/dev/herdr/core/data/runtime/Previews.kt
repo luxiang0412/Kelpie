@@ -19,6 +19,8 @@ data class BlockedPreview(
     val source: Source,
     /** 最后一条是还没出结果的工具调用时，工具名（“想运行 bash”）。 */
     val pendingTool: String? = null,
+    /** 待批准工具调用的参数摘要（命令 / 文件路径），没有时为 null。 */
+    val pendingArgs: String? = null,
 ) {
     enum class Source { Transcript, Screen }
 }
@@ -79,18 +81,66 @@ class Previews(
     }
 
     companion object {
-        /** 取最后一条有意义的助手输出；最后一条是未完成的工具调用时带上工具名。 */
+        /**
+         * 只看**这一轮**（最后一条用户消息之后）：取最后一条助手输出；最后是还没出结果的工具调用时，
+         * 带上工具名和参数摘要。Claude 弹权限框时常常这一轮没有任何正文，以前会拿上一轮的回复来充数。
+         */
         fun fromTranscript(msgs: List<ChatMessage>): BlockedPreview? {
-            val lastTool = msgs.lastOrNull { it.kind == ChatMessage.Kind.TOOL_CALL }
-            val lastResultIdx = msgs.indexOfLast { it.kind == ChatMessage.Kind.TOOL_RESULT }
-            val toolPending = lastTool != null && msgs.indexOf(lastTool) > lastResultIdx
-            val assistant = msgs.lastOrNull { it.kind == ChatMessage.Kind.ASSISTANT && it.text.isNotBlank() }
-                ?: return if (toolPending) BlockedPreview(lastTool!!.text.take(MAX), BlockedPreview.Source.Transcript, lastTool.toolName) else null
-            return BlockedPreview(assistant.text.trim().take(MAX), BlockedPreview.Source.Transcript, if (toolPending) lastTool!!.toolName else null)
+            val turn = msgs.drop(msgs.indexOfLast { it.kind == ChatMessage.Kind.USER } + 1)
+            val lastTool = turn.lastOrNull { it.kind == ChatMessage.Kind.TOOL_CALL }
+            val lastResultIdx = turn.indexOfLast { it.kind == ChatMessage.Kind.TOOL_RESULT }
+            val toolPending = lastTool != null && turn.lastIndexOf(lastTool) > lastResultIdx
+            val assistant = turn.lastOrNull { it.kind == ChatMessage.Kind.ASSISTANT && it.text.isNotBlank() }
+            val args = if (toolPending) argsSummary(lastTool!!.text) else null
+            return when {
+                assistant != null -> BlockedPreview(assistant.text.trim().take(MAX), BlockedPreview.Source.Transcript, lastTool?.toolName?.takeIf { toolPending }, args)
+                toolPending -> BlockedPreview("", BlockedPreview.Source.Transcript, lastTool!!.toolName ?: "tool", args)
+                else -> null
+            }
         }
 
-        /** 终端尾部：去掉空行与框线，保留最后 8 行。 */
+        /** 工具参数 JSON → 一行能看懂的摘要：优先 command / file_path / path / url / pattern。 */
+        fun argsSummary(json: String): String? {
+            val o = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(json) as? kotlinx.serialization.json.JsonObject }.getOrNull()
+                ?: return json.trim().takeIf { it.isNotEmpty() }?.take(MAX)
+            for (k in listOf("command", "file_path", "path", "url", "pattern", "query")) {
+                val v = runCatching { (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.content }.getOrNull()
+                if (!v.isNullOrBlank()) return v.take(MAX)
+            }
+            return json.take(MAX)
+        }
+
+        /**
+         * Claude Code 的终端确认框：
+         * ```
+         * ────────
+         *  Bash command            ← 标题（工具）
+         *  Print current dir       ← 描述
+         * ╌╌╌╌╌╌╌╌
+         *  pwd                     ← 命令
+         * ╌╌╌╌╌╌╌╌
+         *  Do you want to proceed?
+         *  ❯ 1. Yes
+         * ```
+         * 认出来就只保留标题和框里的内容，不要“1. Yes / 2. No / Esc to cancel”这些。
+         */
+        fun claudePrompt(raw: String): BlockedPreview? {
+            val lines = raw.lines().map { it.trimEnd() }
+            val ask = lines.indexOfLast { it.contains("Do you want to proceed?") || it.contains("Do you want to make this edit") || it.contains("Do you want to create") }
+            if (ask < 0) return null
+            val top = (ask - 1 downTo 0).firstOrNull { i -> lines[i].trim().let { l -> l.length >= 10 && l.all { it == '─' } } } ?: return null
+            val body = lines.subList(top + 1, ask)
+                .map { it.trim().removePrefix("│").trim() }
+                .filter { l -> l.isNotEmpty() && !l.all { it in "╌─┄ " } }
+            if (body.isEmpty()) return null
+            val header = body.first()
+            val rest = body.drop(1)
+            return BlockedPreview(rest.joinToString("\n").take(MAX), BlockedPreview.Source.Screen, pendingTool = header.take(60))
+        }
+
+        /** 终端尾部：先认 Claude 的确认框；否则去掉空行与框线，保留最后 8 行。 */
         fun fromScreen(raw: String): BlockedPreview? {
+            claudePrompt(raw)?.let { return it }
             val lines = raw.lines().map { it.trimEnd() }
                 .filter { it.isNotBlank() && !it.all { c -> c in BOX_CHARS || c == ' ' } }
                 .takeLast(8)
