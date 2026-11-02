@@ -1,4 +1,4 @@
-# Signal 设计规范 v1（组件规范）
+# Kelpie 设计规范 v1（组件规范）
 
 > 状态：**定稿草案**（2026-11-02）。确认后取代旧版 `docs/design/ux-d0/` 下的 Graphite × Editorial 规格（旧规格已于 2026-11-03 删除，见 git 历史）。
 > 视觉稿：Design 画布「Herdr 移动端重设计」第一至三排（A1–A7 日间、夜间）。画布上 B / C 两排未采用，仅供对照。
@@ -459,24 +459,24 @@
 建议新建模块 `:core:designsystem`，把 `feature/board/.../design/Tokens.kt` 迁过去并按本文重写：
 
 ```kotlin
-@Immutable data class SignalColors(/* 1.1 + 1.2 里的全部 token */)
-val LightSignalColors = SignalColors(bg = Color(0xFFFFFFFF), /* … */)
-val DarkSignalColors  = SignalColors(bg = Color(0xFF0E1013), /* … */)
+@Immutable data class KelpieColors(/* 1.1 + 1.2 里的全部 token */)
+val LightKelpieColors = KelpieColors(bg = Color(0xFFFFFFFF), /* … */)
+val DarkKelpieColors  = KelpieColors(bg = Color(0xFF0E1013), /* … */)
 
-@Immutable data class SignalType(/* 第 2 节字阶，TextStyle */)
-object SignalSpace { val s1 = 4.dp; /* … */ }
-object SignalRadius { val card = 20.dp; /* … */ }
+@Immutable data class KelpieType(/* 第 2 节字阶，TextStyle */)
+object KelpieSpace { val s1 = 4.dp; /* … */ }
+object KelpieRadius { val card = 20.dp; /* … */ }
 
-val LocalSignalColors = staticCompositionLocalOf { LightSignalColors }
+val LocalKelpieColors = staticCompositionLocalOf { LightKelpieColors }
 
-@Composable fun SignalTheme(
+@Composable fun KelpieTheme(
     mode: ThemeMode = ThemeMode.System,   // System / Light / Dark，来自设置
     content: @Composable () -> Unit,
 )
 ```
 
-- 同时把 token 映射进 `MaterialTheme.colorScheme`，让 `ModalBottomSheet`、`Switch` 这类 M3 组件自动跟随；但**业务组件只读 `LocalSignalColors`**，不直接用 M3 的 `primary` / `tertiary`，避免语义混乱。
-- 状态色通过一个函数取：`SignalColors.forStatus(AgentStatus): StatusStyle(fg, container, icon)`，取代现在的 `statusFg` / `statusBg` lambda。
+- 同时把 token 映射进 `MaterialTheme.colorScheme`，让 `ModalBottomSheet`、`Switch` 这类 M3 组件自动跟随；但**业务组件只读 `LocalKelpieColors`**，不直接用 M3 的 `primary` / `tertiary`，避免语义混乱。
+- 状态色通过一个函数取：`KelpieColors.forStatus(AgentStatus): StatusStyle(fg, container, icon)`，取代现在的 `statusFg` / `statusBg` lambda。
 
 ### 8.2 和现有实现的对应
 

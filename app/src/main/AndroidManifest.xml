@@ -9,13 +9,13 @@
 
     <application
         android:localeConfig="@xml/locales_config"
-        android:name=".SignalApp"
+        android:name=".KelpieApp"
         android:allowBackup="false"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Signal">
+        android:theme="@style/Theme.Kelpie">
 
         <profileable android:shell="true" />
 
@@ -28,12 +28,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- 扫码配对：系统相机 / 任意扫码 App 扫到 herdr-signal://pair?… 时打开确认页（不会直接写入） -->
+            <!-- 扫码配对：系统相机 / 任意扫码 App 扫到 kelpie://pair?… 时打开确认页（不会直接写入） -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="herdr-signal" android:host="pair" />
+                <data android:scheme="kelpie" android:host="pair" />
             </intent-filter>
         </activity>
 

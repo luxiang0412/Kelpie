@@ -1,6 +1,6 @@
-# Herdr Signal 的 CI：单元测试、截图回归、lint、debug + release 构建、文案检查。
+# Kelpie 的 CI：单元测试、截图回归、lint、debug + release 构建、文案检查。
 # 只改文档（docs/、*.md）时不跑。
-# 发布签名：仓库 secret 里放 SIGNAL_KEYSTORE_BASE64 / SIGNAL_KEYSTORE_PASSWORD 时才签正式包，否则显式加 -Psignal.allowDebugSigning=true 用 debug 签名（本地默认不允许）。
+# 发布签名：仓库 secret 里放 KELPIE_KEYSTORE_BASE64 / KELPIE_KEYSTORE_PASSWORD 时才签正式包，否则显式加 -Pkelpie.allowDebugSigning=true 用 debug 签名（本地默认不允许）。
 name: android
 
 on:
@@ -41,12 +41,12 @@ jobs:
       - name: Release keystore (optional)
         if: ${{ github.event_name != 'pull_request' }}
         env:
-          KS: ${{ secrets.SIGNAL_KEYSTORE_BASE64 }}
-          PW: ${{ secrets.SIGNAL_KEYSTORE_PASSWORD }}
+          KS: ${{ secrets.KELPIE_KEYSTORE_BASE64 }}
+          PW: ${{ secrets.KELPIE_KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KS" ]; then
-            echo "$KS" | base64 -d > signal-release.jks
-            printf 'storeFile=signal-release.jks\nstorePassword=%s\nkeyAlias=signal\nkeyPassword=%s\n' "$PW" "$PW" > keystore.properties
+            echo "$KS" | base64 -d > kelpie-release.jks
+            printf 'storeFile=kelpie-release.jks\nstorePassword=%s\nkeyAlias=signal\nkeyPassword=%s\n' "$PW" "$PW" > keystore.properties
           fi
 
       - name: Unit tests
@@ -60,7 +60,7 @@ jobs:
         run: ./gradlew :app:lintDebug --console=plain
 
       - name: Build
-        run: ./gradlew :app:assembleDebug :app:assembleRelease --console=plain $( [ -f keystore.properties ] || echo -Psignal.allowDebugSigning=true )
+        run: ./gradlew :app:assembleDebug :app:assembleRelease --console=plain $( [ -f keystore.properties ] || echo -Pkelpie.allowDebugSigning=true )
 
       - name: i18n literal check
         # 新加的中文字面量必须包在 t("中文", "English") 里
@@ -69,7 +69,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: signal-reports
+          name: kelpie-reports
           path: |
             **/build/reports/
             **/build/test-results/
@@ -78,6 +78,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: signal-apks
+          name: kelpie-apks
           path: app/build/outputs/apk/**/*.apk
           retention-days: 14

@@ -85,6 +85,6 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 
 # 约定插件（build-logic/convention）
-herdr-android-application = { id = "herdr.android.application" }
-herdr-android-library = { id = "herdr.android.library" }
-herdr-android-compose = { id = "herdr.android.compose" }
+kelpie-android-application = { id = "kelpie.android.application" }
+kelpie-android-library = { id = "kelpie.android.library" }
+kelpie-android-compose = { id = "kelpie.android.compose" }

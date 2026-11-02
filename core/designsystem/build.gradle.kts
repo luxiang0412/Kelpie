@@ -1,8 +1,8 @@
 plugins {
-    alias(libs.plugins.herdr.android.library)
-    alias(libs.plugins.herdr.android.compose)
+    alias(libs.plugins.kelpie.android.library)
+    alias(libs.plugins.kelpie.android.compose)
 }
-android { namespace = "dev.herdr.core.designsystem" }
+android { namespace = "io.github.luxiang0412.kelpie.core.designsystem" }
 dependencies {
     api(platform(libs.compose.bom))
     api(libs.compose.ui)

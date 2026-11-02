@@ -19,4 +19,4 @@
     *** Companion;
     kotlinx.serialization.KSerializer serializer(...);
 }
--keep class dev.herdr.signal.nav.Routes** { *; }
+-keep class io.github.luxiang0412.kelpie.nav.Routes** { *; }

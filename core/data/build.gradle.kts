@@ -1,8 +1,8 @@
 plugins {
-    alias(libs.plugins.herdr.android.library)
+    alias(libs.plugins.kelpie.android.library)
     alias(libs.plugins.ksp)
 }
-android { namespace = "dev.herdr.core.data" }
+android { namespace = "io.github.luxiang0412.kelpie.core.data" }
 dependencies {
     api(project(":core:herdr"))
     api(libs.room.runtime)

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.herdr.signal.benchmark"
+    namespace = "io.github.luxiang0412.kelpie.benchmark"
     compileSdk = libs.versions.compileSdk.get().toInt()
     defaultConfig {
         minSdk = 28

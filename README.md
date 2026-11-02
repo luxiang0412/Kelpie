@@ -1,4 +1,4 @@
-# Herdr Signal
+# Kelpie
 
 <img src="art/logo-512.png" width="96" align="right" alt="logo">
 
@@ -11,14 +11,14 @@
 - **配对**：开发机上运行脚本生成二维码，手机扫一下就添加好主机；主机指纹固定，不做首次信任（TOFU）。
 - 后台通知（MIUI 可用）、中英文、日夜间主题。
 
-当前版本 **0.3.0**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
+当前版本 **0.4.0**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 快速开始
 
 需要 JDK 17、Android SDK（compileSdk 37），`local.properties` 里写 `sdk.dir`。
 
 ```bash
-./gradlew :app:assembleDebug     # 调试包，包名 dev.herdr.signal.debug
+./gradlew :app:assembleDebug     # 调试包，包名 io.github.luxiang0412.kelpie.debug
 ./gradlew test                   # 单元测试
 ```
 

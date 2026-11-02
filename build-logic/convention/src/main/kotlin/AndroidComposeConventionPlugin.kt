@@ -5,7 +5,7 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies
 
 /**
- * `herdr.android.compose`：在 application / library 约定插件之后应用。
+ * `kelpie.android.compose`：在 application / library 约定插件之后应用。
  * 打开 Compose、加 Compose 编译器插件和 BOM（版本由 BOM 统一）。
  */
 class AndroidComposeConventionPlugin : Plugin<Project> {

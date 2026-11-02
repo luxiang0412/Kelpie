@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 只负责冷启动那一帧的窗口底色；其余全部由 Compose 的 SignalTheme 绘制。 -->
-    <style name="Theme.Signal" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- 只负责冷启动那一帧的窗口底色；其余全部由 Compose 的 KelpieTheme 绘制。 -->
+    <style name="Theme.Kelpie" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/window_bg</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

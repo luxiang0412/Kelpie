@@ -1,5 +1,5 @@
-plugins { alias(libs.plugins.herdr.android.library) }
-android { namespace = "dev.herdr.core.ssh" }
+plugins { alias(libs.plugins.kelpie.android.library) }
+android { namespace = "io.github.luxiang0412.kelpie.core.ssh" }
 dependencies {
     api(libs.sshj)
     implementation(libs.bouncycastle.prov)

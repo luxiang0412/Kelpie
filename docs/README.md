@@ -23,7 +23,8 @@
 ## 历史
 
 - 0.1.x 是旧版客户端（原 `android/`），2026-10 底。
-- 2026-11-02 起重写为 Signal（0.2.0）。
+- 2026-11-02 起重写为 Kelpie（0.2.0）。
 - 2026-11-03：旧客户端代码、早期探针、旧版文档（设计规格、过程报告、截图证据，以及 `DECISIONS.md`、`ISSUES.md`、`RESULTS.md` 等台账）都已从仓库删除。
 - 同一天，Android 工程从 `signal/` 挪到仓库根目录，文档从 `docs/signal/` 挪到 `docs/`。
+- 0.4.0 起改名 Kelpie（原名 Herdr Signal，包名 `dev.herdr.signal`）。
 - 删掉的内容可以从 git 历史取，例如 `git show signal-v0.2.0:DECISIONS.md`、`git checkout signal-v0.3.0 -- archive/`。

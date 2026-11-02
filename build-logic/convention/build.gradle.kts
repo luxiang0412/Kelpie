@@ -10,15 +10,15 @@ dependencies {
 gradlePlugin {
     plugins {
         register("androidApplication") {
-            id = libs.plugins.herdr.android.application.get().pluginId
+            id = libs.plugins.kelpie.android.application.get().pluginId
             implementationClass = "AndroidApplicationConventionPlugin"
         }
         register("androidLibrary") {
-            id = libs.plugins.herdr.android.library.get().pluginId
+            id = libs.plugins.kelpie.android.library.get().pluginId
             implementationClass = "AndroidLibraryConventionPlugin"
         }
         register("androidCompose") {
-            id = libs.plugins.herdr.android.compose.get().pluginId
+            id = libs.plugins.kelpie.android.compose.get().pluginId
             implementationClass = "AndroidComposeConventionPlugin"
         }
     }

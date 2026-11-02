@@ -242,3 +242,12 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 文档从 `docs/signal/` 拍平到 `docs/`，文件名改成小写；过程记录放进 `docs/history/`。旧的 `signal/README.md` 拆成根目录 README（介绍、目录）、`docs/development.md`（开发指南）和 `companion/README.md`。
 - CI 改名为 `.github/workflows/android.yml`，去掉 `working-directory: signal`，只改文档时不跑。
 - 签名文件（`keystore.properties`、`signal-release.jks`）和 `local.properties` 跟着挪到根目录，仍然不入库。
+
+## 改名 Kelpie，0.4.0（2026-11-03，用户要求）
+
+- 查重：Google Play、GitHub 上没有叫 Kelpie 的同类 App / 开发工具；美国有两个还有效的 KELPIE 商标，分别是超声探伤探头（Novosound）和一个车辆类商标（Agent Oriented Software），都不在这个领域。
+- App 名 Herdr Signal → Kelpie；包名 `dev.herdr.signal` / `dev.herdr.core` → `io.github.luxiang0412.kelpie`（以及 `.core.*`）。配对 scheme 改为 `kelpie://`，脚本改为 `kelpie_pair.py` / `kelpie_approve.py`，环境变量 `SIGNAL_*` → `KELPIE_*`。`herdr` 作为被监督工具的名字（`core/herdr`、协议类）没改。
+- `kelpie_pair.py --list / --revoke` 也认改名前的 `herdr-signal-` 密钥（在临时 HOME 里测过）。
+- 本机签名文件改名为 `kelpie-release.jks`（`keystore.properties` 同步改），证书不变。
+- 截图基准图重录：只有首页标题从“Herdr”变成“Kelpie”（逐张算了差异区域，都只在标题处）。
+- 真机：MIUI 拦截了新包名的 adb 安装（`INSTALL_FAILED_USER_RESTRICTED`），要在手机上确认。安装前推上去的 provision.json 和私钥已立即从 `/sdcard/Android/data/io.github.luxiang0412.kelpie.min/` 删除。

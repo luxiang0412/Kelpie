@@ -76,8 +76,8 @@ def apply(mp):
             out.append(s[last:a]); out.append(f't("{t}", "{m[t]}")'); last = b; changed = True
         if changed:
             out.append(s[last:]); s2 = ''.join(out)
-            pkg_imp = 'import dev.herdr.core.herdr.t\n'
-            if pkg_imp not in s2 and not s2.startswith('package dev.herdr.core.herdr\n'):
+            pkg_imp = 'import io.github.luxiang0412.kelpie.core.herdr.t\n'
+            if pkg_imp not in s2 and not s2.startswith('package io.github.luxiang0412.kelpie.core.herdr\n'):
                 s2 = re.sub(r'(\npackage [^\n]+\n)', r'\1\n' + pkg_imp, '\n' + s2, count=1)[1:]
             p.write_text(s2); print('updated', p)
 

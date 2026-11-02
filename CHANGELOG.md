@@ -1,5 +1,18 @@
 # 更新说明
 
+## 0.4.0（2026-11-03）：改名 Kelpie
+
+功能和 0.3.0 相同，只是改名。
+
+- App 名从 Herdr Signal 改为 **Kelpie**（澳洲牧羊犬）。原来的名字容易让人以为是 herdr 官方出的。
+- 包名改为 `io.github.luxiang0412.kelpie`，**是一个新 App**：不能覆盖安装 0.3.0 及以前的版本，主机要重新添加（扫码最快）。旧的 Herdr Signal 确认不用了以后卸载即可。
+- 配对二维码的链接改为 `kelpie://pair?…`。0.3.0 的二维码新 App 不认，请用新脚本重新生成。
+- 开发机脚本改名：`companion/pair/kelpie_pair.py`、`companion/hooks/kelpie_approve.py`；环境变量 `SIGNAL_*` 改为 `KELPIE_*`。
+  新密钥的注释是 `kelpie-<名称>-<日期>`；`--list` / `--revoke` 也认以前的 `herdr-signal-…` 密钥。
+- 签名证书没有变。
+
+以下是改名前的记录，名称和路径保持当时的写法。
+
 ## 0.3.0（2026-11-03）
 
 **Codex**

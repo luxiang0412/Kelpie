@@ -5,7 +5,7 @@ pluginManagement {
 dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
-rootProject.name = "herdr-signal"
+rootProject.name = "kelpie"
 include(
     ":app",
     ":core:ssh",
