@@ -55,6 +55,10 @@ jobs:
       - name: Unit tests
         run: ./gradlew test --console=plain
 
+      - name: Screenshot tests (Roborazzi)
+        # 基准图在 app/src/test/screenshots/；UI 有意改动时本地跑 recordRoborazziDebug 后一起提交
+        run: ./gradlew :app:verifyRoborazziDebug --console=plain
+
       - name: Lint
         run: ./gradlew :app:lintDebug --console=plain
 
@@ -72,6 +76,7 @@ jobs:
           path: |
             signal/**/build/reports/
             signal/**/build/test-results/
+            signal/app/build/outputs/roborazzi/
           retention-days: 7
 
       - uses: actions/upload-artifact@v4

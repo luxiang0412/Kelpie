@@ -181,7 +181,11 @@ internal fun stripMarkdown(s: String): String = s
 fun OfflineBanner(b: Banner, nowMs: Long, onRetry: () -> Unit) {
     val c = Signal.colors
     val (title, sub) = when (b) {
-        is Banner.PhoneOffline -> t("手机没有网络", "Phone is offline") to (if (b.lastAtMs > 0) t("下面是 ${Durations.ago(b.lastAtMs, nowMs)}的内容 · 联网后自动更新", "Showing data from ${Durations.ago(b.lastAtMs, nowMs)} · updates when back online") else t("联网后自动更新", "Updates when back online"))
+        is Banner.PhoneOffline -> t("手机没有网络", "Phone is offline") to (if (b.lastAtMs > 0) Durations.ago(b.lastAtMs, nowMs).let { ago ->
+            // 中文里数字前后留空格（“下面是 3 分钟前的内容”），“刚刚”前不留
+            val sp = if (ago.firstOrNull()?.isDigit() == true) " " else ""
+            t("下面是$sp${ago}的内容 · 联网后自动更新", "Showing data from $ago · updates when back online")
+        } else t("联网后自动更新", "Updates when back online"))
         is Banner.HostsUnreachable -> t("连不上 ${b.labels.joinToString("、")}", "Can't reach ${b.labels.joinToString(", ")}") to (b.detail.ifBlank { t("正在自动重连", "Reconnecting automatically") })
     }
     Row(

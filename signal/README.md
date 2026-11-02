@@ -39,6 +39,8 @@ cd signal
 ./gradlew :app:assembleMinified     # R8 混淆 + adb 导入钩子，包名 .min，只用于真机验证
 ./gradlew :app:assembleRelease      # 发布包；有 keystore.properties 时用它签名，否则用 debug 签名
 ./gradlew test                      # 全部单元测试
+./gradlew :app:verifyRoborazziDebug # 首页截图回归（Robolectric，JVM 上跑，不需要设备）
+./gradlew :app:recordRoborazziDebug # UI 有意改动后重新录基准图（app/src/test/screenshots/），和代码一起提交
 ```
 
 发布签名：`signal/keystore.properties`（`storeFile / storePassword / keyAlias / keyPassword`）+ `signal/signal-release.jks`，两者都在 .gitignore 里，**只存在于本机，需要另外备份**。
