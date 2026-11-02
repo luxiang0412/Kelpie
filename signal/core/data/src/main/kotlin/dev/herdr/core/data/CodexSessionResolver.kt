@@ -11,7 +11,7 @@ import java.util.EnumSet
 
 /**
  * 按 cwd 在 `~/.codex/sessions` 里找 Codex 会话文件（规则见 [CodexSessionLocator]）。
- * **只读**：列最近两天的日期目录，读候选文件开头 8KB。
+ * **只读**：列最近两天的日期目录，读候选文件开头 2KB。
  */
 class CodexSessionResolver {
 
@@ -43,7 +43,7 @@ class CodexSessionResolver {
         }
             .filter { (_, mt) -> mt >= nowMs - windowMs }
             .sortedByDescending { it.second }
-            .take(40) // 只读最新的 40 个文件头
+            .take(300) // 一天可能上百个（多是别的 agent 调的 codex exec）；每个只读开头 2KB
             .mapNotNull { (path, mt) ->
                 val meta = runCatching { CodexSessionLocator.metaOf(readHead(sftp, path)) }.getOrNull() ?: return@mapNotNull null
                 CodexSessionLocator.Candidate(path, mt, meta)
@@ -54,7 +54,7 @@ class CodexSessionResolver {
     }
 
     private fun readHead(sftp: SFTPClient, path: String): String {
-        val buf = ByteArray(8 * 1024)
+        val buf = ByteArray(2 * 1024) // session_meta 的 cwd / originator 在开头几百字节
         val n = sftp.open(path, EnumSet.of(OpenMode.READ)).use { it.read(0, buf, 0, buf.size) }
         return if (n <= 0) "" else String(buf, 0, n, Charsets.UTF_8)
     }
