@@ -10,6 +10,7 @@
 | 23:20:12 | .2 | w8:p1（沙箱 Pi） | `agent.prompt` "reply with just SIGNAL-OK" | 已送达；Pi 回复 SIGNAL-OK；会话文件里只出现 1 次 |
 | 23:22 | .2 | ~/spike-sandbox/approvals | 手工放一条 `ls -la` 请求（带 nonce）→ 手机上短按（未批准）→ 按住 1 秒批准 | `.answer` 为 allow，nonce 匹配；测试文件已删 |
 | 23:24 | .2 | ~/spike-sandbox/approvals | 同上，手机上拒绝 | `.answer` 为 deny；测试文件已删 |
+| 23:29–23:36 | .2 | w8:p1（沙箱 Pi） | 从电脑上通过 bridge 发 `agent.prompt` "reply with just NOTIFY-OK[-2…6]"，共 6 次，用来在 App 处于后台时触发“完成” | 每次都回复对应文本；第 6 次时后台通知送达 |
 
 仓库目录下的 agent（w7 / w9 / wA / wB）全程只读。
 
@@ -33,3 +34,9 @@
 - 发送回执链路真机验证（发送中 → 已送达 → 工作中 → 已完成，输入框清空，草稿删除）。
 - 修复：已回答但请求方还没清理的 `.req` 会在下次轮询时重新出现 → 跳过已有 `.answer` 的请求。
 - 修复：夜间模式下次要按钮与弹层同色。
+
+### P4 通知
+- App 在后台时，状态转换协程不运行：MIUI 把缓存进程冻结了 → 加前台服务（dataSync，低优先级常驻通知），只在前台时启动。
+- 运行时权限已授予，MIUI 仍把应用通知设为关闭（importance NONE，appop ignore）→ `Notifier.allowed()` 同时检查 `areNotificationsEnabled()`，设置页显示提示并跳到系统通知设置。
+- 系统在通知权限变更时会杀掉 App 进程（ActivityManager: PermissionHelper），需要重新打开一次。
+- 验证：后台收到“spike-sandbox 完成了 · Pi · MS-7E07”，点通知直达该对话；锁屏只显示公开版本。

@@ -43,11 +43,15 @@ class AppContainer(app: Application) {
     val sender = Sender(fleet, scope, pendingSink)
     val previews = Previews(fleet, scope)
     val approvals = ApprovalCenter(fleet, scope)
+    val notifier = dev.herdr.signal.platform.Notifier(app, prefs)
+    /** 点通知要打开的对话（MainActivity 写，导航层读一次后清空）。 */
+    val pendingOpen = MutableStateFlow<dev.herdr.core.data.attention.AgentKey?>(null)
 
     init {
         scope.launch { runCatching { sender.restore(pendingSink.load()) } }
         // 阻塞预览只跟着首页的“等你处理”走
         scope.launch { fleet.home.collect { previews.sync(it.needsYou) } }
+        notifier.start(fleet, scope)
     }
 }
 
@@ -60,6 +64,17 @@ class SignalApp : Application() {
         container = AppContainer(this)
         DebugHooks.onAppStart(this, container)
         container.fleet.start()
+        val c = container
+        // 前台：开审批轮询并立刻对账一次；后台：停审批轮询（连接与状态对账继续，供通知使用）
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onStart(owner: androidx.lifecycle.LifecycleOwner) {
+                c.approvals.setActive(true); c.fleet.refreshAll()
+                // 前台时启动（后台不允许启动前台服务）；两个通知开关都关时不需要
+                if (c.prefs.notifyBlocked.value || c.prefs.notifyDone.value) dev.herdr.signal.platform.MonitorService.start(this@SignalApp)
+                else dev.herdr.signal.platform.MonitorService.stop(this@SignalApp)
+            }
+            override fun onStop(owner: androidx.lifecycle.LifecycleOwner) = c.approvals.setActive(false)
+        })
     }
 }
 

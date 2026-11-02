@@ -28,6 +28,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,8 +59,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val notifyBlocked = c.prefs.notifyBlocked
     val notifyDone = c.prefs.notifyDone
     fun setTheme(m: ThemeMode) = c.prefs.setTheme(m)
-    fun setNotifyBlocked(v: Boolean) = c.prefs.setNotifyBlocked(v)
-    fun setNotifyDone(v: Boolean) = c.prefs.setNotifyDone(v)
+    fun setNotifyBlocked(v: Boolean) { c.prefs.setNotifyBlocked(v); syncService() }
+    fun setNotifyDone(v: Boolean) { c.prefs.setNotifyDone(v); syncService() }
+    private fun syncService() {
+        val app = getApplication<Application>()
+        if (c.prefs.notifyBlocked.value || c.prefs.notifyDone.value) dev.herdr.signal.platform.MonitorService.start(app)
+        else dev.herdr.signal.platform.MonitorService.stop(app)
+    }
     fun retry(id: String) = c.fleet.reconnect(id)
 }
 
@@ -120,6 +126,23 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
             }
 
             GroupLabel("通知")
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val notifOk = remember(nb, nd) { ctx.container.notifier.allowed() }
+            if ((nb || nd) && !notifOk) {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(SignalRadius.l)).background(c.offlineContainer)
+                        .clickable {
+                            ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName))
+                        }
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(SignalIcons.Info, null, tint = c.warning, modifier = Modifier.size(18.dp))
+                    Text("系统关闭了本应用的通知，开关不会生效。点这里去开启。", style = Signal.type.meta, color = c.textPrimary, modifier = Modifier.weight(1f))
+                }
+            }
             Group {
                 SwitchRow("有 agent 在等你时通知", "App 在后台运行期间", nb, vm::setNotifyBlocked)
                 Divider()

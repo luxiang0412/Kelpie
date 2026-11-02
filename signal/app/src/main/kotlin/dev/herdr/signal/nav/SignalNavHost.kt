@@ -9,6 +9,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,8 +32,14 @@ object Routes {
 }
 
 @Composable
-fun SignalNavHost() {
+fun SignalNavHost(pendingOpen: kotlinx.coroutines.flow.MutableStateFlow<dev.herdr.core.data.attention.AgentKey?>) {
     val nav = rememberNavController()
+    val open by pendingOpen.collectAsState()
+    LaunchedEffect(open) {
+        val k = open ?: return@LaunchedEffect
+        pendingOpen.value = null
+        nav.navigate(Routes.Conversation(k.hostId, k.paneId)) { popUpTo(Routes.Home) }
+    }
     val reduce = dev.herdr.signal.designsystem.rememberReduceMotion()
     val d = if (reduce) 0 else 260
     Box(Modifier.fillMaxSize().background(Signal.colors.bg)) {

@@ -79,6 +79,7 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
         if (started) return
         started = true
         key = AgentKey(hostId, paneId)
+        c.notifier.clear(hostId, paneId)
         receipt = c.sender.records.map { it[key] }.stateIn(viewModelScope, SharingStarted.Eagerly, c.sender.records.value[key])
         online = c.fleet.links.map { it[hostId]?.reach == dev.herdr.core.data.attention.HostReach.Online }
             .stateIn(viewModelScope, SharingStarted.Eagerly, c.fleet.isOnline(hostId))
