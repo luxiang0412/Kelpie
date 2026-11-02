@@ -53,3 +53,9 @@
 - APK：debug 17.6 MB → release 5.2 MB。
 - 冷启动（am start -W，4 次）：debug 640–657 ms → minified 334–382 ms。
 - 对话页来回快速滑动 12 次：852 帧，janky 2.35%，p50 6 ms / p90 9 ms / p99 15 ms。
+
+### P5 基线配置（baseline profile）
+- 没用 Macrobenchmark：旧项目已验证 MIUI 的后台启动限制会让 instrumentation 启动目标 Activity 失败。改为：在 debug 包上手动走一遍首页 → 对话 → 滑动 → 设置 → 空闲列表，`cmd package dump-profiles` 导出 ART 配置，用 `signal/tools/profdump2baseline.py` 转成 `app/src/main/baseline-prof.txt`（9680 条，只保留自家代码、sshj、BouncyCastle、coroutines、navigation、room、serialization；Compose 自带）。
+- 冷启动 verify vs speed-profile 各 5 次：307–374 vs 308–343 ms，基本持平（这个体量下主要是进程创建）。
+- 首次打开对话后快速滑动（2 轮）：janky 2.96% / 2.76% → 1.17% / 1.17%，p99 20 / 22 → 14 / 16 ms。
+- 截图测试：Roborazzi / Paparazzi 依赖 Robolectric / layoutlib，目前对 compileSdk 37 + AGP 9.2 的支持不确定，本轮不引入；视觉回归继续用 `signal/tools/shots.sh` 在真机上截取关键页面（日 / 夜）人工对照。
