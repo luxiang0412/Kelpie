@@ -129,7 +129,7 @@ fun PermissionCard(e: AttentionEntry.Permission, nowMs: Long, offline: Boolean, 
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (offline) "可能已过期，联网后重新确认" else (r.tool?.let { "$it · " } ?: "") + "${(r.expiresAtMs - nowMs).coerceAtLeast(0) / 1000} 秒内有效",
+                if (offline) "可能已过期，联网后重新确认" else (r.tool?.let { "$it · " } ?: "") + validFor(r.expiresAtMs - nowMs),
                 style = Signal.type.meta, color = c.attentionOnContainerMeta, modifier = Modifier.weight(1f),
             )
             if (!offline) {
@@ -184,5 +184,14 @@ fun OfflineBanner(b: Banner, nowMs: Long, onRetry: () -> Unit) {
             Text(sub, style = Signal.type.meta, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         SignalChip("重试", onClick = onRetry, container = c.surface, border = c.outline, height = SignalSize.chipSmall)
+    }
+}
+
+private fun validFor(ms: Long): String {
+    val m = (ms / 60_000).toInt()
+    return when {
+        ms <= 0 -> "已过期"
+        m < 1 -> "不到 1 分钟内有效"
+        else -> "$m 分钟内有效"
     }
 }

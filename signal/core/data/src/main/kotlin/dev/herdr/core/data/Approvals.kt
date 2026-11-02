@@ -45,9 +45,13 @@ class Approvals(
         val sftp = conn.openSftp()
         try {
             if (runCatching { sftp.statExistence(dir) }.getOrNull() == null) return@withContext emptyList()
-            sftp.ls(dir).mapNotNull { e ->
+            val entries = sftp.ls(dir)
+            // 已经回答过、但请求方还没来得及清理的请求：不再显示（否则会被重复回答）
+            val answered = entries.map { it.name }.filter { it.endsWith(".answer") }.map { it.removeSuffix(".answer") }.toSet()
+            entries.mapNotNull { e ->
                 val name = e.name
                 if (!name.endsWith(".req")) return@mapNotNull null
+                if (name.removeSuffix(".req") in answered) return@mapNotNull null
                 val full = "$dir/$name"
                 val text = runCatching {
                     sftp.open(full, EnumSet.of(OpenMode.READ)).use { f ->

@@ -199,7 +199,7 @@ fun SignalButton(
     val bg = when {
         !enabled -> c.outline
         primary -> c.primary
-        else -> c.surfaceSubtle
+        else -> c.surfaceRaised
     }
     val fg = when {
         !enabled -> c.textTertiary

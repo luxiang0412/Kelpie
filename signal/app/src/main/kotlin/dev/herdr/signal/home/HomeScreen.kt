@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,15 +68,25 @@ import dev.herdr.core.data.runtime.ApprovalItem
 @Composable
 fun HomeRoute(
     onOpen: (AgentKey, String?) -> Unit,
-    onOpenApproval: (ApprovalItem) -> Unit,
     onSettings: () -> Unit,
     onAddHost: () -> Unit,
     vm: HomeViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prompt by vm.hostKeyPrompt.collectAsStateWithLifecycle()
-    HomeScreen(ui, onOpen, onOpenApproval, onSettings, onAddHost, onRetry = vm::retry)
+    var sheet by remember { mutableStateOf<ApprovalItem?>(null) }
+    HomeScreen(ui, onOpen, { sheet = it }, onSettings, onAddHost, onRetry = vm::retry)
     prompt?.let { HostKeyDialog(it, vm::answerHostKey) }
+    sheet?.let { a ->
+        // 请求从列表里消失（已回答 / 过期 / 电脑上处理了）时自动关闭
+        val live = ui.entries.any { it is AttentionEntry.Permission && it.approval.request.requestId == a.request.requestId }
+        androidx.compose.runtime.LaunchedEffect(live) { if (!live) sheet = null }
+        val pane = a.request.paneId
+        dev.herdr.signal.conversation.ApprovalSheet(
+            a, onDismiss = { sheet = null },
+            onOpenConversation = pane?.let { p -> { onOpen(AgentKey(a.hostId, p), null) } },
+        )
+    }
 }
 
 @Composable

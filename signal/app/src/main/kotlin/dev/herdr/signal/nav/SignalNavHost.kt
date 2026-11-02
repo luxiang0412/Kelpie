@@ -24,7 +24,6 @@ import kotlinx.serialization.Serializable
 object Routes {
     @Serializable data object Home
     @Serializable data class Conversation(val hostId: String, val paneId: String, val prefill: String? = null)
-    @Serializable data class Approval(val hostId: String, val requestId: String)
     @Serializable data object Settings
     @Serializable data class HostEdit(val hostId: String? = null)
 }
@@ -46,7 +45,6 @@ fun SignalNavHost() {
             composable<Routes.Home> {
                 HomeRoute(
                     onOpen = { key, prefill -> nav.navigate(Routes.Conversation(key.hostId, key.paneId, prefill)) },
-                    onOpenApproval = { a -> nav.navigate(Routes.Approval(a.hostId, a.request.requestId)) },
                     onSettings = { nav.navigate(Routes.Settings) },
                     onAddHost = { nav.navigate(Routes.HostEdit()) },
                 )
@@ -54,10 +52,6 @@ fun SignalNavHost() {
             composable<Routes.Conversation> { entry ->
                 val r = entry.toRoute<Routes.Conversation>()
                 ConversationRoute(r.hostId, r.paneId, r.prefill, onBack = { nav.popBackStack() })
-            }
-            composable<Routes.Approval> { entry ->
-                val r = entry.toRoute<Routes.Approval>()
-                dev.herdr.signal.conversation.ApprovalRoute(r.hostId, r.requestId, onDone = { nav.popBackStack() })
             }
             composable<Routes.Settings> {
                 SettingsRoute(
