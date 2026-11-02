@@ -116,7 +116,7 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
         val path = pane.agentSessionPath?.takeIf { it.isNotBlank() } ?: run {
             if (pane.agent == "codex") {
                 val sameCwd = c.fleet.panes(key.hostId).count { it.agent == "codex" && it.cwd == pane.cwd }
-                when (val r = CodexSessionResolver().resolve(conn, pane.cwd, sameCwd)) {
+                when (val r = CodexSessionResolver().resolve(conn, pane.cwd, pane.agentSessionId, sameCwd)) {
                     is ClaudeSessionResolver.Result.Found -> r.path
                     is ClaudeSessionResolver.Result.Failure -> { _source.value = Source.TerminalOnly(r.message); null }
                 }

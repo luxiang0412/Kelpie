@@ -106,6 +106,8 @@ class AttentionTest {
         assertEquals("spike-sandbox", Titles.of(pane("p", AgentStatus.IDLE, title = "π - spike-sandbox")))
         assertEquals("repo", Titles.of(pane("p", AgentStatus.IDLE, agent = "claude", title = "Claude Code")))
         assertEquals("修复登录超时", Titles.of(pane("p", AgentStatus.IDLE, agent = "claude", title = "✳ 修复登录超时")))
+        assertEquals("Run the requested touch command", Titles.of(pane("p", AgentStatus.BLOCKED, agent = "codex", title = "[!] Action Required | Run the requested touch command")))
+        assertEquals("Run the requested touch command", Titles.of(pane("p", AgentStatus.BLOCKED, agent = "codex", title = "[.] Action Required | Run the requested touch command")))
         assertEquals("repo", Titles.of(pane("p", AgentStatus.IDLE, agent = "codex", title = "")))
     }
 

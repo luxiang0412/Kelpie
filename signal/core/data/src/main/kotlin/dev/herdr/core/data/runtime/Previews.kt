@@ -6,6 +6,7 @@ import dev.herdr.core.data.attention.AgentItem
 import dev.herdr.core.data.attention.AgentKey
 import dev.herdr.core.herdr.ChatMessage
 import dev.herdr.core.herdr.TranscriptLoader
+import dev.herdr.core.herdr.t
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,7 +75,7 @@ class Previews(
         val path = pane.agentSessionPath?.takeIf { it.isNotBlank() }
             ?: if (pane.agent == "codex") {
                 val sameCwd = fleet.panes(item.key.hostId).count { it.agent == "codex" && it.cwd == pane.cwd }
-                (codexResolver.resolve(conn, pane.cwd, sameCwd) as? ClaudeSessionResolver.Result.Found)?.path
+                (codexResolver.resolve(conn, pane.cwd, pane.agentSessionId, sameCwd) as? ClaudeSessionResolver.Result.Found)?.path
             } else if (pane.agentSessionId != null || pane.agent?.startsWith("claude") == true) {
                 (resolver.resolve(conn, pane.cwd, pane.agentSessionId) as? ClaudeSessionResolver.Result.Found)?.path
             } else null
@@ -147,11 +148,42 @@ class Previews(
         /** 终端尾部：先认 Claude 的确认框；否则去掉空行与框线，保留最后 8 行。 */
         fun fromScreen(raw: String): BlockedPreview? {
             claudePrompt(raw)?.let { return it }
+            codexPrompt(raw)?.let { return it }
             val lines = raw.lines().map { it.trimEnd() }
                 .filter { it.isNotBlank() && !it.all { c -> c in BOX_CHARS || c == ' ' } }
                 .takeLast(8)
             if (lines.isEmpty()) return null
             return BlockedPreview(lines.joinToString("\n").take(MAX), BlockedPreview.Source.Screen)
+        }
+
+        /**
+         * Codex CLI 的终端确认（0.166 实测）：
+         * ```
+         *   Would you like to run the following command?
+         *   Environment: local
+         *   Reason: Allow creating timeout.txt file?
+         *   $ touch timeout.txt
+         * › 1. Yes, proceed (y)
+         *   2. Yes, and don't ask again …
+         *   3. No, and tell Codex what to do differently (esc)
+         * ```
+         * 只保留命令（和理由），不要选项。
+         */
+        fun codexPrompt(raw: String): BlockedPreview? {
+            val lines = raw.lines().map { it.trim() }
+            val ask = lines.indexOfLast { it.startsWith("Would you like to ") && it.endsWith("?") }
+            if (ask < 0) return null
+            val end = (ask + 1 until lines.size).firstOrNull { lines[it].removePrefix("›").trim().startsWith("1. ") } ?: return null
+            val body = lines.subList(ask + 1, end).filter { it.isNotEmpty() && !it.startsWith("Environment:") }
+            val cmd = body.filter { it.startsWith("$ ") }.map { it.removePrefix("$ ") }
+            val reason = body.firstOrNull { it.startsWith("Reason:") }?.removePrefix("Reason:")?.trim()
+            val isCommand = lines[ask].contains("command")
+            val text = (if (cmd.isNotEmpty()) cmd else body.filterNot { it.startsWith("Reason:") }).joinToString("\n")
+            val tool = if (isCommand) t("命令", "command") else lines[ask].removePrefix("Would you like to ").removeSuffix("?").take(40)
+            return BlockedPreview(
+                listOfNotNull(text.takeIf { it.isNotBlank() }, reason?.let { "# $it" }).joinToString("\n").take(MAX).ifBlank { lines[ask] },
+                BlockedPreview.Source.Screen, pendingTool = tool,
+            )
         }
 
         private const val MAX = 600

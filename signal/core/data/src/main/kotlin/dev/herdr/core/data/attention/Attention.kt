@@ -102,10 +102,13 @@ data class AgentItem(
 }
 
 object Titles {
+    private val ATTENTION_PREFIX = Regex("""^\[[^\]]{1,2}]\s*Action Required\s*\|\s*""", RegexOption.IGNORE_CASE) // 标记在 [!] / [.] 间闪烁
     private val prefixes = listOf("π - ", "pi - ", "✳ ", "* ", "⠂ ", "⠐ ")
 
     fun of(p: Pane): String {
         var t = p.title?.trim().orEmpty()
+        // Codex 等你时把终端标题改成 “[!] Action Required | <原标题>”（[!] 和 [.] 交替）：状态已经由卡片表达，去掉
+        t = ATTENTION_PREFIX.replace(t, "")
         prefixes.firstOrNull { t.startsWith(it) }?.let { t = t.removePrefix(it).trim() }
         val generic = t.isBlank() || t.equals(p.agent, ignoreCase = true) ||
             t.equals(AgentNames.display(p.agent), ignoreCase = true)

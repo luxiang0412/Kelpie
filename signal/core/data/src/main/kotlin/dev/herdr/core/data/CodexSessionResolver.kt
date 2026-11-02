@@ -10,7 +10,7 @@ import net.schmizz.sshj.sftp.SFTPClient
 import java.util.EnumSet
 
 /**
- * 按 cwd 在 `~/.codex/sessions` 里找 Codex 会话文件（规则见 [CodexSessionLocator]）。
+ * 在 `~/.codex/sessions` 里找 Codex 会话文件：有会话 id 按 id，没有才按 cwd（规则见 [CodexSessionLocator]）。
  * **只读**：列最近两天的日期目录，读候选文件开头 2KB。
  */
 class CodexSessionResolver {
@@ -20,20 +20,31 @@ class CodexSessionResolver {
     suspend fun resolve(
         conn: SshConnection,
         cwd: String?,
+        sessionId: String?,
         codexPanesWithSameCwd: Int,
         nowMs: Long = System.currentTimeMillis(),
     ): ClaudeSessionResolver.Result = withContext(Dispatchers.IO) {
         fun fail(code: String, message: String) = ClaudeSessionResolver.Result.Failure(code, message)
-        if (cwd.isNullOrBlank()) return@withContext fail("no_cwd", t("pane 没有上报 cwd", "The pane didn't report a cwd"))
-        if (codexPanesWithSameCwd > 1) {
-            return@withContext fail("ambiguous", t("同一目录下有 $codexPanesWithSameCwd 个 Codex，分不清是哪个会话", "$codexPanesWithSameCwd Codex panes share this directory; can't tell which transcript is this one"))
-        }
         val sftp = runCatching { conn.sharedSftp() }.getOrElse { return@withContext fail("no_sftp", it.message ?: t("SFTP 不可用", "SFTP unavailable")) }
         val home = runCatching { sftp.canonicalize(".") }.getOrNull().orEmpty().trimEnd('/')
         if (home.isEmpty()) return@withContext fail("no_home", t("无法确定远端 home 目录", "Couldn't determine the remote home directory"))
         val root = "$home/.codex/sessions"
         fun names(dir: String) = runCatching { sftp.ls(dir).filter { it.isDirectory }.map { it.name } }.getOrDefault(emptyList())
         val days = CodexSessionLocator.recentDayDirs(names(root), { y -> names("$root/$y") }, { y, m -> names("$root/$y/$m") })
+        val id = sessionId?.trim()?.takeIf { it.isNotEmpty() && it.all { c -> c.isLetterOrDigit() || c == '-' } }
+        if (id != null) {
+            val dirs = (days + (CodexSessionLocator.uuidV7Millis(id)?.let { CodexSessionLocator.dayDirsAround(it) }.orEmpty())).distinct()
+            for (d in dirs) {
+                val hit = runCatching { sftp.ls("$root/$d") }.getOrDefault(emptyList()).firstOrNull { CodexSessionLocator.matchesId(it.name, id) }
+                if (hit != null) return@withContext ClaudeSessionResolver.Result.Found("$root/$d/${hit.name}", t("按会话 id 找到", "Located by session id"))
+            }
+            // id 对不上文件（例如 Codex 用了别的 CODEX_HOME）：不再按 cwd 猜，免得挂到同目录的另一个会话
+            return@withContext fail("id_not_found", t("$root 里没有会话 $id（可能用了别的 CODEX_HOME）", "No session $id under $root (a different CODEX_HOME?)"))
+        }
+        if (cwd.isNullOrBlank()) return@withContext fail("no_cwd", t("pane 没有上报 cwd", "The pane didn't report a cwd"))
+        if (codexPanesWithSameCwd > 1) {
+            return@withContext fail("ambiguous", t("同一目录下有 $codexPanesWithSameCwd 个 Codex，分不清是哪个会话", "$codexPanesWithSameCwd Codex panes share this directory; can't tell which transcript is this one"))
+        }
         if (days.isEmpty()) return@withContext fail("dir_missing", t("找不到 $root", "Not found: $root"))
 
         val candidates = days.flatMap { d ->

@@ -69,4 +69,35 @@ class PreviewsTest {
         assertEquals("Bash command", p.pendingTool)
         assertEquals("Print current working directory\npwd\nHook PreToolUse:Bash requires confirmation for this command:\n手机 120 秒内没有回答，改在终端确认 [settings]", p.text)
     }
+
+    /** Codex 0.166 的终端确认框（2026-11-03 在沙箱 pane 里实际截到的屏幕）。 */
+    @Test fun codexCommandPrompt() {
+        val raw = """
+› Now run: touch timeout.txt (request approval again)
+
+• Running touch timeout.txt
+
+  Would you like to run the following command?
+
+  Environment: local
+
+  Reason: Allow creating timeout.txt file?
+
+  $ touch timeout.txt
+
+› 1. Yes, proceed (y)
+  2. Yes, and don't ask again for commands that start with `touch timeout.txt` (p)
+  3. No, and tell Codex what to do differently (esc)
+
+  Press enter to confirm or esc to cancel
+"""
+        dev.herdr.core.herdr.L10n.update(java.util.Locale.SIMPLIFIED_CHINESE)
+        val p = Previews.fromScreen(raw)!!
+        assertEquals("命令", p.pendingTool)
+        assertEquals("touch timeout.txt\n# Allow creating timeout.txt file?", p.text)
+    }
+
+    @Test fun codexPromptNeedsOptions() {
+        assertNull(Previews.codexPrompt("  Would you like to run the following command?\n  $ ls\n"))
+    }
 }

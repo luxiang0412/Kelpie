@@ -74,7 +74,8 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
             Text(t("联网后才能回复 · 草稿会保留", "Can't reply while offline · draft is kept"), style = Signal.type.meta, color = c.attentionOnContainerMeta)
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                QuickReplies.forEach { q ->
+                // 在等批准（终端里的选择框）时不给“继续 / 好的”：那是给提问用的，发到选择框里没有意义
+                if (e.preview?.pendingTool == null) QuickReplies.forEach { q ->
                     SignalChip(q, onClick = { onOpen(item.key, q) }, container = c.attentionContainerInner, content = c.attentionOnContainerBody)
                 }
                 Spacer(Modifier.weight(1f))

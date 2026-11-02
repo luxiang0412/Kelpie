@@ -42,4 +42,14 @@ class CodexSessionLocatorTest {
         )
         assertEquals(listOf("2026/11/01", "2026/10/31"), d)
     }
+
+    @Test fun sessionIdHelpers() {
+        val id = "01a19e58-8746-7013-bf32-e6e0b24c6128"
+        val ms = CodexSessionLocator.uuidV7Millis(id)!!
+        assertEquals("2026-11-02T22:19:24.358Z", java.time.Instant.ofEpochMilli(ms).toString())
+        assertEquals(listOf("2026/11/01", "2026/11/02", "2026/11/03"), CodexSessionLocator.dayDirsAround(ms))
+        assertNull(CodexSessionLocator.uuidV7Millis("15367e80-d73d-45f0-9d85-f699bf7fbab8")) // v4
+        assertEquals(true, CodexSessionLocator.matchesId("rollout-2026-11-03T06-19-24-$id.jsonl", id))
+        assertEquals(false, CodexSessionLocator.matchesId("rollout-2026-11-03T06-19-24-$id.jsonl.bak", id))
+    }
 }
