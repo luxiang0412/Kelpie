@@ -37,7 +37,13 @@ class AppContainer(app: Application) {
     private val pendingSink = RoomPendingWriteSink(draftDb.pendingWrites(), scope)
     private val trustDir = File(app.filesDir, "trust")
 
-    fun connector(hostId: String) = SshConnector(File(trustDir, "$hostId.known_hosts"))
+    fun trustFile(hostId: String) = File(trustDir, "$hostId.known_hosts")
+    fun connector(hostId: String) = SshConnector(trustFile(hostId))
+
+    /** 深链 / 扫码拿到、等待确认的配对链接。 */
+    val pendingPair = MutableStateFlow<String?>(null)
+    /** 正在确认的配对链接（只在内存里）。 */
+    val pairLink = MutableStateFlow<String?>(null)
 
     val fleet = Fleet(hosts, boards, ::connector, scope)
     val sender = Sender(fleet, scope, pendingSink)

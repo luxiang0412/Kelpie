@@ -30,11 +30,24 @@ object Routes {
     @Serializable data class Conversation(val hostId: String, val paneId: String, val prefill: String? = null)
     @Serializable data object Settings
     @Serializable data class HostEdit(val hostId: String? = null)
+    /** 配对确认页。链接里有私钥，所以不放进路由参数（会进 saved state），只放在内存里的 [AppContainer.pairLink]。 */
+    @Serializable data object Pair
 }
 
 @Composable
-fun SignalNavHost(pendingOpen: kotlinx.coroutines.flow.MutableStateFlow<dev.herdr.core.data.attention.AgentKey?>) {
+fun SignalNavHost(
+    pendingOpen: kotlinx.coroutines.flow.MutableStateFlow<dev.herdr.core.data.attention.AgentKey?>,
+    pendingPair: kotlinx.coroutines.flow.MutableStateFlow<String?>,
+    pairLink: kotlinx.coroutines.flow.MutableStateFlow<String?>,
+) {
     val nav = rememberNavController()
+    val pair by pendingPair.collectAsState()
+    LaunchedEffect(pair) {
+        val l = pair ?: return@LaunchedEffect
+        pendingPair.value = null
+        pairLink.value = l
+        nav.navigate(Routes.Pair)
+    }
     val open by pendingOpen.collectAsState()
     LaunchedEffect(open) {
         val k = open ?: return@LaunchedEffect
@@ -48,7 +61,7 @@ fun SignalNavHost(pendingOpen: kotlinx.coroutines.flow.MutableStateFlow<dev.herd
         dev.herdr.signal.JankMonitor.screen(
             when {
                 "Conversation" in r -> "conversation"
-                "HostEdit" in r -> "host-edit"
+                "HostEdit" in r || "Pair" in r -> "host-edit"
                 "Settings" in r -> "settings"
                 else -> "home"
             },
@@ -84,7 +97,21 @@ fun SignalNavHost(pendingOpen: kotlinx.coroutines.flow.MutableStateFlow<dev.herd
             }
             composable<Routes.HostEdit> { entry ->
                 val r = entry.toRoute<Routes.HostEdit>()
-                dev.herdr.signal.settings.HostEditRoute(r.hostId, onDone = { nav.popBackStack() })
+                dev.herdr.signal.settings.HostEditRoute(r.hostId, onDone = { nav.popBackStack() }, onPair = { pairLink.value = it; nav.navigate(Routes.Pair) })
+            }
+            composable<Routes.Pair> {
+                // 进入时取一次；之后清空也不影响这一页（否则清空的瞬间会再触发一次返回，把首页也弹掉）
+                val link = androidx.compose.runtime.remember { pairLink.value }
+                val done = { pairLink.value = null }
+                // 进程被杀后恢复到这一页时链接已经没了：直接回去
+                if (link == null) LaunchedEffect(Unit) { nav.popBackStack() }
+                link?.let { l ->
+                    dev.herdr.signal.settings.PairConfirmRoute(
+                        l,
+                        onCancel = { done(); nav.popBackStack() },
+                        onPaired = { done(); nav.navigate(Routes.Home) { popUpTo(Routes.Home) { inclusive = true } } },
+                    )
+                }
             }
         }
     }

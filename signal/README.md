@@ -48,6 +48,23 @@ cd signal
 CI：`.github/workflows/signal.yml`（单元测试、lint、debug + release 构建、`tools/i18n_literals.py --check`）。
 要在 CI 里签正式包，把 jks 的 base64 放进 secret `SIGNAL_KEYSTORE_BASE64`、密码放进 `SIGNAL_KEYSTORE_PASSWORD`。
 
+### 扫码添加主机
+
+在**要添加的那台开发机**上运行（只依赖 Python 3 标准库和 ssh-keygen）：
+
+```bash
+python3 signal/companion/pair/signal_pair.py --session test --host <手机能连到的地址>
+```
+
+脚本会生成一把这台手机专用的 ed25519 密钥（注释 `herdr-signal-<名称>-<日期>`），问你是否加入 `~/.ssh/authorized_keys`，
+然后在终端画出二维码（`--png` 另存图片）。二维码里有地址、本机全部 host key 指纹和私钥，10 分钟后手机不再接受。
+App 里：设置 → 添加主机 → 扫描二维码 / 从图片识别；系统相机扫到也会打开 App。**所有入口都要在确认页按下按钮才会写入**。
+
+- 指纹来自开发机自己显示的二维码，视为已经核对过，直接固定；和已保存的指纹不一致时拒绝，不会覆盖。
+- 同一地址 + 用户 + 会话的主机已存在时，更新它而不是新增一条。
+- 多网卡 / VPN 的机器请务必用 `--host` 指定地址（脚本会列出候选）。
+- `--list` 列出发过的手机密钥，`--revoke <名称>` 撤销（会先备份 authorized_keys）。
+
 ### 调试包快速配置主机（免去在手机上粘贴私钥）
 
 ```bash

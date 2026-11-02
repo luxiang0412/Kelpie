@@ -2,6 +2,15 @@ package dev.herdr.signal.settings
 
 import dev.herdr.core.herdr.t
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import dev.herdr.core.data.PairingPayload
+import dev.herdr.signal.designsystem.SignalIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -49,10 +58,10 @@ import dev.herdr.signal.ui.BackTopBar
 
 /**
  * 添加 / 编辑主机。私钥只在本页粘贴，保存后写入 app 私有目录，界面上永远不再显示原文。
- * 二维码配对（规范 v1 范围外）以后在这里加入口。
+ * 新主机可以改用二维码配对（`signal/companion/pair/signal_pair.py`）：扫码或从图片识别，进入确认页。
  */
 @Composable
-fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
+fun HostEditRoute(hostId: String?, onDone: () -> Unit, onPair: (String) -> Unit = {}) {
     val ctx = LocalContext.current
     val repo = ctx.container.hosts
     val existing = remember(hostId) { hostId?.let { repo.get(it) } }
@@ -68,6 +77,18 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
     var key by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+
+    fun handleCode(text: String?) {
+        when {
+            text == null -> error = t("没有识别到二维码", "No QR code found")
+            !PairingPayload.looksLikePairing(text) -> error = t("这不是 Herdr Signal 的配对二维码", "This isn't a Herdr Signal pairing code")
+            else -> { error = null; onPair(text) }
+        }
+    }
+    val scan = rememberLauncherForActivityResult(ScanContract()) { r -> if (r.contents != null) handleCode(r.contents) }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) handleCode(QrImage.decode(ctx, uri))
+    }
 
     fun save() {
         val p = port.toIntOrNull()
@@ -101,6 +122,25 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (existing == null) {
+                GroupLabel(t("用二维码添加（推荐）", "Add with a QR code (recommended)"))
+                Group {
+                    ActionRow(SignalIcons.Scan, t("扫描二维码", "Scan QR code")) {
+                        scan.launch(
+                            ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false)
+                                .setOrientationLocked(false).setPrompt(t("对准电脑上 signal_pair.py 显示的二维码", "Point at the code shown by signal_pair.py")),
+                        )
+                    }
+                    Divider()
+                    ActionRow(SignalIcons.File, t("从图片识别", "From an image")) {
+                        pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                }
+                Text(
+                    t("在开发机上运行 signal/companion/pair/signal_pair.py，会显示带地址、主机指纹和手机专用私钥的二维码。也可以在下面手动填写。", "Run signal/companion/pair/signal_pair.py on the dev machine to show a code with the address, host fingerprints and a key for this phone. Or fill in the fields below."),
+                    style = Signal.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             GroupLabel(t("连接", "Connection"))
             Group {
                 Field(t("名称", "Name"), label, { label = it }, t("例如：家里的台式机", "e.g. Home desktop"))
@@ -151,6 +191,20 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
             confirmButton = { TextButton(onClick = { repo.remove(existing.id); confirmDelete = false; onDone() }) { Text(t("删除", "Delete"), color = c.error) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(t("取消", "Cancel"), color = c.textSecondary) } },
         )
+    }
+}
+
+@Composable
+private fun ActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
+    val c = Signal.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(onClickLabel = text, onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(icon, null, tint = c.iconMuted, modifier = Modifier.size(20.dp))
+        Text(text, style = Signal.type.body, color = c.textPrimary, modifier = Modifier.weight(1f))
+        Icon(SignalIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(16.dp))
     }
 }
 

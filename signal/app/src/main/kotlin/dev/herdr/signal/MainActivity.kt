@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
                     else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, colors.scrim.toArgb())
                     enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                 }
-                SignalNavHost(c.pendingOpen)
+                SignalNavHost(c.pendingOpen, c.pendingPair, c.pairLink)
             }
         }
     }
@@ -49,6 +49,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: android.content.Intent?) {
+        intent?.data?.takeIf { it.scheme == dev.herdr.core.data.PairingPayload.SCHEME }?.let { uri ->
+            container.pendingPair.value = uri.toString()
+            intent.data = null // 旋转 / 重建时不要再触发一次
+            return
+        }
         val host = intent?.getStringExtra(dev.herdr.signal.platform.Notifier.EXTRA_HOST) ?: return
         val pane = intent.getStringExtra(dev.herdr.signal.platform.Notifier.EXTRA_PANE) ?: return
         container.pendingOpen.value = dev.herdr.core.data.attention.AgentKey(host, pane)

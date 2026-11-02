@@ -74,6 +74,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("androidx.metrics:metrics-performance:1.0.0-beta01")
+    // 扫码配对：相机扫描（不依赖 Google Play 服务）+ 从图片识别
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0") { isTransitive = false }
+    implementation("com.google.zxing:core:3.5.3")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.ui:ui-tooling-preview")
     testImplementation("junit:junit:4.13.2")
