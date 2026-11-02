@@ -213,3 +213,21 @@ OpenRouter 用量：0.1115 → 0.1220 美元。沙箱 pane `w8:p2` 暂时保留�
 OpenRouter 用量：0.1256 → 0.1400 美元。
 
 **留在 .2 上的：** `~/spike-sandbox/.codex-signal`（214 MB，配置、hook、会话记录、日志库）、`~/spike-sandbox/codex-work/hello.txt`。不要了可以直接删。
+
+## 0.3.0 与仓库整理（2026-11-03 06:40–07:00）
+
+- **wA 里 Codex 的项目评审**（06:34，用户发起）：核实并修复了 5 条问题，提交 8146efc。
+  - “结果未知”的发送在重启后不显示。
+  - 待确认写操作的保存不是事务。
+  - `Fleet` 的主机表没加锁就读、`tracker` 被并发修改。
+  - 主机的状态监听不随主机一起取消。
+  - release 缺密钥时悄悄用 debug 签名。
+- **仓库整理**（用户选择：旧客户端一起归档、旧版文档直接删除）：提交 6aa62c1。
+  - `android/` 移到 `archive/android/`。
+  - Signal 文档集中到 `docs/signal/`。
+  - 旧版文档删除。代码注释里还在引用的旧决策 / 旧问题摘录到 `BACKGROUND.md`。
+- **发版 0.3.0**：提交 dcd3071，打 tag `signal-v0.3.0`。
+  - 第一次用正式密钥签名，证书 SHA-256 `FE:8D:7D:…:76:D2:EA`。
+  - 产物 `dist/herdr-signal-0.3.0.apk`，不入库。
+  - 发版前在手机上冒烟测试了 minified 包：首页正常、两台主机在线、Codex 对话正常显示。
+  - 正式包没有装到手机上：手机上的 `dev.herdr.signal` 0.2.0 是 debug 签名，要先卸载，由用户决定。
