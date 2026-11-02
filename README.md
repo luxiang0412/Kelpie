@@ -1,38 +1,50 @@
 # Herdr Signal
 
-人离开电脑后，用手机监督远程开发机上由 [herdr](https://herdr.dev) 托管的 coding agent（Claude Code / Codex / Pi）：
-谁在等你、在等什么，读结构化对话，补发指令，批准工具调用。**不是**移动 SSH 终端。
+<img src="art/logo-512.png" width="96" align="right" alt="logo">
 
-![logo](signal/art/logo-512.png)
+人离开电脑后，用手机监督远程开发机上由 [herdr](https://herdr.dev) 托管的 coding agent（Claude Code / Codex / Pi）。
+**不是**移动 SSH 终端。
 
-## 目录
+- **首页**：所有主机、所有 agent 按注意力排序：在等你 → 工作中 → 刚完成 → 空闲。在等你的直接显示它问了什么、要运行什么。
+- **对话**：读 Claude Code / Codex / Pi 的结构化对话；对话内搜索，查看工具完整输出；补发指令，带送达回执。
+- **审批**：agent 要运行命令时，在手机上按住允许或拒绝（Claude Code / Codex，hook 见 [`companion/`](companion/)）。
+- **配对**：开发机上运行脚本生成二维码，手机扫一下就添加好主机；主机指纹固定，不做首次信任（TOFU）。
+- 后台通知（MIUI 可用）、中英文、日夜间主题。
 
-| 目录 | 内容 |
-| --- | --- |
-| [`signal/`](signal/) | **当前的 Android 客户端**（Kotlin / Compose）。构建、运行、发版见 [`signal/README.md`](signal/README.md) |
-| [`signal/companion/`](signal/companion/) | 装在开发机上的小脚本：扫码配对（`pair/`）、手机审批 hook（`hooks/`） |
-| [`docs/signal/`](docs/signal/) | 设计规范、herdr 接口审计、审批实验、过程记录（索引见下） |
-| `tools/` | 仓库维护脚本（`check_doc_links.py`：检查文档里的路径引用） |
-| `.github/workflows/signal.yml` | CI：单元测试、截图回归、lint、构建、文案检查 |
+当前版本 **0.3.0**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-## 文档索引
+## 快速开始
 
-| 文档 | 内容 |
-| --- | --- |
-| [`signal/README.md`](signal/README.md) | 模块结构、构建命令、发版与签名、扫码配对、调试技巧、性能数据 |
-| [`signal/CHANGELOG.md`](signal/CHANGELOG.md) | 版本更新说明 |
-| [`docs/signal/DESIGN-SPEC.md`](docs/signal/DESIGN-SPEC.md) | 设计规范（信息架构、视觉 token、各页面规格） |
-| [`docs/signal/HERDR-AUDIT.md`](docs/signal/HERDR-AUDIT.md) | 客户端用到的 herdr 远程接口，以及还缺什么 |
-| [`docs/signal/APPROVALS.md`](docs/signal/APPROVALS.md) | 手机审批（Claude Code / Codex）的机制、实验结果、启用前要决定的事 |
-| [`docs/signal/PUSH-OPTIONS.md`](docs/signal/PUSH-OPTIONS.md) | 后台推送方案对比（FCM / ntfy / UnifiedPush）；目前不做，靠常驻连接 |
-| [`docs/signal/MARKDOWN-RENDERING.md`](docs/signal/MARKDOWN-RENDERING.md) | Markdown 渲染选型 |
-| [`docs/signal/BACKGROUND.md`](docs/signal/BACKGROUND.md) | 代码注释里引用的旧决策（`Dn`）、旧问题（`I-n`）摘录 |
-| [`docs/signal/REMOTE-SCOPE.md`](docs/signal/REMOTE-SCOPE.md) | 开发过程中对远端主机的授权范围 |
-| [`docs/signal/RUN-LOG.md`](docs/signal/RUN-LOG.md) | 开发过程记录：每次远端写操作、每个阶段的自查 |
-| [`docs/signal/REDESIGN-BRIEF.md`](docs/signal/REDESIGN-BRIEF.md) | 重写前的调研简报（历史） |
+需要 JDK 17、Android SDK（compileSdk 37），`local.properties` 里写 `sdk.dir`。
 
-## 历史
+```bash
+./gradlew :app:assembleDebug     # 调试包，包名 dev.herdr.signal.debug
+./gradlew test                   # 单元测试
+```
 
-- 0.1.x：旧版客户端（原 `android/`），2026-10 底。
-- 2026-11-02：在 `signal/` 重写（新设计、新架构），0.2.0 起是 Signal。
-- 2026-11-03：旧版客户端代码、早期探针（`archive/`），以及旧版的设计规格、过程报告、截图证据、台账（`DECISIONS.md`、`ISSUES.md`、`RESULTS.md` 等）都从仓库删除。需要时从 git 历史取，例如 `git show signal-v0.2.0:DECISIONS.md`、`git checkout signal-v0.3.0 -- archive/`。
+完整的构建、测试、发版、调试说明见 [`docs/development.md`](docs/development.md)。
+
+## 目录结构
+
+```text
+app/                    # 应用：Activity、导航、各页面、通知、前台服务
+core/
+  ssh/                  # SSH 连接、主机指纹信任
+  herdr/                # herdr 协议、连接监督、Claude / Codex / Pi 会话解析、中英文案
+  data/                 # 主机配置、缓存、草稿、审批；runtime/（多主机运行时）、attention/（首页排序）
+  designsystem/         # 颜色 / 字体 / 间距 token、图标、基础组件
+  markdown/             # Markdown 渲染
+benchmark/              # Macrobenchmark（冷启动、长对话滚动）
+build-logic/            # Gradle 约定插件：各模块共用的 Android 配置
+gradle/libs.versions.toml  # 依赖和插件版本
+companion/              # 装在开发机上的脚本：扫码配对、审批 hook
+docs/                   # 文档（索引见 docs/README.md）
+tools/                  # 开发脚本
+art/                    # 标志源文件
+```
+
+依赖方向：`app` → `core:markdown` / `core:designsystem` / `core:data` → `core:herdr` → `core:ssh`。
+
+## 文档
+
+见 [`docs/README.md`](docs/README.md)。
