@@ -1,5 +1,8 @@
 package dev.herdr.signal.settings
 
+import dev.herdr.core.herdr.plural
+import dev.herdr.core.herdr.t
+
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -80,12 +83,12 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
     val nd by vm.notifyDone.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().background(c.bgGrouped).statusBarsPadding()) {
-        BackTopBar("设置", onBack)
+        BackTopBar(t("设置", "Settings"), onBack)
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            GroupLabel("主机")
+            GroupLabel(t("主机", "Hosts"))
             Group {
                 hosts.forEachIndexed { i, h ->
                     val link = links[h.id]
@@ -104,11 +107,11 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
                         Dot(dot, 8.dp)
                         Column(Modifier.weight(1f)) {
                             Text(h.label, style = Signal.type.rowTitle, color = c.textPrimary)
-                            val sub = (link?.text ?: "未连接") + if (link?.reach == HostReach.Online) " · $count 个 agent" else ""
+                            val sub = (link?.text ?: t("未连接", "Not connected")) + if (link?.reach == HostReach.Online) t(" · $count 个 agent", " · " + plural(count, "agent")) else ""
                             Text(sub, style = Signal.type.meta, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                         if (link?.reach == HostReach.Unreachable) {
-                            SignalChip("立即重试", onClick = { vm.retry(h.id) }, container = c.surface, border = c.outline, height = SignalSize.chipSmall)
+                            SignalChip(t("立即重试", "Retry now"), onClick = { vm.retry(h.id) }, container = c.surface, border = c.outline, height = SignalSize.chipSmall)
                         } else {
                             Icon(SignalIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(18.dp))
                         }
@@ -121,11 +124,11 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Icon(SignalIcons.Plus, null, tint = c.textPrimary, modifier = Modifier.size(18.dp))
-                    Text("添加主机", style = Signal.type.label, color = c.textPrimary)
+                    Text(t("添加主机", "Add host"), style = Signal.type.label, color = c.textPrimary)
                 }
             }
 
-            GroupLabel("通知")
+            GroupLabel(t("通知", "Notifications"))
             val ctx = androidx.compose.ui.platform.LocalContext.current
             val notifOk = remember(nb, nd) { ctx.container.notifier.allowed() }
             if ((nb || nd) && !notifOk) {
@@ -140,19 +143,19 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Icon(SignalIcons.Info, null, tint = c.warning, modifier = Modifier.size(18.dp))
-                    Text("系统关闭了本应用的通知，开关不会生效。点这里去开启。", style = Signal.type.meta, color = c.textPrimary, modifier = Modifier.weight(1f))
+                    Text(t("系统关闭了本应用的通知，开关不会生效。点这里去开启。", "Notifications are turned off for this app in system settings, so these switches have no effect. Tap to turn them on."), style = Signal.type.meta, color = c.textPrimary, modifier = Modifier.weight(1f))
                 }
             }
             Group {
-                SwitchRow("有 agent 在等你时通知", "App 在后台运行期间", nb, vm::setNotifyBlocked)
+                SwitchRow(t("有 agent 在等你时通知", "Notify when an agent is waiting"), t("App 在后台运行期间", "While the app runs in the background"), nb, vm::setNotifyBlocked)
                 Divider()
-                SwitchRow("任务完成时通知", "默认关闭，避免打扰", nd, vm::setNotifyDone)
+                SwitchRow(t("任务完成时通知", "Notify when a task finishes"), t("默认关闭，避免打扰", "Off by default to avoid noise"), nd, vm::setNotifyDone)
             }
 
-            GroupLabel("外观")
+            GroupLabel(t("外观", "Appearance"))
             Group {
                 Row(Modifier.fillMaxWidth().padding(6.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(ThemeMode.System to "跟随系统", ThemeMode.Light to "日间", ThemeMode.Dark to "夜间").forEach { (m, label) ->
+                    listOf(ThemeMode.System to t("跟随系统", "System"), ThemeMode.Light to t("日间", "Light"), ThemeMode.Dark to t("夜间", "Dark")).forEach { (m, label) ->
                         val sel = theme == m
                         Text(
                             label,
@@ -168,9 +171,9 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
                 }
             }
 
-            GroupLabel("关于")
+            GroupLabel(t("关于", "About"))
             Group {
-                InfoRow("版本", BuildConfig.VERSION_NAME)
+                InfoRow(t("版本", "Version"), BuildConfig.VERSION_NAME)
                 Divider()
                 InfoRow("herdr", links.values.firstOrNull { it.version.isNotBlank() }?.version?.let { "$it · protocol 22" } ?: "—")
             }

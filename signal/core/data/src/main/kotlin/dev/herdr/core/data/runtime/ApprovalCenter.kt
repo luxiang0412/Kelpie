@@ -1,5 +1,7 @@
 package dev.herdr.core.data.runtime
 
+import dev.herdr.core.herdr.t
+
 import dev.herdr.core.data.Approvals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -67,15 +69,15 @@ class ApprovalCenter(
             drop(item)
             return ApprovalOutcome.Expired
         }
-        val cfg = fleet.config(item.hostId) ?: return ApprovalOutcome.Failed("主机已移除")
-        val conn = fleet.connection(item.hostId) ?: return ApprovalOutcome.Failed("主机未连接")
+        val cfg = fleet.config(item.hostId) ?: return ApprovalOutcome.Failed(t("主机已移除", "Host was removed"))
+        val conn = fleet.connection(item.hostId) ?: return ApprovalOutcome.Failed(t("主机未连接", "Host not connected"))
         val ok = runCatching { Approvals(conn, dirFor(cfg.user)).answer(item.request, allow) }.getOrDefault(false)
         synchronized(_audit) {
             _audit += "${System.currentTimeMillis()} ${item.hostId}/${item.request.requestId} " +
                 "decision=${if (allow) "allow" else "deny"} written=$ok nonce=${item.request.nonce.take(6)}"
         }
         if (ok) drop(item)
-        return if (ok) ApprovalOutcome.Written(allow) else ApprovalOutcome.Failed("回答写入失败")
+        return if (ok) ApprovalOutcome.Written(allow) else ApprovalOutcome.Failed(t("回答写入失败", "Failed to write the answer"))
     }
 
     private fun drop(item: ApprovalItem) =

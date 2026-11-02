@@ -1,5 +1,7 @@
 package dev.herdr.core.data.drafts
 
+import dev.herdr.core.herdr.t
+
 import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
@@ -108,19 +110,19 @@ object SendTargetCheck {
         editedAgentSession: String?,
         editedOccupancy: String?,
     ): Result {
-        if (pane == null) return Result.Blocked("pane_gone", "目标 pane 已不存在")
-        if (pane.agent == null) return Result.Blocked("no_agent", "这个 pane 没有运行 agent")
-        if (!writable) return Result.Blocked("not_writable", "当前连接不可写（未连接或重连中）")
+        if (pane == null) return Result.Blocked("pane_gone", t("目标 pane 已不存在", "The target pane no longer exists"))
+        if (pane.agent == null) return Result.Blocked("no_agent", t("这个 pane 没有运行 agent", "No agent is running in this pane"))
+        if (!writable) return Result.Blocked("not_writable", t("当前连接不可写（未连接或重连中）", "Connection isn't writable (offline or reconnecting)"))
 
         val nowAgent = pane.agentSessionPath?.takeIf { it.isNotBlank() }
         if (editedAgentSession != null && nowAgent != null && editedAgentSession != nowAgent) {
-            return Result.NeedsConfirm("agent session 已变化，发送将进入新会话")
+            return Result.NeedsConfirm(t("agent session 已变化，发送将进入新会话", "The agent session changed; this will go to the new session"))
         }
         if (editedAgentSession != null && nowAgent == null) {
-            return Result.NeedsConfirm("当前 pane 已没有 agent session")
+            return Result.NeedsConfirm(t("当前 pane 已没有 agent session", "The pane no longer has an agent session"))
         }
         if (editedOccupancy != null && nowAgent == null && DraftKey.occupancyFingerprint(pane) != editedOccupancy) {
-            return Result.NeedsConfirm("pane 上的 agent 可能已更换")
+            return Result.NeedsConfirm(t("pane 上的 agent 可能已更换", "The agent in this pane may have changed"))
         }
         return Result.Ok
     }

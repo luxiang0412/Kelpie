@@ -1,5 +1,7 @@
 package dev.herdr.signal.ui
 
+import dev.herdr.core.herdr.t
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,7 +36,7 @@ fun BackTopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        SignalIconButton(SignalIcons.Back, "返回", onBack)
+        SignalIconButton(SignalIcons.Back, t("返回", "Back"), onBack)
         Column(Modifier.weight(1f).semantics(mergeDescendants = true) { heading() }) {
             Text(title, style = Signal.type.itemTitle, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) Text(subtitle, style = Signal.type.caption, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)

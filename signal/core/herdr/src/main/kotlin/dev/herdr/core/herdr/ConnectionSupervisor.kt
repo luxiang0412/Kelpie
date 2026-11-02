@@ -102,7 +102,7 @@ class ConnectionSupervisor(
         while (scope.isActive) {
             val cfg = configProvider()
             if (cfg == null) {
-                _state.value = State.Failed("还没有配置主机", Kind.CONFIG)
+                _state.value = State.Failed(t("还没有配置主机", "No host configured"), Kind.CONFIG)
                 delay(1_000)
                 continue
             }
@@ -111,7 +111,7 @@ class ConnectionSupervisor(
                 connector.connect(cfg) { ex ->
                     _state.value = State.AwaitingHostKey(ex.id.toString(), ex.fingerprint)
                     val accepted = onUnknownHostKey(ex)
-                    if (!accepted) _state.value = State.Failed("用户拒绝信任该主机指纹", Kind.HOST_KEY_UNKNOWN)
+                    if (!accepted) _state.value = State.Failed(t("用户拒绝信任该主机指纹", "Host fingerprint was not trusted"), Kind.HOST_KEY_UNKNOWN)
                     accepted
                 }
             } catch (e: Throwable) {
@@ -138,7 +138,7 @@ class ConnectionSupervisor(
                 log("ping ok version=${ping.version} protocol=${ping.protocol}")
                 if (ping.protocol != requiredProtocol) {
                     _state.value = State.Failed(
-                        "协议版本不匹配：server=${ping.protocol}, app 支持 $requiredProtocol",
+                        t("协议版本不匹配：server=${ping.protocol}, app 支持 $requiredProtocol", "Protocol mismatch: server=${ping.protocol}, app supports $requiredProtocol"),
                         Kind.PROTOCOL,
                     )
                     conn.close(); currentConnection = null
@@ -229,7 +229,7 @@ class ConnectionSupervisor(
                 ) continue
                 val ok = runCatching { api.ping(8_000) }.isSuccess
                 if (!ok) {
-                    _state.value = State.Stale(generation, "连接探测失败，数据可能不是最新")
+                    _state.value = State.Stale(generation, t("连接探测失败，数据可能不是最新", "Connection probe failed; data may be outdated"))
                 } else if (_state.value is State.Stale) {
                     _state.value = State.Connected(
                         generation,
@@ -255,13 +255,13 @@ class ConnectionSupervisor(
     }
 
     private fun classify(e: Throwable): Pair<Kind, String> = when (e) {
-        is SshFailure.UnknownHostKey -> Kind.HOST_KEY_UNKNOWN to "未知主机指纹（未确认）"
-        is SshFailure.HostKeyChanged -> Kind.HOST_KEY_CHANGED to "主机指纹变化，已拒绝连接"
-        is SshFailure.Auth -> Kind.AUTH to "认证失败：${e.message}"
-        is SshFailure.KeyUnusable -> Kind.KEY to "私钥不可用：${e.message}"
-        is SshFailure.Protocol -> Kind.PROTOCOL to "协议错误：${e.message}"
-        is SshFailure.Timeout -> Kind.NETWORK to "超时：${e.message}"
-        is SshFailure.Network -> Kind.NETWORK to "网络错误：${e.message}"
+        is SshFailure.UnknownHostKey -> Kind.HOST_KEY_UNKNOWN to t("未知主机指纹（未确认）", "Unknown host fingerprint (not confirmed)")
+        is SshFailure.HostKeyChanged -> Kind.HOST_KEY_CHANGED to t("主机指纹变化，已拒绝连接", "Host fingerprint changed; connection refused")
+        is SshFailure.Auth -> Kind.AUTH to t("认证失败：${e.message}", "Authentication failed: ${e.message}")
+        is SshFailure.KeyUnusable -> Kind.KEY to t("私钥不可用：${e.message}", "Private key unusable: ${e.message}")
+        is SshFailure.Protocol -> Kind.PROTOCOL to t("协议错误：${e.message}", "Protocol error: ${e.message}")
+        is SshFailure.Timeout -> Kind.NETWORK to t("超时：${e.message}", "Timed out: ${e.message}")
+        is SshFailure.Network -> Kind.NETWORK to t("网络错误：${e.message}", "Network error: ${e.message}")
         else -> Kind.UNKNOWN to (e.message ?: e.javaClass.simpleName)
     }
 }

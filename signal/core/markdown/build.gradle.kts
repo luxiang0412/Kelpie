@@ -7,6 +7,7 @@ android {
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 dependencies {
+    implementation(project(":core:herdr"))
     api(project(":core:designsystem"))
     implementation(project(":core:herdr"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

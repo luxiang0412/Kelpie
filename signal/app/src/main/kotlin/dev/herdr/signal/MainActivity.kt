@@ -19,6 +19,7 @@ import dev.herdr.signal.nav.SignalNavHost
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dev.herdr.core.herdr.L10n.update(resources.configuration.locales[0])
         enableEdgeToEdge()
         val c = container
         handleIntent(intent)

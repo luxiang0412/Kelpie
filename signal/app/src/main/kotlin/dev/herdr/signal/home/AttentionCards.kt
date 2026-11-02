@@ -1,5 +1,7 @@
 package dev.herdr.signal.home
 
+import dev.herdr.core.herdr.t
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +36,7 @@ import dev.herdr.signal.designsystem.SignalRadius
 import dev.herdr.signal.designsystem.SignalSize
 
 /** 快捷回复（规范 5.3）：点了只填进输入框并打开对话，**从不直接发送**。 */
-val QuickReplies = listOf("继续", "好的", "先解释一下")
+val QuickReplies: List<String> get() = listOf(t("继续", "Continue"), t("好的", "OK"), t("先解释一下", "Explain first"))
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -53,26 +55,26 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
     ) {
         Column(
             Modifier.clip(RoundedCornerShape(SignalRadius.m)).clickable { onOpen(item.key, null) }
-                .semantics(mergeDescendants = true) { contentDescription = "${item.title}，${item.agentName}，等了 $waited" },
+                .semantics(mergeDescendants = true) { contentDescription = t("${item.title}，${item.agentName}，等了 $waited", "${item.title}, ${item.agentName}, waiting $waited") },
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             CardHeader(
                 icon = if (e.preview?.pendingTool != null) SignalIcons.Terminal else SignalIcons.Spark,
                 title = item.title,
                 sub = "${item.agentName} · ${item.hostLabel}",
-                trailing = if (stale) "最后看到" else "等了 $waited",
+                trailing = if (stale) t("最后看到", "Last seen") else t("等了 $waited", "waiting $waited"),
             )
             PreviewBody(e.preview, stale)
         }
         if (stale || offline) {
-            Text("联网后才能回复 · 草稿会保留", style = Signal.type.meta, color = c.attentionOnContainerMeta)
+            Text(t("联网后才能回复 · 草稿会保留", "Can't reply while offline · draft is kept"), style = Signal.type.meta, color = c.attentionOnContainerMeta)
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 QuickReplies.forEach { q ->
                     SignalChip(q, onClick = { onOpen(item.key, q) }, container = c.attentionContainerInner, content = c.attentionOnContainerBody)
                 }
                 Spacer(Modifier.weight(1f))
-                SignalChip("回复", onClick = { onOpen(item.key, null) }, container = c.primary, content = c.onPrimary, trailing = SignalIcons.ChevronRight)
+                SignalChip(t("回复", "Reply"), onClick = { onOpen(item.key, null) }, container = c.primary, content = c.onPrimary, trailing = SignalIcons.ChevronRight)
             }
         }
     }
@@ -83,7 +85,7 @@ private fun PreviewBody(p: BlockedPreview?, stale: Boolean) {
     val c = Signal.colors
     when {
         p == null -> Text(
-            if (stale) "离线前它在等你回复。" else "正在读取它问了什么…",
+            if (stale) t("离线前它在等你回复。", "It was waiting for your reply before going offline.") else t("正在读取它问了什么…", "Reading what it asked…"),
             style = Signal.type.bodyCard, color = c.attentionOnContainerMeta,
         )
         p.source == BlockedPreview.Source.Screen -> Text(
@@ -93,7 +95,7 @@ private fun PreviewBody(p: BlockedPreview?, stale: Boolean) {
         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stripMarkdown(p.text), style = Signal.type.bodyCard, color = c.attentionOnContainerBody, maxLines = 6, overflow = TextOverflow.Ellipsis)
             if (p.pendingTool != null) {
-                Text("等待批准 · ${p.pendingTool}", style = Signal.type.metaStrong, color = c.attentionText)
+                Text(t("等待批准 · ${p.pendingTool}", "Waiting for approval · ${p.pendingTool}"), style = Signal.type.metaStrong, color = c.attentionText)
             }
         }
     }
@@ -117,8 +119,8 @@ fun PermissionCard(e: AttentionEntry.Permission, nowMs: Long, offline: Boolean, 
         CardHeader(
             icon = SignalIcons.Shield,
             title = title,
-            sub = "$agent · ${e.approval.hostLabel} · 请求权限",
-            trailing = Durations.ago(r.createdAtMs, nowMs).removeSuffix("前").ifBlank { "刚刚" },
+            sub = t("$agent · ${e.approval.hostLabel} · 请求权限", "$agent · ${e.approval.hostLabel} · permission request"),
+            trailing = Durations.ago(r.createdAtMs, nowMs).removeSuffix(t("前", " ago")).ifBlank { t("刚刚", "just now") },
         )
         Text(
             r.command ?: r.question,
@@ -129,11 +131,11 @@ fun PermissionCard(e: AttentionEntry.Permission, nowMs: Long, offline: Boolean, 
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (offline) "可能已过期，联网后重新确认" else (r.tool?.let { "$it · " } ?: "") + validFor(r.expiresAtMs - nowMs),
+                if (offline) t("可能已过期，联网后重新确认", "May have expired; recheck when online") else (r.tool?.let { "$it · " } ?: "") + validFor(r.expiresAtMs - nowMs),
                 style = Signal.type.meta, color = c.attentionOnContainerMeta, modifier = Modifier.weight(1f),
             )
             if (!offline) {
-                Text("查看并处理", style = Signal.type.metaStrong, color = c.attentionText)
+                Text(t("查看并处理", "Review"), style = Signal.type.metaStrong, color = c.attentionText)
                 Icon(SignalIcons.ChevronRight, null, tint = c.attentionText, modifier = Modifier.size(14.dp))
             }
         }
@@ -170,8 +172,8 @@ internal fun stripMarkdown(s: String): String = s
 fun OfflineBanner(b: Banner, nowMs: Long, onRetry: () -> Unit) {
     val c = Signal.colors
     val (title, sub) = when (b) {
-        is Banner.PhoneOffline -> "手机没有网络" to (if (b.lastAtMs > 0) "下面是 ${Durations.ago(b.lastAtMs, nowMs)}的内容 · 联网后自动更新" else "联网后自动更新")
-        is Banner.HostsUnreachable -> "连不上 ${b.labels.joinToString("、")}" to (b.detail.ifBlank { "正在自动重连" })
+        is Banner.PhoneOffline -> t("手机没有网络", "Phone is offline") to (if (b.lastAtMs > 0) t("下面是 ${Durations.ago(b.lastAtMs, nowMs)}的内容 · 联网后自动更新", "Showing data from ${Durations.ago(b.lastAtMs, nowMs)} · updates when back online") else t("联网后自动更新", "Updates when back online"))
+        is Banner.HostsUnreachable -> t("连不上 ${b.labels.joinToString("、")}", "Can't reach ${b.labels.joinToString(", ")}") to (b.detail.ifBlank { t("正在自动重连", "Reconnecting automatically") })
     }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(SignalRadius.l)).background(c.offlineContainer).padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
@@ -183,15 +185,15 @@ fun OfflineBanner(b: Banner, nowMs: Long, onRetry: () -> Unit) {
             Text(title, style = Signal.type.rowTitle, color = c.textPrimary)
             Text(sub, style = Signal.type.meta, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        SignalChip("重试", onClick = onRetry, container = c.surface, border = c.outline, height = SignalSize.chipSmall)
+        SignalChip(t("重试", "Retry"), onClick = onRetry, container = c.surface, border = c.outline, height = SignalSize.chipSmall)
     }
 }
 
 private fun validFor(ms: Long): String {
     val m = (ms / 60_000).toInt()
     return when {
-        ms <= 0 -> "已过期"
-        m < 1 -> "不到 1 分钟内有效"
-        else -> "$m 分钟内有效"
+        ms <= 0 -> t("已过期", "Expired")
+        m < 1 -> t("不到 1 分钟内有效", "Valid for under a minute")
+        else -> t("$m 分钟内有效", "Valid for $m min")
     }
 }

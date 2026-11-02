@@ -23,10 +23,10 @@ object BoardGrouper {
             .filterValues { it > 0 }
 
     fun title(status: AgentStatus): String = when (status) {
-        AgentStatus.BLOCKED -> "等你处理"
-        AgentStatus.WORKING -> "工作中"
-        AgentStatus.DONE -> "已完成"
-        AgentStatus.IDLE -> "空闲"
-        AgentStatus.UNKNOWN -> "未知"
+        AgentStatus.BLOCKED -> t("等你处理", "Needs you")
+        AgentStatus.WORKING -> t("工作中", "Working")
+        AgentStatus.DONE -> t("已完成", "Done")
+        AgentStatus.IDLE -> t("空闲", "Idle")
+        AgentStatus.UNKNOWN -> t("未知", "Unknown")
     }
 }

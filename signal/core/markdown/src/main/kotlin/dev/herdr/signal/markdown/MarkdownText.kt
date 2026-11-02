@@ -1,5 +1,7 @@
 package dev.herdr.signal.markdown
 
+import dev.herdr.core.herdr.t
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -250,7 +252,7 @@ private fun CodeBlock(block: MdBlock.CodeFence) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = (block.language ?: "text").lowercase() + if (!block.closed) " · 未闭合" else "",
+                    text = (block.language ?: "text").lowercase() + if (!block.closed) t(" · 未闭合", " · unclosed") else "",
                     style = MdCaption,
                     color = palette.textSecondary,
                     fontFamily = MonoStyle.fontFamily,
@@ -263,7 +265,7 @@ private fun CodeBlock(block: MdBlock.CodeFence) {
                     },
                     modifier = Modifier.heightIn(min = 48.dp),
                 ) {
-                    Text(if (copied) "已复制" else "复制", style = MdLabel)
+                    Text(if (copied) t("已复制", "Copied") else t("复制", "Copy"), style = MdLabel)
                 }
             }
             Box(
@@ -280,12 +282,12 @@ private fun CodeBlock(block: MdBlock.CodeFence) {
                     modifier = Modifier
                         .horizontalScroll(rememberScrollState())
                         .padding(horizontal = SignalSpace.s5, vertical = SignalSpace.s1)
-                        .semantics { contentDescription = "${block.language ?: "text"} 代码块，共 $lineCount 行" },
+                        .semantics { contentDescription = t("${block.language ?: "text"} 代码块，共 $lineCount 行", "${block.language ?: "text"} code block, $lineCount lines") },
                 )
             }
             if (collapsible) {
                 Text(
-                    text = if (expanded) "收起代码" else "展开全部 $lineCount 行",
+                    text = if (expanded) t("收起代码", "Collapse code") else t("展开全部 $lineCount 行", "Show all $lineCount lines"),
                     style = MdLabel,
                     color = palette.working,
                     modifier = Modifier
@@ -342,7 +344,7 @@ private fun inline(spans: List<MdSpan>, highlight: String? = null): AnnotatedStr
                         builder.withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) {
                             builder.append(s.text)
                         }
-                        builder.append("（链接已停用）")
+                        builder.append(t("（链接已停用）", " (link disabled)"))
                     }
                 }
             }

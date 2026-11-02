@@ -110,11 +110,24 @@ class AttentionTest {
     }
 
     @Test fun durations() {
+        dev.herdr.core.herdr.L10n.update(java.util.Locale.SIMPLIFIED_CHINESE)
         assertEquals("至少 12 分钟", Durations.waited(0, true, 12 * 60_000))
         assertEquals("12 分钟", Durations.waited(0, false, 12 * 60_000))
         assertEquals("刚刚", Durations.waited(0, false, 30_000))
         assertEquals("2 小时 15 分", Durations.waited(0, false, 135 * 60_000))
         assertEquals("1 小时", Durations.waited(0, false, 65 * 60_000))
         assertEquals("3 分钟前", Durations.ago(0, 3 * 60_000))
+    }
+
+    @Test fun durationsEnglish() {
+        dev.herdr.core.herdr.L10n.update(java.util.Locale.US)
+        try {
+            assertEquals("at least 12 min", Durations.waited(0, true, 12 * 60_000))
+            assertEquals("just now", Durations.waited(0, false, 30_000))
+            assertEquals("2 h 15 min", Durations.waited(0, false, 135 * 60_000))
+            assertEquals("3 min ago", Durations.ago(0, 3 * 60_000))
+        } finally {
+            dev.herdr.core.herdr.L10n.update(java.util.Locale.SIMPLIFIED_CHINESE)
+        }
     }
 }

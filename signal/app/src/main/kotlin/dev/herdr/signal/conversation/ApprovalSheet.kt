@@ -1,5 +1,7 @@
 package dev.herdr.signal.conversation
 
+import dev.herdr.core.herdr.t
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +69,7 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
             result = when (val o = center.answer(item, allow)) {
                 is ApprovalOutcome.Written -> null.also { onDismiss() }
                 is ApprovalOutcome.Failed -> o.reason
-                ApprovalOutcome.Expired -> "请求已过期"
+                ApprovalOutcome.Expired -> t("请求已过期", "Request expired")
             }
             busy = false
         }
@@ -85,7 +87,7 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
         ) {
             Text(listOfNotNull(r.cwd?.trimEnd('/')?.substringAfterLast('/'), r.agent, item.hostLabel).joinToString(" · "),
                 style = Signal.type.meta, color = c.textSecondary)
-            Text(if (r.command != null) "允许运行这条命令？" else r.question, style = Signal.type.title, color = c.textPrimary)
+            Text(if (r.command != null) t("允许运行这条命令？", "Allow this command to run?") else r.question, style = Signal.type.title, color = c.textPrimary)
 
             if (r.command != null) {
                 Column(
@@ -99,22 +101,22 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                r.tool?.let { KV("工具", it) }
-                KV("请求编号", r.requestId.take(8) + " · 带一次性校验码")
-                KV("有效期", if (expired) "已过期" else "还剩 %d:%02d".format(left / 60, left % 60))
+                r.tool?.let { KV(t("工具", "Tool"), it) }
+                KV(t("请求编号", "Request ID"), r.requestId.take(8) + t(" · 带一次性校验码", " · with one-time nonce"))
+                KV(t("有效期", "Valid for"), if (expired) t("已过期", "Expired") else t("还剩 %d:%02d", "%d:%02d left").format(left / 60, left % 60))
             }
 
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(SignalIcons.InfoSmall, null, tint = c.iconMuted, modifier = Modifier.size(16.dp).padding(top = 2.dp))
-                Text("只对这一次请求生效。电脑上已经处理过的话，这里的回答会被忽略，不会再执行一次。",
+                Text(t("只对这一次请求生效。电脑上已经处理过的话，这里的回答会被忽略，不会再执行一次。", "Applies to this request only. If it was already handled on the computer, this answer is ignored and nothing runs twice."),
                     style = Signal.type.caption, color = c.textSecondary)
             }
             result?.let { Text(it, style = Signal.type.metaStrong, color = c.error) }
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SignalButton("拒绝", { answer(false) }, Modifier.weight(1f), primary = false, enabled = !busy && !expired)
+                SignalButton(t("拒绝", "Deny"), { answer(false) }, Modifier.weight(1f), primary = false, enabled = !busy && !expired)
                 HoldToConfirmButton(
-                    text = if (busy) "正在提交…" else "按住允许",
+                    text = if (busy) t("正在提交…", "Submitting…") else t("按住允许", "Hold to allow"),
                     onConfirm = { answer(true) },
                     onAccessibilityConfirm = { a11yConfirm = true },
                     modifier = Modifier.weight(1.4f),
@@ -123,7 +125,7 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
             }
             if (onOpenConversation != null) {
                 Text(
-                    "查看完整对话", style = Signal.type.label, color = c.textSecondary,
+                    t("查看完整对话", "View full conversation"), style = Signal.type.label, color = c.textSecondary,
                     modifier = Modifier.align(Alignment.CenterHorizontally).clip(RoundedCornerShape(SignalRadius.m))
                         .clickable { onDismiss(); onOpenConversation() }.padding(12.dp),
                 )
@@ -135,10 +137,10 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
         AlertDialog(
             onDismissRequest = { a11yConfirm = false },
             containerColor = c.surface,
-            title = { Text("确认允许？", style = Signal.type.headline, color = c.textPrimary) },
+            title = { Text(t("确认允许？", "Allow this?"), style = Signal.type.headline, color = c.textPrimary) },
             text = { Text(r.command ?: r.question, style = Signal.type.body, color = c.textSecondary) },
-            confirmButton = { TextButton(onClick = { a11yConfirm = false; answer(true) }) { Text("允许", color = c.textPrimary) } },
-            dismissButton = { TextButton(onClick = { a11yConfirm = false }) { Text("取消", color = c.textSecondary) } },
+            confirmButton = { TextButton(onClick = { a11yConfirm = false; answer(true) }) { Text(t("允许", "Allow"), color = c.textPrimary) } },
+            dismissButton = { TextButton(onClick = { a11yConfirm = false }) { Text(t("取消", "Cancel"), color = c.textSecondary) } },
         )
     }
 }

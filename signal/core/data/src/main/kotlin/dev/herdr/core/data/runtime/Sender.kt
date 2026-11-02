@@ -1,5 +1,7 @@
 package dev.herdr.core.data.runtime
 
+import dev.herdr.core.herdr.t
+
 import dev.herdr.core.data.attention.AgentKey
 import dev.herdr.core.data.drafts.DraftKey
 import dev.herdr.core.data.drafts.SendTargetCheck
@@ -70,15 +72,15 @@ class Sender(
         confirmed: Boolean = false,
     ): SendBlocked? {
         val body = text.trim()
-        if (body.isEmpty()) return SendBlocked("empty", "内容为空", false)
-        if (_records.value[key]?.receipt == Receipt.Sending) return SendBlocked("busy", "上一条还在发送", false)
+        if (body.isEmpty()) return SendBlocked("empty", t("内容为空", "Nothing to send"), false)
+        if (_records.value[key]?.receipt == Receipt.Sending) return SendBlocked("busy", t("上一条还在发送", "Previous message is still sending"), false)
         val pane = fleet.pane(key)
         when (val c = SendTargetCheck.check(pane, fleet.isOnline(key.hostId), editedAgentSession, editedOccupancy)) {
             is SendTargetCheck.Result.Ok -> Unit
             is SendTargetCheck.Result.Blocked -> return SendBlocked(c.code, c.reason, false)
             is SendTargetCheck.Result.NeedsConfirm -> if (!confirmed) return SendBlocked("target_changed", c.reason, true)
         }
-        val api = fleet.runtime(key.hostId)?.api() ?: return SendBlocked("not_connected", "主机未连接", false)
+        val api = fleet.runtime(key.hostId)?.api() ?: return SendBlocked("not_connected", t("主机未连接", "Host not connected"), false)
 
         val rec = ledger.begin("agent.prompt", key.paneId, body.toByteArray())
         val id = rec.clientRequestId

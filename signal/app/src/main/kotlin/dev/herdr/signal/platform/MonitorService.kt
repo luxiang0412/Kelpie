@@ -1,5 +1,7 @@
 package dev.herdr.signal.platform
 
+import dev.herdr.core.herdr.t
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -27,15 +29,15 @@ class MonitorService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) { stopSelf(); return START_NOT_STICKY }
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CH, "后台关注", NotificationManager.IMPORTANCE_MIN).apply {
-            description = "让 App 在后台也能发现有 agent 在等你"
+        nm.createNotificationChannel(NotificationChannel(CH, t("后台关注", "Background watch"), NotificationManager.IMPORTANCE_MIN).apply {
+            description = t("让 App 在后台也能发现有 agent 在等你", "Lets the app notice waiting agents while in the background")
             setShowBadge(false)
         })
         val pi = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val n = Notification.Builder(this, CH)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("正在关注你的 agent")
-            .setContentText("有 agent 在等你时会通知你")
+            .setContentTitle(t("正在关注你的 agent", "Watching your agents"))
+            .setContentText(t("有 agent 在等你时会通知你", "You'll be notified when an agent is waiting"))
             .setContentIntent(pi)
             .setOngoing(true)
             .build()

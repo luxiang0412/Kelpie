@@ -1,5 +1,7 @@
 package dev.herdr.signal.settings
 
+import dev.herdr.core.herdr.t
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,12 +72,12 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
     fun save() {
         val p = port.toIntOrNull()
         error = when {
-            host.isBlank() -> "请填写地址"
-            user.isBlank() -> "请填写用户名"
-            p == null || p !in 1..65535 -> "端口不对"
-            session.isBlank() -> "请填写 herdr 会话名"
-            existing == null && key.isBlank() -> "新主机需要粘贴私钥"
-            key.isNotBlank() && !key.contains("PRIVATE KEY-----") -> "内容不像私钥（缺少 PRIVATE KEY 头）"
+            host.isBlank() -> t("请填写地址", "Enter an address")
+            user.isBlank() -> t("请填写用户名", "Enter a username")
+            p == null || p !in 1..65535 -> t("端口不对", "Invalid port")
+            session.isBlank() -> t("请填写 herdr 会话名", "Enter the herdr session name")
+            existing == null && key.isBlank() -> t("新主机需要粘贴私钥", "A new host needs a private key")
+            key.isNotBlank() && !key.contains("PRIVATE KEY-----") -> t("内容不像私钥（缺少 PRIVATE KEY 头）", "This doesn't look like a private key (no PRIVATE KEY header)")
             else -> null
         }
         if (error != null) return
@@ -94,40 +96,40 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().background(c.bgGrouped).statusBarsPadding().imePadding()) {
-        BackTopBar(if (existing == null) "添加主机" else "编辑主机", onDone)
+        BackTopBar(if (existing == null) t("添加主机", "Add host") else t("编辑主机", "Edit host"), onDone)
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            GroupLabel("连接")
+            GroupLabel(t("连接", "Connection"))
             Group {
-                Field("名称", label, { label = it }, "例如：家里的台式机")
+                Field(t("名称", "Name"), label, { label = it }, t("例如：家里的台式机", "e.g. Home desktop"))
                 Divider()
-                Field("地址", host, { host = it }, "IP 或域名", KeyboardType.Uri)
+                Field(t("地址", "Address"), host, { host = it }, t("IP 或域名", "IP or hostname"), KeyboardType.Uri)
                 Divider()
-                Field("端口", port, { port = it.filter(Char::isDigit).take(5) }, "22", KeyboardType.Number)
+                Field(t("端口", "Port"), port, { port = it.filter(Char::isDigit).take(5) }, "22", KeyboardType.Number)
                 Divider()
-                Field("用户名", user, { user = it }, "SSH 用户")
+                Field(t("用户名", "Username"), user, { user = it }, t("SSH 用户", "SSH user"))
             }
             GroupLabel("herdr")
             Group {
-                Field("会话", session, { session = it }, "test")
+                Field(t("会话", "Session"), session, { session = it }, "test")
                 Divider()
-                Field("程序路径", bin, { bin = it }, "默认 ~/.local/bin/herdr")
+                Field(t("程序路径", "Binary path"), bin, { bin = it }, t("默认 ~/.local/bin/herdr", "Default ~/.local/bin/herdr"))
             }
-            GroupLabel(if (hasKey) "私钥（已导入，留空表示不更换）" else "私钥")
+            GroupLabel(if (hasKey) t("私钥（已导入，留空表示不更换）", "Private key (imported; leave empty to keep)") else t("私钥", "Private key"))
             Group {
-                Field("", key, { key = it }, "粘贴 OpenSSH 私钥（-----BEGIN … PRIVATE KEY-----）", secret = true, singleLine = false)
+                Field("", key, { key = it }, t("粘贴 OpenSSH 私钥（-----BEGIN … PRIVATE KEY-----）", "Paste an OpenSSH private key (-----BEGIN … PRIVATE KEY-----)"), secret = true, singleLine = false)
             }
             Text(
-                "私钥只保存在这台手机的 App 私有目录里。第一次连接时会请你核对主机指纹。",
+                t("私钥只保存在这台手机的 App 私有目录里。第一次连接时会请你核对主机指纹。", "The key stays in this app's private storage on this phone. You'll be asked to verify the host fingerprint on first connect."),
                 style = Signal.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
             error?.let { Text(it, style = Signal.type.metaStrong, color = c.error, modifier = Modifier.padding(horizontal = 16.dp)) }
             if (existing != null) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "删除这台主机",
+                    t("删除这台主机", "Delete this host"),
                     style = Signal.type.label, color = c.error,
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(SignalRadius.xl)).background(c.surface)
                         .clickable { confirmDelete = true }.padding(16.dp),
@@ -136,7 +138,7 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
         Box(Modifier.navigationBarsPadding().padding(16.dp)) {
-            SignalButton("保存", ::save, Modifier.fillMaxWidth(), height = SignalSize.primaryButton)
+            SignalButton(t("保存", "Save"), ::save, Modifier.fillMaxWidth(), height = SignalSize.primaryButton)
         }
     }
 
@@ -144,10 +146,10 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             containerColor = c.surface,
-            title = { Text("删除 ${existing.label}？", style = Signal.type.headline, color = c.textPrimary) },
-            text = { Text("会同时删除这台主机的私钥。远端的 agent 不受影响。", style = Signal.type.body, color = c.textSecondary) },
-            confirmButton = { TextButton(onClick = { repo.remove(existing.id); confirmDelete = false; onDone() }) { Text("删除", color = c.error) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("取消", color = c.textSecondary) } },
+            title = { Text(t("删除 ${existing.label}？", "Delete ${existing.label}?"), style = Signal.type.headline, color = c.textPrimary) },
+            text = { Text(t("会同时删除这台主机的私钥。远端的 agent 不受影响。", "This also deletes the host's private key. Remote agents are not affected."), style = Signal.type.body, color = c.textSecondary) },
+            confirmButton = { TextButton(onClick = { repo.remove(existing.id); confirmDelete = false; onDone() }) { Text(t("删除", "Delete"), color = c.error) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(t("取消", "Cancel"), color = c.textSecondary) } },
         )
     }
 }

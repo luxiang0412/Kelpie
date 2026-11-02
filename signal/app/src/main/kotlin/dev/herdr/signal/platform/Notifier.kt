@@ -1,5 +1,7 @@
 package dev.herdr.signal.platform
 
+import dev.herdr.core.herdr.t
+
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -38,8 +40,8 @@ class Notifier(private val context: Context, private val prefs: SignalPrefs) {
                 android.util.Log.i("Notifier", "transition ${t.key} blocked=${t.toBlocked} completed=${t.completed} fg=$foreground allowed=${allowed()}")
                 if (foreground || !allowed()) return@collect
                 when {
-                    t.toBlocked && prefs.notifyBlocked.value -> post(t, CH_BLOCKED, "在等你", "${AgentNames.display(t.pane.agent)} · ${t.hostLabel} 需要你回复")
-                    t.completed && prefs.notifyDone.value -> post(t, CH_DONE, "完成了", "${AgentNames.display(t.pane.agent)} · ${t.hostLabel}")
+                    t.toBlocked && prefs.notifyBlocked.value -> post(t, CH_BLOCKED, t("在等你", "Waiting for you"), t("${AgentNames.display(t.pane.agent)} · ${t.hostLabel} 需要你回复", "${AgentNames.display(t.pane.agent)} · ${t.hostLabel} needs your reply"))
+                    t.completed && prefs.notifyDone.value -> post(t, CH_DONE, t("完成了", "is done"), "${AgentNames.display(t.pane.agent)} · ${t.hostLabel}")
                 }
             }
         }
@@ -74,7 +76,7 @@ class Notifier(private val context: Context, private val prefs: SignalPrefs) {
             .setPublicVersion(
                 android.app.Notification.Builder(context, channel)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(if (channel == CH_BLOCKED) "有 agent 在等你" else "有任务完成了")
+                    .setContentTitle(if (channel == CH_BLOCKED) t("有 agent 在等你", "An agent is waiting for you") else t("有任务完成了", "A task finished"))
                     .build(),
             )
             .build()
@@ -82,11 +84,11 @@ class Notifier(private val context: Context, private val prefs: SignalPrefs) {
     }
 
     private fun ensureChannels() {
-        nm.createNotificationChannel(NotificationChannel(CH_BLOCKED, "在等你", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "agent 停下来等你回复或批准"
+        nm.createNotificationChannel(NotificationChannel(CH_BLOCKED, t("在等你", "Waiting for you"), NotificationManager.IMPORTANCE_HIGH).apply {
+            description = t("agent 停下来等你回复或批准", "An agent stopped to wait for your reply or approval")
         })
-        nm.createNotificationChannel(NotificationChannel(CH_DONE, "完成", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "agent 完成一轮工作"
+        nm.createNotificationChannel(NotificationChannel(CH_DONE, t("完成", "Done"), NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = t("agent 完成一轮工作", "An agent finished a round of work")
         })
     }
 

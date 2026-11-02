@@ -1,5 +1,8 @@
 package dev.herdr.signal.home
 
+import dev.herdr.core.herdr.plural
+import dev.herdr.core.herdr.t
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -134,7 +137,7 @@ fun HomeScreen(
             }
 
             if (s.working.isNotEmpty()) {
-                item(key = "working-label") { SectionLabel(if (offline) "离线前在工作 · ${s.working.size}" else "工作中 · ${s.working.size}") }
+                item(key = "working-label") { SectionLabel(if (offline) t("离线前在工作 · ${s.working.size}", "Working before offline · ${s.working.size}") else t("工作中 · ${s.working.size}", "Working · ${s.working.size}")) }
                 items(s.working, key = { "w:" + it.key.hostId + it.key.paneId }) { item ->
                     AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, showPane = item.key in dupTitles) { onOpen(item.key, null) }
                 }
@@ -144,22 +147,22 @@ fun HomeScreen(
                 item(key = "toggles") {
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (s.recentlyDone.isNotEmpty()) {
-                            ToggleTile(Modifier.weight(1f), "刚完成 ${s.recentlyDone.size}", showDone, done = true) { showDone = !showDone }
+                            ToggleTile(Modifier.weight(1f), t("刚完成 ${s.recentlyDone.size}", "Just done ${s.recentlyDone.size}"), showDone, done = true) { showDone = !showDone }
                         }
                         if (s.quiet.isNotEmpty()) {
-                            ToggleTile(Modifier.weight(1f), "空闲 ${s.quiet.size}", showQuiet, done = false) { showQuiet = !showQuiet }
+                            ToggleTile(Modifier.weight(1f), t("空闲 ${s.quiet.size}", "Idle ${s.quiet.size}"), showQuiet, done = false) { showQuiet = !showQuiet }
                         }
                     }
                 }
             }
             if (showDone) {
-                if (showQuiet) item(key = "done-label") { SectionLabel("刚完成 · ${s.recentlyDone.size}") }
+                if (showQuiet) item(key = "done-label") { SectionLabel(t("刚完成 · ${s.recentlyDone.size}", "Just done · ${s.recentlyDone.size}")) }
                 items(s.recentlyDone, key = { "d:" + it.key.hostId + it.key.paneId }) { item ->
                     AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, showPane = item.key in dupTitles) { onOpen(item.key, null) }
                 }
             }
             if (showQuiet) {
-                if (showDone) item(key = "quiet-label") { SectionLabel("空闲 · ${s.quiet.size}") }
+                if (showDone) item(key = "quiet-label") { SectionLabel(t("空闲 · ${s.quiet.size}", "Idle · ${s.quiet.size}")) }
                 items(s.quiet, key = { "i:" + it.key.hostId + it.key.paneId }) { item ->
                     AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, showPane = item.key in dupTitles) { onOpen(item.key, null) }
                 }
@@ -178,7 +181,7 @@ private fun HomeTopBar(attention: Boolean, onSettings: () -> Unit) {
     ) {
         SignalLogo(size = 22.dp, attention = attention)
         Text("Herdr", style = Signal.type.appName, color = Signal.colors.textPrimary, modifier = Modifier.weight(1f))
-        SignalIconButton(SignalIcons.Settings, "设置", onSettings, tint = Signal.colors.textPrimary)
+        SignalIconButton(SignalIcons.Settings, t("设置", "Settings"), onSettings, tint = Signal.colors.textPrimary)
     }
 }
 
@@ -188,22 +191,22 @@ private fun Header(ui: HomeUi) {
     val s = ui.state
     val n = ui.entries.size
     val title = when {
-        s.noHosts -> "还没有主机"
-        s.loading -> "正在连接…"
-        n > 0 -> "$n 个 agent 在等你"
-        else -> "没有 agent 在等你"
+        s.noHosts -> t("还没有主机", "No hosts yet")
+        s.loading -> t("正在连接…", "Connecting…")
+        n > 0 -> t("$n 个 agent 在等你", (if (n == 1) "1 agent is waiting for you" else "$n agents waiting for you"))
+        else -> t("没有 agent 在等你", "No agents waiting for you")
     }
     val total = s.hosts.size
     val (dot, sub) = when {
-        s.noHosts -> null to "添加一台运行 herdr 的电脑，就能在这里看到它的 agent"
+        s.noHosts -> null to t("添加一台运行 herdr 的电脑，就能在这里看到它的 agent", "Add a computer running herdr to see its agents here")
         ui.banner is Banner.PhoneOffline || (ui.banner != null && ui.onlineHosts == 0) -> {
             val at = s.hosts.maxOfOrNull { it.fetchedAtMs } ?: 0
-            c.warning to (if (at > 0) "截至 ${clock(at)} · 现在的状态未知" else "还没拿到过数据")
+            c.warning to (if (at > 0) t("截至 ${clock(at)} · 现在的状态未知", "As of ${clock(at)} · current status unknown") else t("还没拿到过数据", "No data yet"))
         }
-        ui.banner != null -> c.warning to "${ui.onlineHosts} 台在线 · ${total - ui.onlineHosts} 台连不上"
-        s.loading -> c.iconMuted to "$total 台主机"
-        n == 0 -> c.done to "${ui.onlineHosts} 台主机在线 · 有新情况会通知你"
-        else -> c.done to "${ui.onlineHosts} 台主机在线 · 实时"
+        ui.banner != null -> c.warning to t("${ui.onlineHosts} 台在线 · ${total - ui.onlineHosts} 台连不上", "${ui.onlineHosts} online · ${total - ui.onlineHosts} unreachable")
+        s.loading -> c.iconMuted to t("$total 台主机", plural(total, "host"))
+        n == 0 -> c.done to t("${ui.onlineHosts} 台主机在线 · 有新情况会通知你", plural(ui.onlineHosts, "host") + " online · you'll be notified of changes")
+        else -> c.done to t("${ui.onlineHosts} 台主机在线 · 实时", plural(ui.onlineHosts, "host") + " online · live")
     }
     Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, style = Signal.type.display, color = c.textPrimary, modifier = Modifier.semantics { heading() })
@@ -239,7 +242,7 @@ fun AgentRow(item: AgentItem, nowMs: Long, multiHost: Boolean, showPane: Boolean
                 Text(item.agentName, style = Signal.type.caption, color = c.textSecondary, maxLines = 1)
             }
             val sub = buildString {
-                if (item.lastSeen) append("最后看到 · ")
+                if (item.lastSeen) append(t("最后看到 · ", "Last seen · "))
                 append(if (multiHost) item.hostLabel else item.pane.cwd?.replace(Regex("^/home/[^/]+"), "~") ?: item.hostLabel)
                 // 同一台主机上标题重名时，带上 pane 编号区分
                 if (showPane) append(" · ").append(item.pane.paneId)
@@ -288,7 +291,7 @@ private fun UnknownSendRow(title: String, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(SignalIcons.Info, null, tint = c.warning, modifier = Modifier.size(18.dp))
-        Text("1 条发送结果无法确认 · $title", style = Signal.type.label, color = c.textPrimary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(t("1 条发送结果无法确认 · $title", "1 send couldn't be confirmed · $title"), style = Signal.type.label, color = c.textPrimary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Icon(SignalIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(16.dp))
     }
 }
@@ -296,7 +299,7 @@ private fun UnknownSendRow(title: String, onClick: () -> Unit) {
 @Composable
 private fun NoHosts(onAddHost: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SignalButton("添加主机", onAddHost, Modifier.fillMaxWidth(), height = SignalSize.primaryButton, leading = SignalIcons.Plus)
+        SignalButton(t("添加主机", "Add host"), onAddHost, Modifier.fillMaxWidth(), height = SignalSize.primaryButton, leading = SignalIcons.Plus)
     }
 }
 
@@ -306,17 +309,17 @@ fun HostKeyDialog(p: HostKeyPrompt, onAnswer: (Boolean) -> Unit) {
     AlertDialog(
         onDismissRequest = { onAnswer(false) },
         containerColor = c.surface,
-        title = { Text("确认 ${p.label} 的指纹", style = Signal.type.headline, color = c.textPrimary) },
+        title = { Text(t("确认 ${p.label} 的指纹", "Verify fingerprint for ${p.label}"), style = Signal.type.headline, color = c.textPrimary) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("第一次连接 ${p.host}。在电脑上运行 ssh-keyscan ${p.host} | ssh-keygen -lf - 对照，一致再信任。", style = Signal.type.body, color = c.textSecondary)
+                Text(t("第一次连接 ${p.host}。在电脑上运行 ssh-keyscan ${p.host} | ssh-keygen -lf - 对照，一致再信任。", "First connection to ${p.host}. On your computer run ssh-keyscan ${p.host} | ssh-keygen -lf - and trust only if it matches."), style = Signal.type.body, color = c.textSecondary)
                 if (p.algorithm.isNotBlank()) Text(p.algorithm, style = Signal.type.metaStrong, color = c.textSecondary)
                 Text(p.fingerprint, style = Signal.type.code, color = c.textPrimary,
                     modifier = Modifier.clip(RoundedCornerShape(SignalRadius.m)).background(c.surfaceSubtle).padding(10.dp))
             }
         },
-        confirmButton = { TextButton(onClick = { onAnswer(true) }) { Text("信任并连接", color = c.textPrimary, style = Signal.type.label) } },
-        dismissButton = { TextButton(onClick = { onAnswer(false) }) { Text("取消", color = c.textSecondary, style = Signal.type.label) } },
+        confirmButton = { TextButton(onClick = { onAnswer(true) }) { Text(t("信任并连接", "Trust and connect"), color = c.textPrimary, style = Signal.type.label) } },
+        dismissButton = { TextButton(onClick = { onAnswer(false) }) { Text(t("取消", "Cancel"), color = c.textSecondary, style = Signal.type.label) } },
     )
 }
 

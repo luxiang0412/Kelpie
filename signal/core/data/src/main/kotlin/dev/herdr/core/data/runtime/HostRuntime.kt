@@ -1,5 +1,7 @@
 package dev.herdr.core.data.runtime
 
+import dev.herdr.core.herdr.t
+
 import dev.herdr.core.data.HostRepository
 import dev.herdr.core.data.attention.HostReach
 import dev.herdr.core.herdr.ConnectionSupervisor
@@ -91,15 +93,15 @@ internal class HostRuntime(
     companion object {
         fun link(st: ConnectionSupervisor.State, hasKey: Boolean): HostLink = when (st) {
             is ConnectionSupervisor.State.Idle ->
-                if (hasKey) HostLink(HostReach.Connecting, "未连接") else HostLink(HostReach.Unreachable, "未导入私钥", ConnectionSupervisor.Kind.KEY)
-            is ConnectionSupervisor.State.Connecting -> HostLink(HostReach.Connecting, if (st.attempt <= 1) "连接中…" else "连接中（第 ${st.attempt} 次）")
-            is ConnectionSupervisor.State.AwaitingHostKey -> HostLink(HostReach.Connecting, "等待确认主机指纹", ConnectionSupervisor.Kind.HOST_KEY_UNKNOWN)
-            is ConnectionSupervisor.State.Connected -> HostLink(HostReach.Online, "已连接 · herdr ${st.version}", version = st.version)
+                if (hasKey) HostLink(HostReach.Connecting, t("未连接", "Not connected")) else HostLink(HostReach.Unreachable, t("未导入私钥", "No private key imported"), ConnectionSupervisor.Kind.KEY)
+            is ConnectionSupervisor.State.Connecting -> HostLink(HostReach.Connecting, if (st.attempt <= 1) t("连接中…", "Connecting…") else t("连接中（第 ${st.attempt} 次）", "Connecting (attempt ${st.attempt})"))
+            is ConnectionSupervisor.State.AwaitingHostKey -> HostLink(HostReach.Connecting, t("等待确认主机指纹", "Waiting for fingerprint confirmation"), ConnectionSupervisor.Kind.HOST_KEY_UNKNOWN)
+            is ConnectionSupervisor.State.Connected -> HostLink(HostReach.Online, t("已连接 · herdr ${st.version}", "Connected · herdr ${st.version}"), version = st.version)
             // Stale：连接还在，但超过 25 秒没刷新成功。对用户来说数据已不可信。
-            is ConnectionSupervisor.State.Stale -> HostLink(HostReach.Unreachable, "数据可能过期：${st.reason}", ConnectionSupervisor.Kind.NETWORK)
+            is ConnectionSupervisor.State.Stale -> HostLink(HostReach.Unreachable, t("数据可能过期：${st.reason}", "Data may be stale: ${st.reason}"), ConnectionSupervisor.Kind.NETWORK)
             is ConnectionSupervisor.State.Reconnecting -> HostLink(
                 HostReach.Unreachable,
-                listOfNotNull(reason(st.lastError), "${st.delayMs / 1000} 秒后第 ${st.attempt} 次重连").joinToString(" · "),
+                listOfNotNull(reason(st.lastError), t("${st.delayMs / 1000} 秒后第 ${st.attempt} 次重连", "retry ${st.attempt} in ${st.delayMs / 1000}s")).joinToString(" · "),
                 ConnectionSupervisor.Kind.NETWORK,
             )
             is ConnectionSupervisor.State.Failed -> HostLink(HostReach.Unreachable, reason(st.message) ?: st.message, st.kind)
@@ -109,12 +111,12 @@ internal class HostRuntime(
         fun reason(raw: String?): String? {
             val r = raw?.lowercase() ?: return null
             return when {
-                "refused" in r -> "连接被拒绝"
-                "timed out" in r || "timeout" in r -> "连接超时"
-                "unreachable" in r || "no route" in r -> "网络不通"
-                "auth" in r -> "认证失败（私钥不被接受）"
-                "unknownhost" in r || "unable to resolve" in r -> "找不到这个地址"
-                "host key" in r || "mismatch" in r -> "主机指纹不一致"
+                "refused" in r -> t("连接被拒绝", "Connection refused")
+                "timed out" in r || "timeout" in r -> t("连接超时", "Connection timed out")
+                "unreachable" in r || "no route" in r -> t("网络不通", "Network unreachable")
+                "auth" in r -> t("认证失败（私钥不被接受）", "Authentication failed (key rejected)")
+                "unknownhost" in r || "unable to resolve" in r -> t("找不到这个地址", "Address not found")
+                "host key" in r || "mismatch" in r -> t("主机指纹不一致", "Host fingerprint mismatch")
                 else -> raw.take(40)
             }
         }

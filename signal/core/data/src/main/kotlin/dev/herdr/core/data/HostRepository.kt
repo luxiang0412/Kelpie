@@ -1,5 +1,7 @@
 package dev.herdr.core.data
 
+import dev.herdr.core.herdr.t
+
 import android.content.Context
 import dev.herdr.core.ssh.SshConfig
 import org.json.JSONArray
@@ -88,7 +90,7 @@ class HostRepository(context: Context) {
 
     fun importKey(hostId: String, text: String): Result<File> = runCatching {
         val trimmed = text.trim()
-        require(trimmed.contains("PRIVATE KEY-----")) { "内容不像私钥（缺少 PRIVATE KEY 头）" }
+        require(trimmed.contains("PRIVATE KEY-----")) { t("内容不像私钥（缺少 PRIVATE KEY 头）", "This doesn't look like a private key (no PRIVATE KEY header)") }
         val f = keyFile(hostId)
         f.writeText(trimmed + "\n")
         runCatching { f.setReadable(false, false); f.setReadable(true, true) }

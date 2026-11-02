@@ -1,5 +1,7 @@
 package dev.herdr.signal.conversation
 
+import dev.herdr.core.herdr.t
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -117,7 +119,7 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
                     is ClaudeSessionResolver.Result.Failure -> { _source.value = Source.TerminalOnly(r.message); null }
                 }
             } else {
-                _source.value = Source.TerminalOnly("${dev.herdr.core.data.attention.AgentNames.display(pane.agent)} 没有可读的会话记录")
+                _source.value = Source.TerminalOnly(t("${dev.herdr.core.data.attention.AgentNames.display(pane.agent)} 没有可读的会话记录", "${dev.herdr.core.data.attention.AgentNames.display(pane.agent)} has no readable transcript"))
                 null
             }
         }

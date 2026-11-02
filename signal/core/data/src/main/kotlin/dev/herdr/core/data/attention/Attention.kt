@@ -1,5 +1,7 @@
 package dev.herdr.core.data.attention
 
+import dev.herdr.core.herdr.t
+
 import dev.herdr.core.herdr.AgentStatus
 import dev.herdr.core.herdr.Pane
 
@@ -118,7 +120,7 @@ object AgentNames {
         "claude", "claude-code", "claude_code" -> "Claude Code"
         "pi" -> "Pi"
         "codex" -> "Codex"
-        null, "" -> "终端"
+        null, "" -> t("终端", "Terminal")
         else -> agent.replaceFirstChar { it.uppercase() }
     }
 }
@@ -203,25 +205,25 @@ object HomeDerivation {
 /** “等了多久”的文案（规范 5.4）。 */
 object Durations {
     fun waited(sinceMs: Long?, lowerBound: Boolean, nowMs: Long): String {
-        if (sinceMs == null) return "刚刚"
+        if (sinceMs == null) return t("刚刚", "just now")
         val m = ((nowMs - sinceMs) / 60_000).coerceAtLeast(0)
         val core = when {
-            m < 1 -> return if (lowerBound) "等待中" else "刚刚"
-            m < 60 -> "$m 分钟"
-            m < 24 * 60 -> "${m / 60} 小时" + if (m % 60 >= 10) " ${m % 60} 分" else ""
-            else -> "${m / (24 * 60)} 天"
+            m < 1 -> return if (lowerBound) t("等待中", "waiting") else t("刚刚", "just now")
+            m < 60 -> t("$m 分钟", "$m min")
+            m < 24 * 60 -> t("${m / 60} 小时", "${m / 60} h") + if (m % 60 >= 10) t(" ${m % 60} 分", " ${m % 60} min") else ""
+            else -> t("${m / (24 * 60)} 天", "${m / (24 * 60)} d")
         }
-        return if (lowerBound) "至少 $core" else core
+        return if (lowerBound) t("至少 $core", "at least $core") else core
     }
 
     fun ago(atMs: Long?, nowMs: Long): String {
         if (atMs == null) return ""
         val m = ((nowMs - atMs) / 60_000).coerceAtLeast(0)
         return when {
-            m < 1 -> "刚刚"
-            m < 60 -> "$m 分钟前"
-            m < 24 * 60 -> "${m / 60} 小时前"
-            else -> "${m / (24 * 60)} 天前"
+            m < 1 -> t("刚刚", "just now")
+            m < 60 -> t("$m 分钟前", "$m min ago")
+            m < 24 * 60 -> t("${m / 60} 小时前", "${m / 60} h ago")
+            else -> t("${m / (24 * 60)} 天前", "${m / (24 * 60)} d ago")
         }
     }
 }

@@ -59,8 +59,14 @@ class SignalApp : Application() {
     lateinit var container: AppContainer
         private set
 
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        dev.herdr.core.herdr.L10n.update(newConfig.locales[0])
+    }
+
     override fun onCreate() {
         super.onCreate()
+        dev.herdr.core.herdr.L10n.update(resources.configuration.locales[0])
         container = AppContainer(this)
         DebugHooks.onAppStart(this, container)
         container.fleet.start()

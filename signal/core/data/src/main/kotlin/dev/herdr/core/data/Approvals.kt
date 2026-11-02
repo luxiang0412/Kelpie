@@ -1,5 +1,7 @@
 package dev.herdr.core.data
 
+import dev.herdr.core.herdr.t
+
 import dev.herdr.core.ssh.SshConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,7 +75,7 @@ class Approvals(
                     hostId = "",
                     requestId = id,
                     nonce = nonce,
-                    question = o.optString("question", "(无问题描述)"),
+                    question = o.optString("question", t("(无问题描述)", "(no description)")),
                     createdAtMs = o.optLong("created_at") * 1000,
                     expiresAtMs = o.optLong("expires_at") * 1000,
                     path = full,

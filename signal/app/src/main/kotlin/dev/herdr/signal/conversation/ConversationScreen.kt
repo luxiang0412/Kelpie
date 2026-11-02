@@ -1,5 +1,7 @@
 package dev.herdr.signal.conversation
 
+import dev.herdr.core.herdr.t
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -94,7 +96,7 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
             onBack = onBack,
             subtitle = item?.let { statusLine(it, now) } ?: hostId,
             actions = {
-                SignalIconButton(SignalIcons.Terminal, "查看终端", { vm.refreshTerminal(); showTerminal = true }, tint = c.textPrimary)
+                SignalIconButton(SignalIcons.Terminal, t("查看终端", "View terminal"), { vm.refreshTerminal(); showTerminal = true }, tint = c.textPrimary)
             },
         )
         Box(Modifier.fillMaxWidth().padding(0.dp).background(c.hairline).heightIn(min = 1.dp, max = 1.dp))
@@ -111,7 +113,7 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
             onText = vm::setText,
             onSend = { vm.send() },
             enabled = online && item?.lastSeen != true,
-            placeholder = if (!online) "联网后才能发送 · 草稿会保留" else "回复 ${item?.title ?: ""}…",
+            placeholder = if (!online) t("联网后才能发送 · 草稿会保留", "Can't send while offline · draft is kept") else t("回复 ${item?.title ?: ""}…", "Reply to ${item?.title ?: ""}…"),
             quick = if (item?.status == AgentStatus.BLOCKED && online) QuickReplies else emptyList(),
             onQuick = vm::applyQuick,
             sending = receipt?.receipt == Receipt.Sending,
@@ -123,10 +125,10 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
             AlertDialog(
                 onDismissRequest = vm::dismissBlocked,
                 containerColor = c.surface,
-                title = { Text("目标变了", style = Signal.type.headline, color = c.textPrimary) },
-                text = { Text(b.message + "。确定还要发给它吗？", style = Signal.type.body, color = c.textSecondary) },
-                confirmButton = { TextButton(onClick = { vm.send(confirmed = true) }) { Text("仍然发送", color = c.textPrimary) } },
-                dismissButton = { TextButton(onClick = vm::dismissBlocked) { Text("取消", color = c.textSecondary) } },
+                title = { Text(t("目标变了", "Target changed"), style = Signal.type.headline, color = c.textPrimary) },
+                text = { Text(b.message + t("。确定还要发给它吗？", ". Send it anyway?"), style = Signal.type.body, color = c.textSecondary) },
+                confirmButton = { TextButton(onClick = { vm.send(confirmed = true) }) { Text(t("仍然发送", "Send anyway"), color = c.textPrimary) } },
+                dismissButton = { TextButton(onClick = vm::dismissBlocked) { Text(t("取消", "Cancel"), color = c.textSecondary) } },
             )
         }
     }
@@ -140,10 +142,10 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
         ) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("终端 · 最近 120 行", style = Signal.type.headline, color = c.textPrimary, modifier = Modifier.weight(1f))
-                    SignalChip("刷新", onClick = vm::refreshTerminal, container = c.surfaceSubtle, height = SignalSize.chipSmall)
+                    Text(t("终端 · 最近 120 行", "Terminal · last 120 lines"), style = Signal.type.headline, color = c.textPrimary, modifier = Modifier.weight(1f))
+                    SignalChip(t("刷新", "Refresh"), onClick = vm::refreshTerminal, container = c.surfaceSubtle, height = SignalSize.chipSmall)
                 }
-                Text("只读。需要在终端里操作时请回到电脑。", style = Signal.type.caption, color = c.textSecondary)
+                Text(t("只读。需要在终端里操作时请回到电脑。", "Read-only. Use the computer to interact with the terminal."), style = Signal.type.caption, color = c.textSecondary)
                 TerminalText(terminal, Modifier.fillMaxWidth().heightIn(max = 520.dp))
             }
         }
@@ -152,12 +154,12 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
 
 private fun statusLine(it: AgentItem, now: Long): String {
     val st = when {
-        it.lastSeen -> "最后看到"
-        it.status == AgentStatus.BLOCKED -> "在等你"
-        it.status == AgentStatus.WORKING -> "工作中"
-        it.status == AgentStatus.DONE -> "已完成"
-        it.status == AgentStatus.IDLE -> "空闲"
-        else -> "状态未知"
+        it.lastSeen -> t("最后看到", "Last seen")
+        it.status == AgentStatus.BLOCKED -> t("在等你", "Waiting for you")
+        it.status == AgentStatus.WORKING -> t("工作中", "Working")
+        it.status == AgentStatus.DONE -> t("已完成", "Done")
+        it.status == AgentStatus.IDLE -> t("空闲", "Idle")
+        else -> t("状态未知", "Status unknown")
     }
     return "$st · ${it.agentName} · ${it.hostLabel}"
 }
@@ -206,10 +208,10 @@ internal fun MessageList(
             }
         }
         if (truncated) item(key = "truncated") {
-            Text("更早的消息没有加载（只取最近 1 MB）", style = Signal.type.caption, color = c.textTertiary, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            Text(t("更早的消息没有加载（只取最近 1 MB）", "Older messages not loaded (last 1 MB only)"), style = Signal.type.caption, color = c.textTertiary, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
         }
         if (loading && items.isEmpty()) item(key = "loading") {
-            Text("正在读取会话…", style = Signal.type.meta, color = c.textSecondary)
+            Text(t("正在读取会话…", "Loading conversation…"), style = Signal.type.meta, color = c.textSecondary)
         }
     }
 }
@@ -219,9 +221,9 @@ private fun LiveStatus(agent: AgentItem?, now: Long) {
     val c = Signal.colors
     agent ?: return
     val (color, text) = when {
-        agent.lastSeen -> c.idle to "连不上主机 · 下面是最后看到的内容"
-        agent.status == AgentStatus.BLOCKED -> c.attention to "在等你回答 · " + Durations.waited(agent.sinceMs, agent.sinceIsLowerBound, now)
-        agent.status == AgentStatus.WORKING -> c.working to "正在工作 · " + Durations.waited(agent.sinceMs, agent.sinceIsLowerBound, now)
+        agent.lastSeen -> c.idle to t("连不上主机 · 下面是最后看到的内容", "Host unreachable · showing what was last seen")
+        agent.status == AgentStatus.BLOCKED -> c.attention to t("在等你回答 · ", "Waiting for your answer · ") + Durations.waited(agent.sinceMs, agent.sinceIsLowerBound, now)
+        agent.status == AgentStatus.WORKING -> c.working to t("正在工作 · ", "Working · ") + Durations.waited(agent.sinceMs, agent.sinceIsLowerBound, now)
         else -> return
     }
     Row(
@@ -254,10 +256,10 @@ private fun UserBubble(text: String) {
 private fun ReceiptLine(r: SendRecord) {
     val c = Signal.colors
     val (text, color) = when (val x = r.receipt) {
-        Receipt.Sending -> "发送中…" to c.textTertiary
-        is Receipt.Accepted -> "已送达 · ${clock(x.atMs)}" to c.textTertiary
-        is Receipt.Rejected -> "没有发出：${x.message} · 内容还在输入框里" to c.error
-        is Receipt.Unknown -> "无法确认是否送达，不会自动重发 · 看看终端再决定" to c.warning
+        Receipt.Sending -> t("发送中…", "Sending…") to c.textTertiary
+        is Receipt.Accepted -> t("已送达 · ${clock(x.atMs)}", "Delivered · ${clock(x.atMs)}") to c.textTertiary
+        is Receipt.Rejected -> t("没有发出：${x.message} · 内容还在输入框里", "Not sent: ${x.message} · text is still in the box") to c.error
+        is Receipt.Unknown -> t("无法确认是否送达，不会自动重发 · 看看终端再决定", "Couldn't confirm delivery; won't resend automatically · check the terminal first") to c.warning
     }
     Text(text, style = Signal.type.micro, color = color, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
 }
@@ -269,7 +271,7 @@ private fun ThinkingRow(text: String) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(SignalRadius.m)).clickable { open = !open }.animateContentSize()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Icon(if (open) SignalIcons.ChevronDown else SignalIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(14.dp))
-            Text("思考过程", style = Signal.type.meta, color = c.textSecondary)
+            Text(t("思考过程", "Thinking"), style = Signal.type.meta, color = c.textSecondary)
         }
         if (open) Text(text, style = Signal.type.meta, color = c.textSecondary, modifier = Modifier.padding(start = 20.dp, top = 6.dp))
     }
@@ -297,9 +299,9 @@ private fun ToolCard(t: ConversationItem.Tool) {
                 style = Signal.type.codeSmall, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
             when {
-                t.result == null -> Text("运行中", style = Signal.type.caption, color = c.workingText)
-                t.resultError -> Text("出错", style = Signal.type.caption, color = c.error)
-                else -> Icon(SignalIcons.Check, "完成", tint = c.done, modifier = Modifier.size(14.dp))
+                t.result == null -> Text(t("运行中", "Running"), style = Signal.type.caption, color = c.workingText)
+                t.resultError -> Text(t("出错", "Error"), style = Signal.type.caption, color = c.error)
+                else -> Icon(SignalIcons.Check, t("完成", "Done"), tint = c.done, modifier = Modifier.size(14.dp))
             }
         }
         if (open && t.result != null) {
@@ -354,9 +356,9 @@ private fun Composer(
             val can = enabled && text.isNotBlank() && !sending
             Box(
                 Modifier.size(SignalSize.sendButton).clip(CircleShape).background(if (can) c.primary else c.outline)
-                    .clickable(enabled = can, onClickLabel = "发送", onClick = onSend),
+                    .clickable(enabled = can, onClickLabel = t("发送", "Send"), onClick = onSend),
                 contentAlignment = Alignment.Center,
-            ) { Icon(SignalIcons.Send, "发送", tint = if (can) c.onPrimary else c.textTertiary, modifier = Modifier.size(20.dp)) }
+            ) { Icon(SignalIcons.Send, t("发送", "Send"), tint = if (can) c.onPrimary else c.textTertiary, modifier = Modifier.size(20.dp)) }
         }
     }
 }
@@ -365,7 +367,7 @@ private fun Composer(
 private fun TerminalBody(terminal: String?, reason: String) {
     val c = Signal.colors
     Column(Modifier.fillMaxSize().padding(horizontal = SignalSpace.pageConversation, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("$reason，这里显示终端的最近内容（只读）。", style = Signal.type.meta, color = c.textSecondary)
+        Text(t("$reason，这里显示终端的最近内容（只读）。", "$reason. Showing recent terminal output (read-only)."), style = Signal.type.meta, color = c.textSecondary)
         TerminalText(terminal, Modifier.weight(1f).fillMaxWidth())
     }
 }
@@ -377,7 +379,7 @@ private fun TerminalText(terminal: String?, modifier: Modifier) {
     LaunchedEffect(terminal) { scroll.scrollTo(scroll.maxValue) }
     Box(modifier.clip(RoundedCornerShape(SignalRadius.l)).background(c.codeBlockBg)) {
         Text(
-            terminal?.trimEnd() ?: "读取中…",
+            terminal?.trimEnd() ?: t("读取中…", "Loading…"),
             style = Signal.type.codeSmall.copy(fontSize = Signal.type.micro.fontSize),
             color = c.codeBlockFg,
             modifier = Modifier.fillMaxWidth().verticalScroll(scroll).horizontalScroll(rememberScrollState()).padding(12.dp),
