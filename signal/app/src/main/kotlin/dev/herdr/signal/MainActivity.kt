@@ -23,7 +23,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val c = container
         handleIntent(intent)
-        maybeAskNotificationPermission()
         JankMonitor.attach(this, "home")
         setContent {
             val mode by c.prefs.theme.collectAsStateWithLifecycle()
@@ -39,6 +38,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        maybeAskNotificationPermission()
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
@@ -51,10 +55,11 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(dev.herdr.signal.platform.Notifier.EXTRA_HOST)
     }
 
-    /** Android 13+：通知开关打开、还没授权、也没问过时，问一次。 */
+    /** Android 13+：已经有主机、通知开关打开、还没授权、也没问过时，问一次（空 App 首次打开不问，没有上下文）。 */
     private fun maybeAskNotificationPermission() {
         if (android.os.Build.VERSION.SDK_INT < 33) return
         val c = container
+        if (c.hosts.hosts.value.isEmpty()) return
         if (!c.prefs.notifyBlocked.value && !c.prefs.notifyDone.value) return
         if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED) return
         val sp = getSharedPreferences("signal-prefs", MODE_PRIVATE)

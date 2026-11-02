@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="18 18 72 72" width="512" height="512">
+  <!-- Herdr Signal：三点，中间那颗（注意力色）代表“有 agent 在等你”。与 ic_launcher_foreground 同一套坐标；viewBox 取启动器实际可见的 72dp 区域。 -->
+  <rect x="18" y="18" width="72" height="72" rx="16" fill="#FFFFFF"/>
+  <circle cx="38.40" cy="61.80" r="6.76" fill="#101217"/>
+  <circle cx="54.00" cy="46.20" r="8.84" fill="#C2410C"/>
+  <circle cx="69.60" cy="61.80" r="6.76" fill="#101217"/>
+</svg>
