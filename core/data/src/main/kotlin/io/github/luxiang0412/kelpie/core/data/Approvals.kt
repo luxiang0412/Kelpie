@@ -23,6 +23,7 @@ import java.util.EnumSet
  */
 class Approvals(
     private val conn: SshConnection,
+    /** 主机配置里的目录，可以是绝对路径或 `~/…`（见 [ApprovalsPath]）。 */
     private val dir: String,
 ) {
     data class Request(
@@ -46,6 +47,7 @@ class Approvals(
     suspend fun poll(): List<Request> = withContext(Dispatchers.IO) {
         val sftp = conn.openSftp()
         try {
+            val dir = ApprovalsPath.resolve(dir) { sftp.canonicalize(".") }
             if (runCatching { sftp.statExistence(dir) }.getOrNull() == null) return@withContext emptyList()
             val entries = sftp.ls(dir)
             // 已经回答过、但请求方还没来得及清理的请求：不再显示（否则会被重复回答）
@@ -101,7 +103,8 @@ class Approvals(
             .toString()
         val sftp = conn.openSftp()
         try {
-            val target = "$dir/${request.requestId}.answer"
+            // 写到读到请求的那个目录（request.path 已经是展开后的绝对路径）
+            val target = "${request.path.substringBeforeLast('/')}/${request.requestId}.answer"
             val tmp = target + ".tmp"
             sftp.open(tmp, EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC)).use { f ->
                 val bytes = (payload + "\n").toByteArray(Charsets.UTF_8)
@@ -123,5 +126,31 @@ class Approvals(
         } finally {
             runCatching { sftp.close() }
         }
+    }
+}
+
+/**
+ * 审批请求目录（每台主机可配置）。和开发机上 hook 的 `KELPIE_APPROVALS_DIR` 必须一致。
+ * 可以写绝对路径，或者 `~/…`（连上后用 SFTP 的家目录展开，所以 macOS 的 `/Users/…` 也行）。
+ */
+object ApprovalsPath {
+    const val DEFAULT = "~/.local/state/kelpie/approvals"
+
+    /** 校验并规范化用户填写的目录：空 → 默认值；去掉结尾的 `/`。 */
+    fun normalize(raw: String): Result<String> = runCatching {
+        val s = raw.trim().ifEmpty { return@runCatching DEFAULT }
+        require(s == "~" || s.startsWith("/") || s.startsWith("~/")) {
+            t("审批目录要写绝对路径，或者以 ~/ 开头", "The approvals directory must be an absolute path or start with ~/")
+        }
+        require(s.length <= 512 && s.none { it.isISOControl() }) { t("审批目录不对", "Invalid approvals directory") }
+        require(s.split('/').none { it == ".." }) { t("审批目录里不能有 ..", "The approvals directory can't contain ..") }
+        s.trimEnd('/').ifEmpty { "/" }
+    }
+
+    /** 展开 `~`；[home] 只在需要时才调用（一次 SFTP 往返）。 */
+    fun resolve(path: String, home: () -> String): String = when {
+        path == "~" -> home().trimEnd('/')
+        path.startsWith("~/") -> home().trimEnd('/') + path.substring(1)
+        else -> path
     }
 }

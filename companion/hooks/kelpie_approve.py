@@ -16,7 +16,7 @@
 HERDR_PANE_ID，所以手机能把请求准确挂到对应的 agent 上，不靠猜。
 
 配置（环境变量）：
-  KELPIE_APPROVALS_DIR   请求目录，默认 ~/spike-sandbox/approvals
+  KELPIE_APPROVALS_DIR   请求目录，默认 ~/.local/state/kelpie/approvals（App 的主机设置里要填同一个目录）
   KELPIE_APPROVAL_TTL    等待秒数，默认 120
   KELPIE_APPROVAL_TOOLS  需要手机批准的工具，逗号分隔，默认 Bash
   KELPIE_HOOK_LOG        若设置，把每次的原始 hook 输入追加到这个文件（实验用）
@@ -33,6 +33,8 @@ import sys
 import time
 
 SOURCE = "kelpie:approve"
+# 和 App 里 ApprovalsPath.DEFAULT 一致；改的话两边一起改
+DEFAULT_DIR = "~/.local/state/kelpie/approvals"
 
 
 CODEX = False  # main() 里按 hook_event_name 设置
@@ -140,9 +142,9 @@ def main() -> None:
         if tool not in tools:
             sys.exit(0)  # 不管的工具：不输出决定，走 Claude 自己的规则
 
-    d = os.path.expanduser(os.environ.get("KELPIE_APPROVALS_DIR", "~/spike-sandbox/approvals"))
+    d = os.path.expanduser(os.environ.get("KELPIE_APPROVALS_DIR", DEFAULT_DIR))
     ttl = int(os.environ.get("KELPIE_APPROVAL_TTL", "120"))
-    os.makedirs(d, exist_ok=True)
+    os.makedirs(d, mode=0o700, exist_ok=True)  # 请求里有命令内容，只给自己看
     tuid = str(hook.get("tool_use_id") or hook.get("call_id") or "")
     rid = re.sub(r"[^A-Za-z0-9_-]", "", tuid)[-40:] or secrets.token_hex(8)
     nonce = secrets.token_hex(8)

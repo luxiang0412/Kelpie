@@ -46,7 +46,7 @@
 1. **安装方式**：现在 hook 只装在隔离配置里。要在真实的 Claude 上用，需要在用户的 `~/.claude/settings.json` 里加一条 PreToolUse（这一步必须由你决定；可以做成 `herdr integration` 风格的安装脚本，或者 herdr 插件）。
 2. **哪些工具需要手机批准**：现在只有 Bash，且对所有 Bash 都拦截。实际用时应该只拦截 Claude 本来就会问的那些（尊重 allowlist / Auto 模式的判断），否则会比现在更打扰。可行做法：hook 先调用 Claude 的权限判断不可行（hook 拿不到），只能在 hook 里维护一份与 settings 一致的 allow 规则，或者只在用户"离开电脑"时启用（例如手机 App 在线时挂一个标记文件）。
 3. **电脑前的人想自己批**：hook 等待期间终端不出确认框。现在的做法是 Esc 取消再让 Claude 重来；更好的是在 herdr 侧给一个快捷键直接写 `.answer`，或者把等待时间缩短到 15–30 秒再退回终端。
-4. **请求目录**：现在是 `~/spike-sandbox/approvals`（实验约定）。正式版应该放到 `~/.local/state/kelpie/approvals`，并在 App 主机设置里可配置。
+4. **请求目录**：~~现在是 `~/spike-sandbox/approvals`（实验约定）~~ 已改（2026-11-03）：默认 `~/.local/state/kelpie/approvals`，App 的主机设置里可以改。
 5. **时钟偏差**：见审计文档最后一条。
 
 ## Codex（2026-11-03 06:18–06:32）
@@ -90,7 +90,8 @@ herdr 0.9.5 对 Codex 上报的是会话 **id**（`agent_session.kind = "id"`）
 还没有安装脚本。下面是实验时在 .2 上实际用的配置，路径换成你自己的。**先在隔离的配置目录里试**（Claude 用 `CLAUDE_CONFIG_DIR`，Codex 用 `CODEX_HOME`），确认没问题再考虑改真实的 `~/.claude`、`~/.codex`。
 
 1. 把 `companion/hooks/kelpie_approve.py` 复制到开发机，例如 `~/.local/share/kelpie/kelpie_approve.py`。
-2. 请求目录：App 目前只读 `/home/<用户>/spike-sandbox/approvals`（写死的，见“结论”第 4 条），hook 的 `KELPIE_APPROVALS_DIR` 必须指向它（默认值就是它）。
+2. 请求目录：两边默认都是 `~/.local/state/kelpie/approvals`，不改就能对上。要换目录，hook 设 `KELPIE_APPROVALS_DIR`，手机上在主机设置 → 手机审批 → 请求目录里填同一个（或者配对时 `kelpie_pair.py --approvals-dir <目录>`，会带进二维码）。
+   hook 会以 700 权限创建这个目录（请求里有命令内容）。
 3. hook 的超时要比等待时间长：`KELPIE_APPROVAL_TTL` 默认 120 秒，下面的 `timeout` 用 200 / 180。
 
 Claude Code（`settings.json`，只拦 Bash）：
@@ -139,7 +140,7 @@ hooks = true
 
 | 变量 | 默认 | 作用 |
 | --- | --- | --- |
-| `KELPIE_APPROVALS_DIR` | `~/spike-sandbox/approvals` | 请求目录，必须和 App 读的一致 |
+| `KELPIE_APPROVALS_DIR` | `~/.local/state/kelpie/approvals` | 请求目录，必须和 App 主机设置里的一致 |
 | `KELPIE_APPROVAL_TTL` | `120` | 等手机回答的秒数，超时退回终端确认 |
 | `KELPIE_APPROVAL_TOOLS` | `Bash` | 只对 Claude Code 生效：哪些工具要手机批准，逗号分隔 |
 | `KELPIE_HOOK_LOG` | 不设 | 设了就把每次的原始 hook 输入追加到这个文件（调试用） |

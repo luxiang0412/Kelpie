@@ -31,6 +31,8 @@ class HostRepository(context: Context) {
         val user: String,
         val session: String = "test",
         val herdrBin: String = "/home/luxiang/.local/bin/herdr",
+        /** 审批请求目录，和 hook 的 KELPIE_APPROVALS_DIR 一致（见 [ApprovalsPath]）。 */
+        val approvalsDir: String = ApprovalsPath.DEFAULT,
     ) {
         fun toSshConfig(keyFile: File) = SshConfig(
             hostId = id,
@@ -62,6 +64,7 @@ class HostRepository(context: Context) {
                     user = o.getString("user"),
                     session = o.optString("session", "test"),
                     herdrBin = o.optString("herdrBin", DEFAULT_BIN),
+                    approvalsDir = o.optString("approvalsDir", ApprovalsPath.DEFAULT),
                 )
             }
         }.getOrDefault(emptyList())
@@ -119,7 +122,8 @@ class HostRepository(context: Context) {
                     .put("port", h.port)
                     .put("user", h.user)
                     .put("session", h.session)
-                    .put("herdrBin", h.herdrBin),
+                    .put("herdrBin", h.herdrBin)
+                    .put("approvalsDir", h.approvalsDir),
             )
         }
         prefs.edit().putString(KEY_HOSTS, arr.toString()).apply()

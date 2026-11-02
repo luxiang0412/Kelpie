@@ -87,7 +87,7 @@ There is no server component. Everything goes over SSH (sshj, `core:ssh`) to eac
   - Codex: as a PermissionRequest hook.
 - The hook writes `<id>.req` (with a nonce) into the approvals dir and puts an `sa_*` token on its herdr pane. The app sees the token (or polls the dir over SFTP) and writes `<id>.answer`; the hook checks request id + nonce.
 - If there is no answer, the answer fails validation or the hook errors, the agent falls back to its own terminal prompt. It never auto-allows.
-- The approvals dir is hardcoded in the app (`ApprovalCenter`) as `/home/<user>/spike-sandbox/approvals`; the hook's `KELPIE_APPROVALS_DIR` must match.
+- The approvals dir is per host (`HostConfig.approvalsDir`, default `~/.local/state/kelpie/approvals`, `ApprovalsPath` validates and expands `~` via SFTP). It must match the hook's `KELPIE_APPROVALS_DIR`; the same default lives in `kelpie_approve.py` and `kelpie_pair.py` — change all three together.
 - See `docs/approvals.md` (manual config examples at the end).
 
 ### Pairing

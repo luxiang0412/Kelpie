@@ -1,5 +1,6 @@
 package io.github.luxiang0412.kelpie.settings
 
+import io.github.luxiang0412.kelpie.core.data.ApprovalsPath
 import io.github.luxiang0412.kelpie.core.herdr.t
 
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -76,6 +77,7 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit, onPair: (String) -> Unit 
     var user by rememberSaveable { mutableStateOf(existing?.user.orEmpty()) }
     var session by rememberSaveable { mutableStateOf(existing?.session ?: "test") }
     var bin by rememberSaveable { mutableStateOf(existing?.herdrBin.orEmpty()) }
+    var approvalsDir by rememberSaveable { mutableStateOf(existing?.approvalsDir?.takeIf { it != ApprovalsPath.DEFAULT }.orEmpty()) }
     var key by rememberSaveable { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -101,7 +103,7 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit, onPair: (String) -> Unit 
             session.isBlank() -> t("请填写 herdr 会话名", "Enter the herdr session name")
             existing == null && key.isBlank() -> t("新主机需要粘贴私钥", "A new host needs a private key")
             key.isNotBlank() && !key.contains("PRIVATE KEY-----") -> t("内容不像私钥（缺少 PRIVATE KEY 头）", "This doesn't look like a private key (no PRIVATE KEY header)")
-            else -> null
+            else -> ApprovalsPath.normalize(approvalsDir).exceptionOrNull()?.message
         }
         if (error != null) return
         val id = existing?.id ?: repo.newId()
@@ -113,6 +115,7 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit, onPair: (String) -> Unit 
                 label = label.trim().ifBlank { host.trim() },
                 host = host.trim(), port = p!!, user = user.trim(), session = session.trim(),
                 herdrBin = bin.trim().ifBlank { "/home/${user.trim()}/.local/bin/herdr" },
+                approvalsDir = ApprovalsPath.normalize(approvalsDir).getOrThrow(),
             ),
         )
         onDone()
@@ -159,6 +162,14 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit, onPair: (String) -> Unit 
                 Divider()
                 Field(t("程序路径", "Binary path"), bin, { bin = it }, t("默认 ~/.local/bin/herdr", "Default ~/.local/bin/herdr"))
             }
+            GroupLabel(t("手机审批", "Phone approvals"))
+            Group {
+                Field(t("请求目录", "Request directory"), approvalsDir, { approvalsDir = it }, t("默认 ${ApprovalsPath.DEFAULT}", "Default ${ApprovalsPath.DEFAULT}"), KeyboardType.Uri)
+            }
+            Text(
+                t("和开发机上审批 hook 的 KELPIE_APPROVALS_DIR 保持一致。可以写绝对路径，或者以 ~/ 开头。", "Must match KELPIE_APPROVALS_DIR of the approval hook on the dev machine. Absolute path or starting with ~/."),
+                style = Kelpie.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
             GroupLabel(if (hasKey) t("私钥（已导入，留空表示不更换）", "Private key (imported; leave empty to keep)") else t("私钥", "Private key"))
             Group {
                 Field("", key, { key = it }, t("粘贴 OpenSSH 私钥（-----BEGIN … PRIVATE KEY-----）", "Paste an OpenSSH private key (-----BEGIN … PRIVATE KEY-----)"), secret = true, singleLine = false)

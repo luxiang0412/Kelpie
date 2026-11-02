@@ -13,7 +13,8 @@ Kelpie 是一个纯客户端：没有自己的服务器，也不需要在开发�
 │                            │   SFTP        │ ~/.claude/projects/  对话记录  │
 │                            │ ────────────▶ │ ~/.codex/sessions/            │
 │                            │               │ ~/.pi/                        │
-│                            │               │ ~/spike-sandbox/approvals/ 审批 │
+│                            │               │ ~/.local/state/kelpie/approvals │
+│                            │               │   审批请求（目录可配置）          │
 └────────────────────────────┘               └──────────────────────────────┘
 ```
 
@@ -93,6 +94,9 @@ Kelpie 是一个纯客户端：没有自己的服务器，也不需要在开发�
 5. hook 核对请求 id 和 nonce 后，告诉 agent 允许还是拒绝。
 6. 超时、核对失败、hook 出错，都退回 agent 自己的终端确认，**不会放行**。
 
+请求目录按主机配置（主机设置 → 手机审批 → 请求目录，或者配对时 `kelpie_pair.py --approvals-dir`），默认 `~/.local/state/kelpie/approvals`，要和 hook 的 `KELPIE_APPROVALS_DIR` 一致。
+`~/` 开头的路径连上后用 SFTP 的家目录展开（`ApprovalsPath`），所以 macOS 的 `/Users/…` 也行。回答写回读到请求的同一个目录。
+
 App 端是 `ApprovalCenter`（读请求、写回答）和 `ApprovalSheet`（弹层）。读屏判断出来的“等待批准”只显示命令，不会显示成可以按的审批卡，因为那种请求没有 hook 接着。
 
 ## 配对
@@ -147,7 +151,6 @@ CI 用 `tools/i18n_literals.py --check` 检查有没有漏包的中文字面量�
 ## 已知限制
 
 - **审批**：
-  - 请求目录在 App 里写死成 `/home/<用户>/spike-sandbox/approvals`，这是实验时的约定。macOS 开发机（`/Users/…`）或者想换目录都不行，需要改成可配置。
   - 还没有安装脚本，hook 要手动配置。
   - Pi 还不支持审批。
   - 请求是否过期，用的是手机时钟和开发机写的过期时间比较。两边时钟差到分钟级会判断错。

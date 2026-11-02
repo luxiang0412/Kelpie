@@ -26,6 +26,8 @@ data class PairingPayload(
     val user: String,
     val session: String,
     val herdrBin: String,
+    /** 审批请求目录（字段 `a`，可选；旧二维码没有时用默认值）。 */
+    val approvalsDir: String = ApprovalsPath.DEFAULT,
     /** 算法 → `SHA256:…` */
     val hostKeys: Map<String, String>,
     val privateKey: String?,
@@ -67,6 +69,9 @@ data class PairingPayload(
             val session = o.str("s")?.takeIf { it.isNotBlank() } ?: "default"
             val bin = o.str("b")?.takeIf { it.startsWith("/") } ?: "/home/$user/.local/bin/herdr"
 
+            // 审批目录写错不致命：退回默认值，不拒绝整个二维码
+            val approvalsDir = o.str("a")?.let { ApprovalsPath.normalize(it).getOrNull() } ?: ApprovalsPath.DEFAULT
+
             val keys = (o["k"] as? JsonObject)?.mapNotNull { (alg, fp) ->
                 val f = runCatching { fp.jsonPrimitive.contentOrNull }.getOrNull() ?: return@mapNotNull null
                 if (ALG.matches(alg) && FP.matches(f)) alg to f else null
@@ -79,7 +84,7 @@ data class PairingPayload(
             PairingPayload(
                 label = o.str("n")?.trim()?.take(64)?.ifBlank { null } ?: host,
                 host = host, port = port, user = user, session = session, herdrBin = bin,
-                hostKeys = keys, privateKey = key, expiresAtSec = exp,
+                approvalsDir = approvalsDir, hostKeys = keys, privateKey = key, expiresAtSec = exp,
             )
         }
 
@@ -117,7 +122,7 @@ object Pairing {
         repo.upsert(
             HostRepository.HostConfig(
                 id = id, label = existing?.label ?: p.label, host = p.host, port = p.port,
-                user = p.user, session = p.session, herdrBin = p.herdrBin,
+                user = p.user, session = p.session, herdrBin = p.herdrBin, approvalsDir = p.approvalsDir,
             ),
         )
         id

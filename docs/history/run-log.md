@@ -256,3 +256,11 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 发现调试导入的 bug：几台主机共用一个密钥文件时，导入第一台就删了文件，第二台没有密钥。改成全部导入完再删，重装后验证 .3 拿到了密钥。
 - 首页“Kelpie”标题、两台主机在线；Codex 对话（wA）正常显示。旧的 Herdr Signal 几个包还装在手机上，没有卸载。
 - 07:3x 用户要求：卸载了手机上所有旧包（`dev.herdr.signal` / `.debug` / `.min`、`dev.herdr.app`、几个测试包），只剩 `io.github.luxiang0412.kelpie.min`。
+
+## 审批目录改成可配置（2026-11-03，用户要求）
+
+- 每台主机新增 `approvalsDir`（主机设置 → 手机审批 → 请求目录；配对二维码字段 `a`；provision.json 字段 `approvalsDir`）。默认 `~/.local/state/kelpie/approvals`，`~/` 用 SFTP 的家目录展开。回答写回读到请求的同一个目录。
+- `kelpie_approve.py` 默认目录同步改，并以 700 创建；`kelpie_pair.py --approvals-dir`（默认值不放进二维码）。
+- 验证：单元测试（`ApprovalsPathTest` 4 个、`PairingPayloadTest` 新增 1 个）、全部测试 / 截图回归 / lint / minified 构建通过；本机假 HOME 里跑 hook（`HERDR_*` 已 unset）：建出 `~/.local/state/kelpie/approvals`（700），2 秒超时退回 `ask`，请求文件已清理；拦截 `build_link` 确认二维码默认不带 `a`、`--approvals-dir /srv/appr/` 时带 `"a": "/srv/appr"`。
+- 还没做：真机端到端（手机的无线调试断开了，`10.144.144.6:42407` 拒绝连接）。
+- 注意：.2 上沙箱里的旧 hook（`signal_approve.py`）还写 `~/spike-sandbox/approvals`；新版 App 不填目录就读不到它们，需要的话在主机设置里填旧目录。

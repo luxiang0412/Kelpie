@@ -27,13 +27,12 @@ sealed interface ApprovalOutcome {
 }
 
 /**
- * 轮询各主机沙箱里的审批目录（只在 App 前台时跑，3 秒一次）。
+ * 轮询各主机的审批目录（主机配置里的 approvalsDir；只在 App 前台时跑，3 秒一次）。
  * 目录不存在的主机直接返回空列表，不报错。
  */
 class ApprovalCenter(
     private val fleet: Fleet,
     private val scope: CoroutineScope,
-    private val dirFor: (user: String) -> String = { u -> "/home/$u/spike-sandbox/approvals" },
 ) {
     private val _items = MutableStateFlow<List<ApprovalItem>>(emptyList())
     val items: StateFlow<List<ApprovalItem>> = _items.asStateFlow()
@@ -83,7 +82,7 @@ class ApprovalCenter(
             val kept = previous[h.hostId].orEmpty().filter { !it.request.expired && "${h.hostId}/${it.request.requestId}" !in gone }
             val cfg = fleet.config(h.hostId) ?: return@flatMap emptyList()
             val conn = fleet.connection(h.hostId) ?: return@flatMap kept
-            val fresh = runCatching { Approvals(conn, dirFor(cfg.user)).poll() }.getOrNull() ?: return@flatMap kept
+            val fresh = runCatching { Approvals(conn, cfg.approvalsDir).poll() }.getOrNull() ?: return@flatMap kept
             fresh.filter { !it.expired && "${h.hostId}/${it.requestId}" !in gone }
                 .map { ApprovalItem(h.hostId, h.label, it.copy(hostId = h.hostId)) }
         }
@@ -116,7 +115,7 @@ class ApprovalCenter(
         }
         val cfg = fleet.config(item.hostId) ?: return ApprovalOutcome.Failed(t("主机已移除", "Host was removed"))
         val conn = fleet.connection(item.hostId) ?: return ApprovalOutcome.Failed(t("主机未连接", "Host not connected"))
-        val ok = runCatching { Approvals(conn, dirFor(cfg.user)).answer(item.request, allow) }.getOrDefault(false)
+        val ok = runCatching { Approvals(conn, cfg.approvalsDir).answer(item.request, allow) }.getOrDefault(false)
         synchronized(_audit) {
             _audit += "${System.currentTimeMillis()} ${item.hostId}/${item.request.requestId} " +
                 "decision=${if (allow) "allow" else "deny"} written=$ok nonce=${item.request.nonce.take(6)}"

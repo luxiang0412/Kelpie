@@ -27,6 +27,13 @@ class PairingPayloadTest {
         assertTrue("toString 不能带私钥", !p.toString().contains("PRIVATE"))
     }
 
+    @Test fun approvalsDir() {
+        assertEquals(ApprovalsPath.DEFAULT, PairingPayload.parse(ok(), nowSec = 900).getOrThrow().approvalsDir)
+        assertEquals("/srv/appr", PairingPayload.parse(ok(""","a":"/srv/appr/""""), nowSec = 900).getOrThrow().approvalsDir)
+        // 写错的目录不拒绝整个二维码，退回默认值
+        assertEquals(ApprovalsPath.DEFAULT, PairingPayload.parse(ok(""","a":"relative/dir""""), nowSec = 900).getOrThrow().approvalsDir)
+    }
+
     @Test fun expiredWithinSkewStillAccepted() = assertTrue(PairingPayload.parse(ok(), nowSec = 1000 + 299).isSuccess)
     @Test fun expiredRejected() = assertTrue(PairingPayload.parse(ok(), nowSec = 1000 + 301).isFailure)
     @Test fun notOurs() = assertTrue(PairingPayload.parse("https://example.com/?d=xx").isFailure)

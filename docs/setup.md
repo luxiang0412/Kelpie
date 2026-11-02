@@ -41,6 +41,7 @@ herdr integration status        # 确认已安装
 ### 5. 手机审批（可选）
 
 要在手机上批准 agent 运行命令，还需要给 Claude Code 或 Codex 装审批 hook（`companion/hooks/kelpie_approve.py`）。
+请求目录两边默认都是 `~/.local/state/kelpie/approvals`；改了的话，在手机的主机设置 → 手机审批里填同一个目录。
 目前**没有安装脚本**，只在隔离配置里验证过；配置方法和启用前要决定的事见 [`approvals.md`](approvals.md)。不装也不影响其他功能。
 
 ### 自查清单

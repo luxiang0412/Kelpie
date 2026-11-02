@@ -1,5 +1,13 @@
 # 更新说明
 
+## 未发布
+
+- 手机审批的请求目录可以按主机配置：主机设置 → 手机审批 → 请求目录；配对脚本加 `--approvals-dir` 会带进二维码。
+  支持 `~/` 开头（连上后按开发机的家目录展开，macOS 也能用）。
+- 默认目录从实验时的 `~/spike-sandbox/approvals` 改为 `~/.local/state/kelpie/approvals`（App 和 `kelpie_approve.py` 同时改）。
+  还在用旧目录的 hook，要么设 `KELPIE_APPROVALS_DIR`，要么在主机设置里填旧目录。
+- `kelpie_approve.py` 以 700 权限创建请求目录。
+
 ## 0.4.0（2026-11-03）：改名 Kelpie
 
 功能和 0.3.0 相同，只是改名。

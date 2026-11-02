@@ -1,5 +1,6 @@
 package io.github.luxiang0412.kelpie
 
+import io.github.luxiang0412.kelpie.core.data.ApprovalsPath
 import android.app.Application
 import android.util.Log
 import io.github.luxiang0412.kelpie.core.data.HostRepository
@@ -12,7 +13,7 @@ import java.io.File
  *   adb push provision.json  /sdcard/Android/data/io.github.luxiang0412.kelpie.debug/files/provision.json
  *   adb push id_xxx          /sdcard/Android/data/io.github.luxiang0412.kelpie.debug/files/<keyFile>
  *
- * provision.json：{"hosts":[{"id","label","host","port","user","session","herdrBin","keyFile"}]}
+ * provision.json：{"hosts":[{"id","label","host","port","user","session","herdrBin","approvalsDir","keyFile"}]}
  * 导入后两个文件都会被删除；私钥只留在 app 私有目录。主机指纹仍然要在界面上确认（不做 TOFU）。
  */
 object DebugHooks {
@@ -33,6 +34,7 @@ object DebugHooks {
                     user = o.getString("user"),
                     session = o.optString("session", "test"),
                     herdrBin = o.optString("herdrBin", "/home/${o.getString("user")}/.local/bin/herdr"),
+                    approvalsDir = ApprovalsPath.normalize(o.optString("approvalsDir")).getOrDefault(ApprovalsPath.DEFAULT),
                 )
                 container.hosts.upsert(cfg)
                 o.optString("keyFile").takeIf { it.isNotBlank() }?.let { name ->

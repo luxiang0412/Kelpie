@@ -12,6 +12,7 @@
     v 版本(1)  n 名称  h 地址  p 端口  u 用户  s herdr 会话  b herdr 路径
     k {算法: "SHA256:…"}  本机全部 SSH host key 的指纹（手机据此固定指纹，不需要再人工核对）
     key 手机专用的 OpenSSH 私钥（ed25519）   exp 过期时间（unix 秒）
+    a 审批请求目录（可选，和默认值不同时才有）
 
 安全说明：
 - 二维码里有私钥。只在自己的屏幕上显示，不要截图外传。过期时间只限制手机端接受旧二维码，
@@ -39,6 +40,8 @@ import time
 import zlib
 
 COMMENT_PREFIX = "kelpie-"
+# 和 App 里 ApprovalsPath.DEFAULT、kelpie_approve.py 的 DEFAULT_DIR 一致
+DEFAULT_APPROVALS_DIR = "~/.local/state/kelpie/approvals"
 # 改名前（Herdr Signal）发的密钥注释是 herdr-signal-…，--list / --revoke 也认
 LEGACY_PREFIXES = ("herdr-signal-",)
 ALL_PREFIXES = (COMMENT_PREFIX, *LEGACY_PREFIXES)
@@ -437,6 +440,8 @@ def main():
     ap.add_argument("--user", default=getpass.getuser())
     ap.add_argument("--session", default=os.environ.get("HERDR_SESSION", "default"), help="herdr 会话名")
     ap.add_argument("--herdr-bin", default=shutil.which("herdr") or os.path.expanduser("~/.local/bin/herdr"))
+    ap.add_argument("--approvals-dir", default=os.environ.get("KELPIE_APPROVALS_DIR", DEFAULT_APPROVALS_DIR),
+                    help=f"审批 hook 的请求目录，和 KELPIE_APPROVALS_DIR 一致（默认 {DEFAULT_APPROVALS_DIR}）")
     ap.add_argument("--ssh-dir", default="/etc/ssh", help="读取 host key 的目录")
     ap.add_argument("--key-file", help="不生成新密钥，改用这把已有的私钥（它必须已经在 authorized_keys 里）")
     ap.add_argument("--install", choices=("ask", "yes", "no"), default="ask", help="是否把新公钥加入 ~/.ssh/authorized_keys")
@@ -491,6 +496,8 @@ def main():
         "v": 1, "n": a.label, "h": host, "p": a.port, "u": a.user,
         "s": a.session, "b": a.herdr_bin, "k": fps, "key": key, "exp": int(time.time()) + a.ttl,
     }
+    if a.approvals_dir.rstrip("/") != DEFAULT_APPROVALS_DIR:  # 默认值不放进二维码，省点空间
+        payload["a"] = a.approvals_dir.rstrip("/")
     link = build_link(payload)
     qr = QR(link.encode(), a.ecl)
     print(qr.terminal())
