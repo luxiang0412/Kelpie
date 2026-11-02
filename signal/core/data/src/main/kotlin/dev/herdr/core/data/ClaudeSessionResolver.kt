@@ -46,6 +46,13 @@ class ClaudeSessionResolver {
         }.trimEnd('/')
         if (home.isEmpty()) return@withContext Result.Failure("no_home", "无法确定远端 home 目录")
         val dir = "$home/.claude/projects/$slug"
+        // Claude 的会话文件以 session id 命名：先直接按 id 找。
+        // 同一目录下跑着多个 Claude 时，“取最新”必然会配错，按 id 才可靠。
+        val direct = "$dir/$expectedSessionId.jsonl"
+        val directHead = runCatching { readHead(sftp, direct) }.getOrNull()
+        if (directHead != null && ClaudeSessionLocator.sessionIdMatches(expectedSessionId, ClaudeSessionLocator.sessionIdOf(directHead))) {
+            return@withContext Result.Found(direct, "cwd→$slug，按 session id 直接定位")
+        }
         val candidates = try {
             sftp.ls(dir)
                 .filter { it.isRegularFile && it.name.endsWith(".jsonl") }
