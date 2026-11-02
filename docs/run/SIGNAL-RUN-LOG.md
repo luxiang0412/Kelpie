@@ -45,3 +45,11 @@
 - 把 .3 的端口临时改成 2（只改 App 本地配置）：横幅“连不上 10.144.144.3 · 连接被拒绝 · N 秒后第 K 次重连”，副标题“1 台在线 · 1 台连不上”，.3 的 agent 显示虚线圆 +“最后看到”；改回 22 后自动恢复。
 - 横幅原来只写“重连中（第 3 次）”，改为带上翻译过的失败原因（拒绝 / 超时 / 网络不通 / 认证失败 / 找不到地址 / 指纹不一致）。
 - “手机没有网络”分支没有在真机上验证：手机走 Wi‑Fi 调试，断网会断开 adb。逻辑只依赖 ConnectivityManager 的默认网络回调。
+
+### P5 R8 / 性能（第一轮）
+- release 开启 R8 + 资源收缩；sshj / BouncyCastle / eddsa 整包 keep（反射加载算法和 JCA provider），导航路由序列化器 keep。
+- 新增 `minified` 构建类型：release 语义（R8、不可调试）+ debug 的 adb 导入钩子，包名 `.min`，只用于真机验证，不发布。
+- 真机（minified）：两台主机指纹确认 → 连上 → 6 个 agent → 打开 spike-sandbox 对话读出 transcript，全程无崩溃。
+- APK：debug 17.6 MB → release 5.2 MB。
+- 冷启动（am start -W，4 次）：debug 640–657 ms → minified 334–382 ms。
+- 对话页来回快速滑动 12 次：852 帧，janky 2.35%，p50 6 ms / p90 9 ms / p99 15 ms。

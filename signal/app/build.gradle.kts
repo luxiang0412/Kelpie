@@ -33,10 +33,21 @@ android {
     buildTypes {
         getByName("debug") { applicationIdSuffix = ".debug"; versionNameSuffix = "-debug" }
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = if (keystorePropsFile.exists()) signingConfigs.getByName("releaseSigned") else signingConfigs.getByName("debug")
         }
     }
+    // minified：release 语义（R8、不可调试）+ debug 的 adb 导入钩子，用来在真机上验证混淆后的 SSH / 性能。
+    buildTypes.create("minified") {
+        initWith(buildTypes.getByName("release"))
+        applicationIdSuffix = ".min"
+        versionNameSuffix = "-min"
+        signingConfig = signingConfigs.getByName("debug")
+        matchingFallbacks += listOf("release")
+    }
+    sourceSets.getByName("minified") { kotlin.srcDir("src/debug/kotlin") }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     packaging {
         resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*", "META-INF/*.kotlin_module")
