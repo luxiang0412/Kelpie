@@ -23,18 +23,18 @@ class CodexSessionResolver {
         codexPanesWithSameCwd: Int,
         nowMs: Long = System.currentTimeMillis(),
     ): ClaudeSessionResolver.Result = withContext(Dispatchers.IO) {
-        fun fail(code: String, zh: String, en: String) = ClaudeSessionResolver.Result.Failure(code, t(zh, en))
-        if (cwd.isNullOrBlank()) return@withContext fail("no_cwd", "pane 没有上报 cwd", "The pane didn't report a cwd")
+        fun fail(code: String, message: String) = ClaudeSessionResolver.Result.Failure(code, message)
+        if (cwd.isNullOrBlank()) return@withContext fail("no_cwd", t("pane 没有上报 cwd", "The pane didn't report a cwd"))
         if (codexPanesWithSameCwd > 1) {
-            return@withContext fail("ambiguous", "同一目录下有 $codexPanesWithSameCwd 个 Codex，分不清是哪个会话", "$codexPanesWithSameCwd Codex panes share this directory; can't tell which transcript is this one")
+            return@withContext fail("ambiguous", t("同一目录下有 $codexPanesWithSameCwd 个 Codex，分不清是哪个会话", "$codexPanesWithSameCwd Codex panes share this directory; can't tell which transcript is this one"))
         }
-        val sftp = runCatching { conn.sharedSftp() }.getOrElse { return@withContext fail("no_sftp", it.message ?: "SFTP 不可用", it.message ?: "SFTP unavailable") }
+        val sftp = runCatching { conn.sharedSftp() }.getOrElse { return@withContext fail("no_sftp", it.message ?: t("SFTP 不可用", "SFTP unavailable")) }
         val home = runCatching { sftp.canonicalize(".") }.getOrNull().orEmpty().trimEnd('/')
-        if (home.isEmpty()) return@withContext fail("no_home", "无法确定远端 home 目录", "Couldn't determine the remote home directory")
+        if (home.isEmpty()) return@withContext fail("no_home", t("无法确定远端 home 目录", "Couldn't determine the remote home directory"))
         val root = "$home/.codex/sessions"
         fun names(dir: String) = runCatching { sftp.ls(dir).filter { it.isDirectory }.map { it.name } }.getOrDefault(emptyList())
         val days = CodexSessionLocator.recentDayDirs(names(root), { y -> names("$root/$y") }, { y, m -> names("$root/$y/$m") })
-        if (days.isEmpty()) return@withContext fail("dir_missing", "找不到 $root", "Not found: $root")
+        if (days.isEmpty()) return@withContext fail("dir_missing", t("找不到 $root", "Not found: $root"))
 
         val candidates = days.flatMap { d ->
             runCatching { sftp.ls("$root/$d") }.getOrDefault(emptyList())
@@ -49,7 +49,7 @@ class CodexSessionResolver {
                 CodexSessionLocator.Candidate(path, mt, meta)
             }
         val hit = CodexSessionLocator.pick(candidates, cwd, nowMs, windowMs)
-            ?: return@withContext fail("no_match", "最近一天里没有 $cwd 下的交互式 Codex 会话", "No interactive Codex session in $cwd during the last day")
+            ?: return@withContext fail("no_match", t("最近一天里没有 $cwd 下的交互式 Codex 会话", "No interactive Codex session in $cwd during the last day"))
         ClaudeSessionResolver.Result.Found(hit.path, t("按 cwd 找到最新的交互式会话", "Newest interactive session for this cwd"))
     }
 
