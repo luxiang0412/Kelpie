@@ -1,6 +1,6 @@
 # 背景：代码注释里引用的旧决策与旧问题
 
-旧版客户端（现已归档在 `archive/android/`）的 `DECISIONS.md`、`ISSUES.md`、`RESULTS.md` 已从仓库删除（2026-11-03）。Signal 代码注释里还引用着其中一些编号：`Dn` 指决策，`I-n` 指问题，`RESULTS §9.x` 指实测结果。这里原样摘录被引用的条目，方便查阅。
+旧版客户端（原 `android/`，已删除）的 `DECISIONS.md`、`ISSUES.md`、`RESULTS.md` 已从仓库删除（2026-11-03）。Signal 代码注释里还引用着其中一些编号：`Dn` 指决策，`I-n` 指问题，`RESULTS §9.x` 指实测结果。这里原样摘录被引用的条目，方便查阅。
 
 完整原文在 git 历史里，例如 `git show signal-v0.2.0:DECISIONS.md`。
 

@@ -1,7 +1,7 @@
 # signal/ — Herdr Signal（Android 客户端 0.3.0）
 
 手机上监督远程开发机里由 herdr 托管的 coding agent（Claude Code / Pi / Codex）。
-这是对旧版客户端（现在归档在 `archive/android/`）的重写：设计依据是 `docs/signal/DESIGN-SPEC.md`（方向 A：一张按注意力排序的列表，日间为主、夜间模式）。
+这是对旧版客户端（原 `android/`，已删除，见 git 历史）的重写：设计依据是 `docs/signal/DESIGN-SPEC.md`（方向 A：一张按注意力排序的列表，日间为主、夜间模式）。
 两者包名不同（`dev.herdr.app` / `dev.herdr.signal`），可以同时安装。版本更新见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ![logo](art/logo-512.png)

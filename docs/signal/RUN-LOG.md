@@ -231,3 +231,5 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
   - 产物 `dist/herdr-signal-0.3.0.apk`，不入库。
   - 发版前在手机上冒烟测试了 minified 包：首页正常、两台主机在线、Codex 对话正常显示。
   - 正式包没有装到手机上：手机上的 `dev.herdr.signal` 0.2.0 是 debug 签名，要先卸载，由用户决定。
+
+- **07:0x 删除 `archive/`**（用户要求）：删掉旧版客户端 `archive/android/` 和早期探针 `archive/spike/`，共 160 个文件，全部在 git 里，没有只存在本地的内容。需要时用 `git checkout signal-v0.3.0 -- archive/` 恢复。

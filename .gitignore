@@ -28,6 +28,3 @@ known_hosts.spike
 # 临时抓取文件
 tmp-*.xml
 tmp_*.txt
-
-# 归档：历史截图 / 日志只留本地
-archive/spike/results/

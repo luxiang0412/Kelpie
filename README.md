@@ -12,7 +12,6 @@
 | [`signal/`](signal/) | **当前的 Android 客户端**（Kotlin / Compose）。构建、运行、发版见 [`signal/README.md`](signal/README.md) |
 | [`signal/companion/`](signal/companion/) | 装在开发机上的小脚本：扫码配对（`pair/`）、手机审批 hook（`hooks/`） |
 | [`docs/signal/`](docs/signal/) | 设计规范、herdr 接口审计、审批实验、过程记录（索引见下） |
-| [`archive/`](archive/) | 不再演进的旧代码：旧版客户端 `archive/android/`、早期探针 `archive/spike/` |
 | `tools/` | 仓库维护脚本（`check_doc_links.py`：检查文档里的路径引用） |
 | `.github/workflows/signal.yml` | CI：单元测试、截图回归、lint、构建、文案检查 |
 
@@ -34,6 +33,6 @@
 
 ## 历史
 
-- 0.1.x：旧版客户端（现 `archive/android/`），2026-10 底。
+- 0.1.x：旧版客户端（原 `android/`），2026-10 底。
 - 2026-11-02：在 `signal/` 重写（新设计、新架构），0.2.0 起是 Signal。
-- 2026-11-03：旧版的设计规格、过程报告、截图证据、台账（`DECISIONS.md`、`ISSUES.md`、`RESULTS.md` 等）从仓库删除，需要时从 git 历史取，例如 `git show signal-v0.2.0:DECISIONS.md`。
+- 2026-11-03：旧版客户端代码、早期探针（`archive/`），以及旧版的设计规格、过程报告、截图证据、台账（`DECISIONS.md`、`ISSUES.md`、`RESULTS.md` 等）都从仓库删除。需要时从 git 历史取，例如 `git show signal-v0.2.0:DECISIONS.md`、`git checkout signal-v0.3.0 -- archive/`。

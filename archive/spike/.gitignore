@@ -1,8 +1,0 @@
-# 环境变量（含主机名/密钥路径）
-.env
-# 构建产物
-jvm/.gradle/
-jvm/build/
-# 本地信任库（指纹可以留，私钥不行；这里统一不入库以免误提交）
-*.spike
-known_hosts.spike
