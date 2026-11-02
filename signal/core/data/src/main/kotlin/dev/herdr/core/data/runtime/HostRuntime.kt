@@ -97,8 +97,26 @@ internal class HostRuntime(
             is ConnectionSupervisor.State.Connected -> HostLink(HostReach.Online, "已连接 · herdr ${st.version}", version = st.version)
             // Stale：连接还在，但超过 25 秒没刷新成功。对用户来说数据已不可信。
             is ConnectionSupervisor.State.Stale -> HostLink(HostReach.Unreachable, "数据可能过期：${st.reason}", ConnectionSupervisor.Kind.NETWORK)
-            is ConnectionSupervisor.State.Reconnecting -> HostLink(HostReach.Unreachable, "重连中（第 ${st.attempt} 次）", ConnectionSupervisor.Kind.NETWORK)
-            is ConnectionSupervisor.State.Failed -> HostLink(HostReach.Unreachable, st.message, st.kind)
+            is ConnectionSupervisor.State.Reconnecting -> HostLink(
+                HostReach.Unreachable,
+                listOfNotNull(reason(st.lastError), "${st.delayMs / 1000} 秒后第 ${st.attempt} 次重连").joinToString(" · "),
+                ConnectionSupervisor.Kind.NETWORK,
+            )
+            is ConnectionSupervisor.State.Failed -> HostLink(HostReach.Unreachable, reason(st.message) ?: st.message, st.kind)
+        }
+
+        /** 把底层异常文字翻成一句人话；认不出来就截短原文。 */
+        fun reason(raw: String?): String? {
+            val r = raw?.lowercase() ?: return null
+            return when {
+                "refused" in r -> "连接被拒绝"
+                "timed out" in r || "timeout" in r -> "连接超时"
+                "unreachable" in r || "no route" in r -> "网络不通"
+                "auth" in r -> "认证失败（私钥不被接受）"
+                "unknownhost" in r || "unable to resolve" in r -> "找不到这个地址"
+                "host key" in r || "mismatch" in r -> "主机指纹不一致"
+                else -> raw.take(40)
+            }
         }
     }
 }

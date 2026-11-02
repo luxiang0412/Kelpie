@@ -40,3 +40,8 @@
 - 运行时权限已授予，MIUI 仍把应用通知设为关闭（importance NONE，appop ignore）→ `Notifier.allowed()` 同时检查 `areNotificationsEnabled()`，设置页显示提示并跳到系统通知设置。
 - 系统在通知权限变更时会杀掉 App 进程（ActivityManager: PermissionHelper），需要重新打开一次。
 - 验证：后台收到“spike-sandbox 完成了 · Pi · MS-7E07”，点通知直达该对话；锁屏只显示公开版本。
+
+### P4 离线
+- 把 .3 的端口临时改成 2（只改 App 本地配置）：横幅“连不上 10.144.144.3 · 连接被拒绝 · N 秒后第 K 次重连”，副标题“1 台在线 · 1 台连不上”，.3 的 agent 显示虚线圆 +“最后看到”；改回 22 后自动恢复。
+- 横幅原来只写“重连中（第 3 次）”，改为带上翻译过的失败原因（拒绝 / 超时 / 网络不通 / 认证失败 / 找不到地址 / 指纹不一致）。
+- “手机没有网络”分支没有在真机上验证：手机走 Wi‑Fi 调试，断网会断开 adb。逻辑只依赖 ConnectivityManager 的默认网络回调。
