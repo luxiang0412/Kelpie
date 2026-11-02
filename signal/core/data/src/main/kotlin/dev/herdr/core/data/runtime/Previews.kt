@@ -1,6 +1,7 @@
 package dev.herdr.core.data.runtime
 
 import dev.herdr.core.data.ClaudeSessionResolver
+import dev.herdr.core.data.CodexSessionResolver
 import dev.herdr.core.data.attention.AgentItem
 import dev.herdr.core.data.attention.AgentKey
 import dev.herdr.core.herdr.ChatMessage
@@ -30,7 +31,8 @@ data class BlockedPreview(
  *
  * - Pi：herdr 给了会话文件路径 → 读文件尾，取最后一条助手消息；
  * - Claude：herdr 只给 session id → 按 cwd 定位会话文件（只读）后同上；
- * - 其他（Codex 等）：读终端最近几行。屏幕内容**只用来展示**，绝不据此一键批准。
+ * - Codex：herdr 没给路径时按 cwd 在 `~/.codex/sessions` 里找（[CodexSessionResolver]）；
+ * - 找不到会话文件的：读终端最近几行。屏幕内容**只用来展示**，绝不据此一键批准。
  */
 class Previews(
     private val fleet: Fleet,
@@ -38,6 +40,7 @@ class Previews(
 ) {
     private val loader = TranscriptLoader()
     private val resolver = ClaudeSessionResolver()
+    private val codexResolver = CodexSessionResolver()
     private val _map = MutableStateFlow<Map<AgentKey, BlockedPreview>>(emptyMap())
     val map: StateFlow<Map<AgentKey, BlockedPreview>> = _map.asStateFlow()
 
@@ -69,7 +72,10 @@ class Previews(
         val conn = fleet.connection(item.key.hostId) ?: return null
         val pane = item.pane
         val path = pane.agentSessionPath?.takeIf { it.isNotBlank() }
-            ?: if (pane.agentSessionId != null || pane.agent?.startsWith("claude") == true) {
+            ?: if (pane.agent == "codex") {
+                val sameCwd = fleet.panes(item.key.hostId).count { it.agent == "codex" && it.cwd == pane.cwd }
+                (codexResolver.resolve(conn, pane.cwd, sameCwd) as? ClaudeSessionResolver.Result.Found)?.path
+            } else if (pane.agentSessionId != null || pane.agent?.startsWith("claude") == true) {
                 (resolver.resolve(conn, pane.cwd, pane.agentSessionId) as? ClaudeSessionResolver.Result.Found)?.path
             } else null
         if (path != null) {

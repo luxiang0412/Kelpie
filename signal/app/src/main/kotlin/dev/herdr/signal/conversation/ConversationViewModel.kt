@@ -6,6 +6,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.herdr.core.data.ClaudeSessionResolver
+import dev.herdr.core.data.CodexSessionResolver
 import dev.herdr.core.data.TranscriptTailer
 import dev.herdr.core.data.attention.AgentItem
 import dev.herdr.core.data.attention.AgentKey
@@ -113,7 +114,13 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
         pane ?: return
         val conn = c.fleet.connection(key.hostId) ?: return
         val path = pane.agentSessionPath?.takeIf { it.isNotBlank() } ?: run {
-            if (pane.agentSessionId != null || pane.agent?.startsWith("claude") == true) {
+            if (pane.agent == "codex") {
+                val sameCwd = c.fleet.panes(key.hostId).count { it.agent == "codex" && it.cwd == pane.cwd }
+                when (val r = CodexSessionResolver().resolve(conn, pane.cwd, sameCwd)) {
+                    is ClaudeSessionResolver.Result.Found -> r.path
+                    is ClaudeSessionResolver.Result.Failure -> { _source.value = Source.TerminalOnly(r.message); null }
+                }
+            } else if (pane.agentSessionId != null || pane.agent?.startsWith("claude") == true) {
                 when (val r = ClaudeSessionResolver().resolve(conn, pane.cwd, pane.agentSessionId)) {
                     is ClaudeSessionResolver.Result.Found -> r.path
                     is ClaudeSessionResolver.Result.Failure -> { _source.value = Source.TerminalOnly(r.message); null }

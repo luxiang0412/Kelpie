@@ -115,6 +115,9 @@ class Fleet(
     /** 当前权威（或最后看到的）pane。 */
     fun pane(key: AgentKey): Pane? = inputs.value[key.hostId]?.panes?.firstOrNull { it.paneId == key.paneId }
 
+    /** 某台主机当前（或最后看到的）全部 pane。 */
+    fun panes(hostId: String): List<Pane> = inputs.value[hostId]?.panes.orEmpty()
+
     private suspend fun sync(list: List<HostRepository.HostConfig>) = lock.withLock {
         val ids = list.map { it.id }.toSet()
         // 删除 / 配置变化的主机：停掉
