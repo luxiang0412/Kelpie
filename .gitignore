@@ -1,47 +1,33 @@
-# 本机环境变量（含主机名/密钥路径/指纹）
-spike/.env
-
-# Gradle 构建产物与缓存
-spike/jvm/.gradle/
-spike/jvm/build/
-.gradle/
-build/
-
-# 本地信任库 / 指纹固定文件（属于运行期状态，不入库）
-known_hosts.spike
-*.spike
-
 # 编辑器 / 系统
 .idea/
 *.iml
 .DS_Store
 Thumbs.db
 
-# Android 构建产物与本机 SDK 路径
-spike/android/.gradle/
-spike/android/build/
-spike/android/app/build/
-spike/android/local.properties
+# 构建产物与缓存
+.gradle/
+.kotlin/
+build/
+dist/
 *.apk
 *.aab
+local.properties
+__pycache__/
+*.pyc
 
 # 正式签名配置与密钥库（绝不入库）
-milestone1/keystore.properties
 keystore.properties
 *.jks
 *.keystore
 
-dist/
-
-# 本机 SDK 路径（每台机器不同，绝不入库）
-milestone1/local.properties
-android/local.properties
+# 本机环境与运行期状态（主机名 / 密钥路径 / 指纹）
+.env
+known_hosts.spike
+*.spike
 
 # 临时抓取文件
 tmp-*.xml
 tmp_*.txt
 
-# 归档目录：探针代码保留，历史截图/日志只留本地（证据已整理到 docs/evidence/）
+# 归档：历史截图 / 日志只留本地
 archive/spike/results/
-archive/spike/*/build/
-archive/spike/*/.gradle/

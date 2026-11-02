@@ -56,7 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Markdown 子集渲染（选型见 docs/design/MARKDOWN-RENDERING-DECISION.md）。
+ * Markdown 子集渲染（选型见 docs/signal/MARKDOWN-RENDERING.md）。
  *
  * 性能约定：
  *  - 解析在 [Dispatchers.Default] 上执行，主线程只做排版；

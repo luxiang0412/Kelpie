@@ -1,3 +1,0 @@
-count=100 TotalTime: 375
-count=500 TotalTime: 344
-count=2000 TotalTime: 298

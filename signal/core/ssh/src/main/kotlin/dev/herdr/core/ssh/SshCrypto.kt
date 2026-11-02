@@ -9,7 +9,7 @@ import java.security.PublicKey
 import java.security.Security
 
 /**
- * Android 上的 sshj 初始化（DECISIONS D27）。
+ * Android 上的 sshj 初始化（D27，见 docs/signal/BACKGROUND.md）。
  *
  * Android 自带一个裁剪版 BouncyCastle（provider 名 `BC`），没有 X25519 / SHA-256，
  * 而 sshj 的 SecurityUtils 只要发现 `BC` 就会用它 → 直接连不上。

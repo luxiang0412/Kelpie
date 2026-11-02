@@ -1,11 +1,13 @@
-# 归档（archive）— 只读，不再演进
+# 归档（archive）—— 只读，不再演进
 
 | 目录 | 是什么 | 为什么在这里 |
 | --- | --- | --- |
-| `archive/spike/` | 早期技术验证工程（`jvm/` 命令行探针 + `android/` 探针 App，27 个源文件） | 能力已在 `android/core/{ssh,herdr,data}` 重写并强化；两份代码无调用关系，保留仅为追溯结论 |
-| `archive/docs/` | 过期/被取代文档：spec v0.1（board/conversation/composer）、PHASE0-SUMMARY、STATUS-FOR-REVIEW、UX-D0-README-IMPORT、外部评审简报两份、UX-01a 任务包草稿、UX 设计评审输入 | v0.2 规格与现行报告已取代它们；保留上下文，避免误当现行规格引用 |
+| `archive/android/` | 旧版 Android 客户端 0.1.x（包名 `dev.herdr.app`；`core:{ssh,herdr,data}` + `feature:board` + `app` + `benchmark`） | 2026-11-02 起被 `signal/` 重写取代；`signal/core/{ssh,herdr,markdown}` 最初就是从这里复制的。2026-11-03 移到这里 |
+| `archive/spike/` | 早期技术验证工程（`jvm/` 命令行探针 + `android/` 探针 App） | 能力早已在客户端里重写；保留仅为追溯 |
 
 规则：
-1. 归档内容**不再修改**，也不作为任何结论的依据；
-2. 现行规格只有 `docs/design/`（v0.2+）、台账只有根目录 4 份活文档；
-3. `archive/spike/results/` 的历史截图/日志**不进 git**，只留本地。
+
+1. 归档内容**不再修改**，也不作为任何结论的依据。
+2. 这里的工程不保证还能构建（依赖版本、路径都没再维护）；构建产物不入库。
+3. 旧版的文档（设计规格、过程报告、截图证据、台账）没有归档，而是已经删除，需要时从 git 历史取：`git show signal-v0.2.0:<路径>`。
+   Signal 代码里还在引用的旧决策 / 旧问题，摘录在 `docs/signal/BACKGROUND.md`。

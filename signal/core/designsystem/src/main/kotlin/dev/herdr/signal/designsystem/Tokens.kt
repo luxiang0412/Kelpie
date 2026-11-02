@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Signal 设计 token。数值与 docs/design/signal/SIGNAL-DESIGN-SPEC-v1.md 第 1–3 节一一对应；
+ * Signal 设计 token。数值与 docs/signal/DESIGN-SPEC.md 第 1–3 节一一对应；
  * 改这里必须同步改规范，并让 ContrastTest 通过。
  */
 @Immutable

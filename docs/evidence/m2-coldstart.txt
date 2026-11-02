@@ -1,5 +1,0 @@
-run1: TotalTime: 555 WaitTime: 561 
-run2: TotalTime: 519 WaitTime: 525 
-run3: TotalTime: 562 WaitTime: 577 
-run4: TotalTime: 539 WaitTime: 547 
-run5: TotalTime: 558 WaitTime: 564 
