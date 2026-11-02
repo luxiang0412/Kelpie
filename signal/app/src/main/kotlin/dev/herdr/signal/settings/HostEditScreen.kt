@@ -47,6 +47,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.herdr.core.data.HostRepository
 import dev.herdr.signal.container
@@ -233,7 +235,8 @@ private fun Field(
                 cursorBrush = SolidColor(c.textPrimary),
                 visualTransformation = if (secret && value.isNotEmpty()) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else keyboard, autoCorrectEnabled = false),
-                modifier = Modifier.fillMaxWidth(),
+                // 字段名和占位提示是旁边独立的 Text，读屏不会把它们和输入框关联起来：显式给输入框一个名字
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = label.ifEmpty { placeholder } },
             )
         }
     }
