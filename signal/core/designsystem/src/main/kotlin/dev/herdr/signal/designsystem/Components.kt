@@ -86,11 +86,13 @@ fun SignalLogo(size: Dp = 22.dp, attention: Boolean = true, modifier: Modifier =
 fun WorkingRing(spinning: Boolean, modifier: Modifier = Modifier) {
     val c = Signal.colors
     val reduce = rememberReduceMotion()
-    val angle = if (spinning && !reduce) {
+    // 角度只在绘制阶段读取：转动时只重绘，不触发重组
+    val angleState = if (spinning && !reduce) {
         val t = rememberInfiniteTransition(label = "ring")
-        t.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart), label = "a").value
-    } else 0f
+        t.animateFloat(0f, 360f, infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart), label = "a")
+    } else null
     Canvas(modifier.size(SignalSize.statusIcon)) {
+        val angle = angleState?.value ?: 0f
         val w = 3.dp.toPx()
         val inset = w / 2 + 1.5.dp.toPx()
         val arcSize = Size(size.width - inset * 2, size.height - inset * 2)

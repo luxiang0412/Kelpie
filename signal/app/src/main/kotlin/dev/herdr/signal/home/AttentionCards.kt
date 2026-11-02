@@ -106,7 +106,7 @@ fun PermissionCard(e: AttentionEntry.Permission, nowMs: Long, offline: Boolean, 
     val c = Signal.colors
     val r = e.approval.request
     val title = e.item?.title ?: r.cwd?.trimEnd('/')?.substringAfterLast('/') ?: e.approval.hostLabel
-    val agent = e.item?.agentName ?: r.agent ?: "Agent"
+    val agent = e.item?.agentName ?: r.agent?.let { dev.herdr.core.data.attention.AgentNames.display(it) } ?: "Agent"
     Column(
         Modifier
             .fillMaxWidth()
@@ -126,7 +126,7 @@ fun PermissionCard(e: AttentionEntry.Permission, nowMs: Long, offline: Boolean, 
             r.command ?: r.question,
             style = if (r.command != null) Signal.type.code else Signal.type.bodyCard,
             color = c.attentionOnContainerBody,
-            maxLines = 4, overflow = TextOverflow.Ellipsis,
+            maxLines = 6, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(SignalRadius.m)).background(c.attentionContainerInner).padding(horizontal = 12.dp, vertical = 10.dp),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {

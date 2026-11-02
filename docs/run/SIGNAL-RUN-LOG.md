@@ -11,6 +11,7 @@
 | 23:22 | .2 | ~/spike-sandbox/approvals | 手工放一条 `ls -la` 请求（带 nonce）→ 手机上短按（未批准）→ 按住 1 秒批准 | `.answer` 为 allow，nonce 匹配；测试文件已删 |
 | 23:24 | .2 | ~/spike-sandbox/approvals | 同上，手机上拒绝 | `.answer` 为 deny；测试文件已删 |
 | 23:29–23:36 | .2 | w8:p1（沙箱 Pi） | 从电脑上通过 bridge 发 `agent.prompt` "reply with just NOTIFY-OK[-2…6]"，共 6 次，用来在 App 处于后台时触发“完成” | 每次都回复对应文本；第 6 次时后台通知送达 |
+| 00:02–00:15 | .2 | ~/spike-sandbox/approvals | 手工放一条长命令的 `ls -la … && cat README.md \| head -50` 请求（`layoutcheck0001`），只用来检查卡片和审批弹层在不同宽度 / 字号下的排版；**没有回答** | 检查完已删除 |
 
 仓库目录下的 agent（w7 / w9 / wA / wB）全程只读。
 

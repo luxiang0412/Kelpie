@@ -6,6 +6,9 @@ import dev.herdr.core.data.Approvals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +46,13 @@ class ApprovalCenter(
     fun setActive(active: Boolean) {
         if (active && job?.isActive != true) {
             job = scope.launch {
+                // 冷启动时第一次轮询往往早于 SSH 连上：有主机新上线就立刻补一次，不等下一个 3 秒
+                launch {
+                    fleet.links
+                        .map { m -> m.filterValues { it.reach == dev.herdr.core.data.attention.HostReach.Online }.keys }
+                        .distinctUntilChanged()
+                        .collect { if (it.isNotEmpty()) pollOnce() }
+                }
                 while (isActive) {
                     pollOnce()
                     delay(POLL_MS)
@@ -53,13 +63,20 @@ class ApprovalCenter(
         }
     }
 
-    suspend fun pollOnce() {
+    private val pollLock = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * 只有某台主机这次真的读到了目录，才替换它的请求列表；没连上或读失败时保留上一次的结果
+     * （过期的照常剔除）。否则重连的瞬间卡片会闪没再出现。
+     */
+    suspend fun pollOnce() = pollLock.withLock {
+        val previous = _items.value.groupBy { it.hostId }
         val all = fleet.home.value.hosts.flatMap { h ->
+            val kept = previous[h.hostId].orEmpty().filter { !it.request.expired }
             val cfg = fleet.config(h.hostId) ?: return@flatMap emptyList()
-            val conn = fleet.connection(h.hostId) ?: return@flatMap emptyList()
-            runCatching { Approvals(conn, dirFor(cfg.user)).poll() }.getOrDefault(emptyList())
-                .filter { !it.expired }
-                .map { ApprovalItem(h.hostId, h.label, it.copy(hostId = h.hostId)) }
+            val conn = fleet.connection(h.hostId) ?: return@flatMap kept
+            val fresh = runCatching { Approvals(conn, dirFor(cfg.user)).poll() }.getOrNull() ?: return@flatMap kept
+            fresh.filter { !it.expired }.map { ApprovalItem(h.hostId, h.label, it.copy(hostId = h.hostId)) }
         }
         _items.value = all
     }

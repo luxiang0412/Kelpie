@@ -29,6 +29,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -85,7 +88,12 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
             Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp).padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(listOfNotNull(r.cwd?.trimEnd('/')?.substringAfterLast('/'), r.agent, item.hostLabel).joinToString(" · "),
+            // 详情可滚动，操作按钮固定在底部：大字体下也一定够得着
+            Column(
+                Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+            Text(listOfNotNull(r.cwd?.trimEnd('/')?.substringAfterLast('/'), r.agent?.let { dev.herdr.core.data.attention.AgentNames.display(it) }, item.hostLabel).joinToString(" · "),
                 style = Signal.type.meta, color = c.textSecondary)
             Text(if (r.command != null) t("允许运行这条命令？", "Allow this command to run?") else r.question, style = Signal.type.title, color = c.textPrimary)
 
@@ -112,6 +120,7 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
                     style = Signal.type.caption, color = c.textSecondary)
             }
             result?.let { Text(it, style = Signal.type.metaStrong, color = c.error) }
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 SignalButton(t("拒绝", "Deny"), { answer(false) }, Modifier.weight(1f), primary = false, enabled = !busy && !expired)
@@ -148,7 +157,7 @@ fun ApprovalSheet(item: ApprovalItem, onDismiss: () -> Unit, onOpenConversation:
 @Composable
 private fun KV(k: String, v: String) {
     Row {
-        Text(k, style = Signal.type.meta, color = Signal.colors.textSecondary, modifier = Modifier.fillMaxWidth(0.28f))
-        Text(v, style = Signal.type.meta, color = Signal.colors.textPrimary)
+        Text(k, style = Signal.type.meta, color = Signal.colors.textSecondary, modifier = Modifier.widthIn(min = 72.dp).padding(end = 12.dp))
+        Text(v, style = Signal.type.meta, color = Signal.colors.textPrimary, modifier = Modifier.weight(1f))
     }
 }

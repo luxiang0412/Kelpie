@@ -147,10 +147,10 @@ fun HomeScreen(
                 item(key = "toggles") {
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (s.recentlyDone.isNotEmpty()) {
-                            ToggleTile(Modifier.weight(1f), t("刚完成 ${s.recentlyDone.size}", "Just done ${s.recentlyDone.size}"), showDone, done = true) { showDone = !showDone }
+                            ToggleTile(Modifier.weight(1f), t("刚完成", "Just done"), s.recentlyDone.size, showDone, done = true) { showDone = !showDone }
                         }
                         if (s.quiet.isNotEmpty()) {
-                            ToggleTile(Modifier.weight(1f), t("空闲 ${s.quiet.size}", "Idle ${s.quiet.size}"), showQuiet, done = false) { showQuiet = !showQuiet }
+                            ToggleTile(Modifier.weight(1f), t("空闲", "Idle"), s.quiet.size, showQuiet, done = false) { showQuiet = !showQuiet }
                         }
                     }
                 }
@@ -205,13 +205,19 @@ private fun Header(ui: HomeUi) {
         }
         ui.banner != null -> c.warning to t("${ui.onlineHosts} 台在线 · ${total - ui.onlineHosts} 台连不上", "${ui.onlineHosts} online · ${total - ui.onlineHosts} unreachable")
         s.loading -> c.iconMuted to t("$total 台主机", plural(total, "host"))
+        // 有缓存但一台都还没连上：不能说“有新情况会通知你”
+        ui.onlineHosts == 0 -> c.iconMuted to t("正在连接 $total 台主机…", "Connecting to " + plural(total, "host") + "…")
         n == 0 -> c.done to t("${ui.onlineHosts} 台主机在线 · 有新情况会通知你", plural(ui.onlineHosts, "host") + " online · you'll be notified of changes")
         else -> c.done to t("${ui.onlineHosts} 台主机在线 · 实时", plural(ui.onlineHosts, "host") + " online · live")
     }
     Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, style = Signal.type.display, color = c.textPrimary, modifier = Modifier.semantics { heading() })
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (dot != null) Dot(dot)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // 圆点对齐第一行文字（副标题在大字体下会折行）
+            if (dot != null) {
+                val lh = with(androidx.compose.ui.platform.LocalDensity.current) { Signal.type.meta.lineHeight.toDp() }
+                Box(Modifier.height(lh), contentAlignment = Alignment.Center) { Dot(dot) }
+            }
             Text(sub, style = Signal.type.meta, color = c.textSecondary)
         }
     }
@@ -258,11 +264,11 @@ fun AgentRow(item: AgentItem, nowMs: Long, multiHost: Boolean, showPane: Boolean
 }
 
 @Composable
-private fun ToggleTile(modifier: Modifier, text: String, open: Boolean, done: Boolean, onClick: () -> Unit) {
+private fun ToggleTile(modifier: Modifier, text: String, count: Int, open: Boolean, done: Boolean, onClick: () -> Unit) {
     val c = Signal.colors
     Row(
         modifier
-            .height(52.dp)
+            .heightIn(min = 52.dp)
             .clip(RoundedCornerShape(SignalRadius.l))
             .background(c.surfaceSubtle)
             .clickable(onClick = onClick)
@@ -271,7 +277,11 @@ private fun ToggleTile(modifier: Modifier, text: String, open: Boolean, done: Bo
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (done) Icon(SignalIcons.Check, null, tint = c.done, modifier = Modifier.size(16.dp)) else Dot(c.idle, 8.dp)
-        Text(text, style = Signal.type.label, color = c.textPrimary, modifier = Modifier.weight(1f))
+        // 大字体 + 窄屏时标签可以省略，数字永远完整显示
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text, style = Signal.type.label, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Text("$count", style = Signal.type.label, color = c.textPrimary, maxLines = 1, softWrap = false)
+        }
         Icon(if (open) SignalIcons.ChevronDown else SignalIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(16.dp))
     }
 }
