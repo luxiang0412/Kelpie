@@ -8,6 +8,7 @@ rootProject.name = "herdr-signal"
 include(
     ":core:ssh",
     ":core:herdr",
+    ":core:data",
     ":core:designsystem",
     ":core:markdown",
 )
