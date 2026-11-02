@@ -9,6 +9,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import dev.herdr.signal.conversation.FullToolOutput
+import dev.herdr.signal.conversation.model.ConversationItem
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.herdr.core.herdr.ChatMessage
@@ -33,7 +38,9 @@ class FixtureActivity : ComponentActivity() {
             val mode by prefs.theme.collectAsStateWithLifecycle()
             SignalTheme(mode) {
                 Box(Modifier.fillMaxSize().background(Signal.colors.bg).systemBarsPadding()) {
-                    MessageList(items, agent = null, receipt = null, now = 0L, truncated = false, loading = false)
+                    var full by remember { mutableStateOf<ConversationItem.Tool?>(null) }
+                    MessageList(items, agent = null, receipt = null, now = 0L, truncated = false, loading = false, onFullTool = { full = it })
+                    full?.let { FullToolOutput(it) { full = null } }
                 }
             }
         }

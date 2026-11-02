@@ -1,5 +1,22 @@
 package dev.herdr.signal.conversation
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.Build
+import android.widget.Toast
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import dev.herdr.signal.conversation.model.ConversationSearch
 import dev.herdr.core.herdr.t
 
 import androidx.compose.animation.animateContentSize
@@ -87,16 +104,64 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
     val receipt by vm.receipt.collectAsStateWithLifecycle()
     val online by vm.online.collectAsStateWithLifecycle()
     var showTerminal by rememberSaveable { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var matchPos by rememberSaveable { mutableStateOf(0) }
+    var fullTool by remember { mutableStateOf<ConversationItem.Tool?>(null) }
+    val context = LocalContext.current
     val c = Signal.colors
     val now = remember(items, item) { System.currentTimeMillis() }
+    // 搜索命中：从最新往旧排（和列表倒序一致），第一个命中就是离底部最近的那条
+    val matches = remember(items, query) { if (query.isBlank()) emptyList() else ConversationSearch.matches(items, query).asReversed() }
+    val current = matches.getOrNull(matchPos.coerceIn(0, (matches.size - 1).coerceAtLeast(0)))
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding().imePadding()) {
-        BackTopBar(
+        if (searching) {
+            SearchBar(
+                query = query,
+                onQuery = { query = it; matchPos = 0 },
+                count = matches.size,
+                pos = matchPos,
+                onPrev = { if (matches.isNotEmpty()) matchPos = (matchPos + 1) % matches.size }, // 更旧的
+                onNext = { if (matches.isNotEmpty()) matchPos = (matchPos - 1 + matches.size) % matches.size }, // 更新的
+                onClose = { searching = false; query = ""; matchPos = 0 },
+            )
+        } else BackTopBar(
             title = item?.title ?: paneId,
             onBack = onBack,
             subtitle = item?.let { statusLine(it, now) } ?: hostId,
             actions = {
                 SignalIconButton(SignalIcons.Terminal, t("查看终端", "View terminal"), { vm.refreshTerminal(); showTerminal = true }, tint = c.textPrimary)
+                Box {
+                    SignalIconButton(SignalIcons.More, t("更多", "More"), { menu = true }, tint = c.textPrimary)
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = c.surface) {
+                        DropdownMenuItem(
+                            text = { Text(t("在对话中搜索", "Search in conversation"), style = Signal.type.body, color = if (items.isNotEmpty()) c.textPrimary else c.textTertiary) },
+                            leadingIcon = { Icon(SignalIcons.Search, null, tint = c.iconMuted, modifier = Modifier.size(18.dp)) },
+                            enabled = items.isNotEmpty(),
+                            onClick = { menu = false; searching = true },
+                        )
+                        val path = (source as? Source.Transcript)?.path
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(t("复制会话文件路径", "Copy session file path"), style = Signal.type.body, color = if (path != null) c.textPrimary else c.textTertiary)
+                                    if (path == null) Text(t("这个 agent 没有会话文件", "This agent has no session file"), style = Signal.type.caption, color = c.textTertiary)
+                                }
+                            },
+                            leadingIcon = { Icon(SignalIcons.Copy, null, tint = c.iconMuted, modifier = Modifier.size(18.dp)) },
+                            enabled = path != null,
+                            onClick = { menu = false; path?.let { copyText(context, t("会话文件路径", "Session file path"), it) } },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(t("复制工作目录", "Copy working directory"), style = Signal.type.body, color = c.textPrimary) },
+                            leadingIcon = { Icon(SignalIcons.File, null, tint = c.iconMuted, modifier = Modifier.size(18.dp)) },
+                            enabled = item?.pane?.cwd != null,
+                            onClick = { menu = false; item?.pane?.cwd?.let { copyText(context, t("工作目录", "Working directory"), it) } },
+                        )
+                    }
+                }
             },
         )
         Box(Modifier.fillMaxWidth().padding(0.dp).background(c.hairline).heightIn(min = 1.dp, max = 1.dp))
@@ -104,7 +169,13 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
         Box(Modifier.weight(1f)) {
             when (val s = source) {
                 is Source.TerminalOnly -> TerminalBody(terminal, s.reason)
-                else -> MessageList(items, item, receipt, now, truncated = (s as? Source.Transcript)?.truncated == true, loading = s is Source.Locating)
+                else -> MessageList(
+                    items, item, receipt, now,
+                    truncated = (s as? Source.Transcript)?.truncated == true,
+                    loading = s is Source.Locating,
+                    highlight = current,
+                    onFullTool = { fullTool = it },
+                )
             }
         }
 
@@ -132,6 +203,8 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
             )
         }
     }
+
+    fullTool?.let { tool -> FullToolOutput(tool, onDismiss = { fullTool = null }) }
 
     if (showTerminal) {
         ModalBottomSheet(
@@ -172,12 +245,22 @@ internal fun MessageList(
     now: Long,
     truncated: Boolean,
     loading: Boolean,
+    highlight: Int? = null,
+    onFullTool: (ConversationItem.Tool) -> Unit = {},
 ) {
     val c = Signal.colors
     val state = rememberLazyListState()
     // 倒序布局：最新的在底部，新消息到来时如果用户停在底部就保持贴底
     val reversed = remember(items) { items.asReversed() }
     val lastUserIdx = remember(items) { items.indexOfLast { it is ConversationItem.User } }
+    LaunchedEffect(highlight) {
+        val h = highlight ?: return@LaunchedEffect
+        val pos = reversed.indexOfFirst { it.index == h }
+        if (pos < 0) return@LaunchedEffect
+        // 消息前面还有“状态”一项，可能还有“发送中”一项
+        val head = state.layoutInfo.visibleItemsInfo.count { it.key == "status" || it.key == "pending-send" }.coerceAtLeast(1)
+        state.animateScrollToItem(pos + head)
+    }
     LazyColumn(
         Modifier.fillMaxSize(),
         state = state,
@@ -196,16 +279,17 @@ internal fun MessageList(
             }
         }
         items(reversed, key = { "m" + it.index }, contentType = { it::class }) { m ->
-            when (m) {
+            val hl = if (m.index == highlight) Modifier.border(2.dp, c.attention, RoundedCornerShape(SignalRadius.m)).padding(4.dp) else Modifier
+            Box(hl) { when (m) {
                 is ConversationItem.User -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     UserBubble(m.text)
                     if (m.index == items.getOrNull(lastUserIdx)?.index && receipt != null && m.text.trim() == receipt.text) ReceiptLine(receipt)
                 }
                 is ConversationItem.Assistant -> MarkdownText(m.text, Modifier.fillMaxWidth())
                 is ConversationItem.Thinking -> ThinkingRow(m.text)
-                is ConversationItem.Tool -> ToolCard(m)
+                is ConversationItem.Tool -> ToolCard(m, onFull = { onFullTool(m) })
                 is ConversationItem.Unknown -> Text(m.text, style = Signal.type.caption, color = c.textTertiary)
-            }
+            } }
         }
         if (truncated) item(key = "truncated") {
             Text(t("更早的消息没有加载（只取最近 1 MB）", "Older messages not loaded (last 1 MB only)"), style = Signal.type.caption, color = c.textTertiary, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
@@ -278,7 +362,7 @@ private fun ThinkingRow(text: String) {
 }
 
 @Composable
-private fun ToolCard(t: ConversationItem.Tool) {
+private fun ToolCard(t: ConversationItem.Tool, onFull: () -> Unit) {
     val c = Signal.colors
     var open by rememberSaveable(t.index) { mutableStateOf(false) }
     Column(
@@ -306,12 +390,25 @@ private fun ToolCard(t: ConversationItem.Tool) {
         }
         if (open && t.result != null) {
             Text(
-                t.result.take(4_000),
+                t.result.take(PREVIEW_CHARS),
                 style = Signal.type.codeSmall,
                 color = if (t.resultError) c.diffDelFg else c.textSecondary,
                 modifier = Modifier.fillMaxWidth().background(c.cardHeaderBg).padding(horizontal = 12.dp, vertical = 8.dp)
                     .heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
             )
+            Row(
+                Modifier.fillMaxWidth().clickable(onClickLabel = t("查看完整输出", "View full output"), onClick = onFull)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(SignalIcons.Expand, null, tint = c.iconMuted, modifier = Modifier.size(14.dp))
+                Text(
+                    if (t.result.length > PREVIEW_CHARS) t("完整输出（共 ${t.result.lines().size} 行）", "Full output (${t.result.lines().size} lines)")
+                    else t("全屏查看 · 复制", "Full screen · copy"),
+                    style = Signal.type.caption, color = c.textSecondary,
+                )
+            }
         }
     }
 }
@@ -386,4 +483,99 @@ private fun TerminalText(terminal: String?, modifier: Modifier) {
         )
     }
     Spacer(Modifier.size(0.dp))
+}
+
+private const val PREVIEW_CHARS = 4_000
+
+private fun copyText(context: Context, label: String, text: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText(label, text))
+    // Android 13+ 系统自己会提示“已复制”
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) Toast.makeText(context, t("已复制", "Copied"), Toast.LENGTH_SHORT).show()
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQuery: (String) -> Unit,
+    count: Int,
+    pos: Int,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val c = Signal.colors
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    Row(
+        Modifier.fillMaxWidth().height(SignalSize.topBarConversation).padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        SignalIconButton(SignalIcons.Close, t("关闭搜索", "Close search"), onClose)
+        Box(Modifier.weight(1f)) {
+            if (query.isEmpty()) Text(t("搜索这段对话", "Search this conversation"), style = Signal.type.body, color = c.textTertiary)
+            BasicTextField(
+                value = query,
+                onValueChange = onQuery,
+                singleLine = true,
+                textStyle = Signal.type.body.copy(color = c.textPrimary),
+                cursorBrush = SolidColor(c.textPrimary),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onPrev() }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = t("搜索这段对话", "Search this conversation") },
+            )
+        }
+        if (query.isNotBlank()) {
+            Text(
+                if (count == 0) t("无结果", "No results") else "${pos + 1}/$count",
+                style = Signal.type.caption, color = c.textSecondary,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        val navTint = if (count > 0) c.textPrimary else c.textTertiary
+        SignalIconButton(SignalIcons.ChevronDown, t("更早的结果", "Older match"), onPrev, tint = navTint, modifier = Modifier.rotate(180f))
+        SignalIconButton(SignalIcons.ChevronDown, t("更新的结果", "Newer match"), onNext, tint = navTint)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FullToolOutput(tool: ConversationItem.Tool, onDismiss: () -> Unit) {
+    val c = Signal.colors
+    val context = LocalContext.current
+    val result = tool.result.orEmpty()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = c.surface,
+        shape = RoundedCornerShape(topStart = SignalRadius.sheet, topEnd = SignalRadius.sheet),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(tool.name, style = Signal.type.headline, color = c.textPrimary)
+                    Text(
+                        t("${result.lines().size} 行 · ${result.length} 字符", "${result.lines().size} lines · ${result.length} chars"),
+                        style = Signal.type.caption, color = c.textSecondary,
+                    )
+                }
+                SignalChip(t("复制", "Copy"), onClick = { copyText(context, tool.name, result) }, container = c.surfaceSubtle, height = SignalSize.chipSmall)
+            }
+            if (tool.argumentsSummary.isNotBlank()) {
+                Text(tool.argumentsSummary, style = Signal.type.codeSmall, color = c.textPrimary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            }
+            Box(Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(RoundedCornerShape(SignalRadius.l)).background(c.codeBlockBg)) {
+                // 很长的输出（上 MB）只渲染前 200 KB，复制按钮给的是全文
+                SelectionContainer {
+                    Text(
+                        result.take(200_000) + if (result.length > 200_000) t("\n…（只显示前 200 KB，复制可得全文）", "\n… (first 200 KB shown; copy for the full text)") else "",
+                        style = Signal.type.codeSmall.copy(fontSize = Signal.type.micro.fontSize),
+                        color = if (tool.resultError) c.diffDelFg else c.codeBlockFg,
+                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(12.dp),
+                    )
+                }
+            }
+        }
+    }
 }
