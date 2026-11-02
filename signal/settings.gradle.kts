@@ -12,4 +12,5 @@ include(
     ":core:data",
     ":core:designsystem",
     ":core:markdown",
+    ":benchmark",
 )
