@@ -6,6 +6,7 @@ dependencyResolutionManagement {
 }
 rootProject.name = "herdr-signal"
 include(
+    ":app",
     ":core:ssh",
     ":core:herdr",
     ":core:data",

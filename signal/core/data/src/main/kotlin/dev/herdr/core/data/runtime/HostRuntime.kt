@@ -26,7 +26,7 @@ data class HostLink(
     val version: String = "",
 )
 
-data class HostKeyPrompt(val hostId: String, val label: String, val host: String, val fingerprint: String)
+data class HostKeyPrompt(val hostId: String, val label: String, val host: String, val fingerprint: String, val algorithm: String = "")
 
 /**
  * 一台主机的运行时：一个 [ConnectionSupervisor]（连接代次 / 退避 / 订阅 / Stale，沿用已实测的实现），
@@ -82,7 +82,7 @@ internal class HostRuntime(
     private fun awaitHostKey(ex: HostKeyUnknownException): Boolean {
         val d = CompletableDeferred<Boolean>()
         pendingKey = d
-        onHostKey(HostKeyPrompt(cfg.id, cfg.label, cfg.host, ex.fingerprint))
+        onHostKey(HostKeyPrompt(cfg.id, cfg.label, cfg.host, ex.fingerprint, ex.id.algorithm))
         return runBlocking { withTimeoutOrNull(90_000) { d.await() } ?: false }.also {
             if (pendingKey === d) { pendingKey = null; onHostKey(null) }
         }

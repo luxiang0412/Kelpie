@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -59,8 +62,11 @@ class Fleet(
     private val _links = MutableStateFlow<Map<String, HostLink>>(emptyMap())
     val links: StateFlow<Map<String, HostLink>> = _links.asStateFlow()
 
-    private val _hostKeyPrompt = MutableStateFlow<HostKeyPrompt?>(null)
-    val hostKeyPrompt: StateFlow<HostKeyPrompt?> = _hostKeyPrompt.asStateFlow()
+    /** 多台主机可能同时等待指纹确认：排队，一次只问一个。 */
+    private val hostKeyQueue = MutableStateFlow<Map<String, HostKeyPrompt>>(emptyMap())
+    val hostKeyPrompt: StateFlow<HostKeyPrompt?> = hostKeyQueue
+        .map { it.values.firstOrNull() }
+        .stateIn(scope, SharingStarted.Eagerly, null)
 
     private val _transitions = MutableSharedFlow<Transition>(extraBufferCapacity = 64)
     val transitions: SharedFlow<Transition> = _transitions.asSharedFlow()
@@ -97,7 +103,7 @@ class Fleet(
     fun refreshAll() = runtimes.values.forEach { it.refresh() }
 
     fun answerHostKey(accept: Boolean) {
-        val p = _hostKeyPrompt.value ?: return
+        val p = hostKeyPrompt.value ?: return
         runtimes[p.hostId]?.answerHostKey(accept)
     }
 
@@ -116,6 +122,7 @@ class Fleet(
             val gone = id !in ids || list.first { it.id == id } != rt.cfg
             if (gone) {
                 rt.stop(); watchers.remove(id)?.cancel(); tracker.forgetHost(id)
+                hostKeyQueue.update { it - id }
                 inputs.update { it - id }
                 _links.update { it - id }
             }
@@ -124,7 +131,7 @@ class Fleet(
         list.forEach { cfg ->
             if (cfg.id in runtimes) return@forEach
             val rt = HostRuntime(cfg, hosts, connectorFor(cfg.id), scope) { prompt ->
-                _hostKeyPrompt.value = prompt ?: _hostKeyPrompt.value?.takeIf { it.hostId != cfg.id }
+                hostKeyQueue.update { q -> if (prompt != null) q + (cfg.id to prompt) else q - cfg.id }
             }
             runtimes[cfg.id] = rt
             watchers[cfg.id] = scope.launch { watch(rt) }
