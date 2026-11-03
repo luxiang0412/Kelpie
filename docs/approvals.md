@@ -1,5 +1,7 @@
 # 手机审批（Claude Code / Codex）：实验记录与结论
 
+<img src="images/approval.png" width="260" align="right" alt="手机上的审批页">
+
 > Codex 部分见文末「Codex（2026-11-03 06:18–06:32）」。手动配置方法见「怎么配置（手动）」。
 
 日期：2026-11-03 00:32–00:55。环境：.2，`test` 会话；隔离配置 `~/spike-sandbox/.claude-signal`（不碰 `~/.claude`）；Claude Code 2.1.316 经 OpenRouter（`anthropic/claude-haiku-5.5`，key 只从 .2 的环境变量读）；手机 MIUI 真机 + Kelpie debug 包。全部命令是 `pwd` / `ls`。

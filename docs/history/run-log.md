@@ -282,3 +282,8 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
   首页：2 台主机在线；通知权限已授予；`blocked_v2` 的提示音已被用户在系统里改成 StoneSkimming，两类振动节奏都在。
   用户用正式版从手机给 .2 上的 Claude Code（`default` 会话 `wB5:p1`，即本对话）发了“可以了”，显示已送达。
   .2 这台连的是 `default` 会话（日常工作会话），不是 `test`。之后的自动化测试仍然只对 `test` 会话做写操作。
+- 08:25 文档截图。.2 本机：手写一个假审批请求 `~/.local/state/kelpie/approvals/toolu_docs_screenshot.req`（目录原本不存在），
+  正式版首页出现审批卡、打开审批页截图后点“拒绝”，App 把 `{"decision":"deny",…}` 写到了展开后的 `~/` 目录（顺带验证了可配置审批目录的真机路径）；
+  随后删除整个 `~/.local/state/kelpie`。
+- 08:28 .3 `test` 会话的 pi（luxiang）：用正式版发送 "Run uname -sr and df -h / , then summarize in one line"（只读命令），已送达，pi 回复后截图。
+  minified 包更新到当前代码（仍是调试用，没卸载）。

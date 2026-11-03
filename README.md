@@ -11,6 +11,14 @@
 - **配对**：开发机上运行脚本生成二维码，手机扫一下就添加好主机；主机指纹固定，不做首次信任（TOFU）。
 - 后台通知（MIUI 可用）、中英文、日夜间主题。
 
+<p>
+<img src="docs/images/home.png" width="19%" alt="首页：在等你的审批卡片">
+<img src="docs/images/approval.png" width="19%" alt="审批：按住允许或拒绝">
+<img src="docs/images/conversation.png" width="19%" alt="对话：结构化消息和工具调用">
+<img src="docs/images/settings.png" width="19%" alt="设置：主机与通知">
+<img src="docs/images/home-dark.png" width="19%" alt="夜间主题（示例数据）">
+</p>
+
 当前版本 **0.4.1**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 安装与使用
