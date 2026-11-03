@@ -19,7 +19,7 @@
 <img src="docs/images/home-dark.png" width="19%" alt="夜间主题（示例数据）">
 </p>
 
-当前版本 **0.4.1**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
+当前版本 **0.4.2**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 安装与使用
 

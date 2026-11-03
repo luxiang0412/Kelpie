@@ -287,3 +287,7 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
   随后删除整个 `~/.local/state/kelpie`。
 - 08:28 .3 `test` 会话的 pi（luxiang）：用正式版发送 "Run uname -sr and df -h / , then summarize in one line"（只读命令），已送达，pi 回复后截图。
   minified 包更新到当前代码（仍是调试用，没卸载）。
+- 08:40–08:52 用户反馈“感觉没有通知”。排查：.3 `test` 会话的 pi（w4:p1）用正式版发了两条只读指令（`sleep 10/20` 后回复），
+  又从 .2 经 `remote-api-bridge` 的 `agent.prompt` 发了四条同类指令（只 sleep 后回复）。App 在后台时都没有“完成”通知。
+  轮询快照发现 herdr 在 agent 工作期间 `completion_seq` 为 null（idle 37 → working null → idle 39），AttentionTracker 在状态变化时记下了 null，
+  干完时没有旧值可比。修复后升 0.4.2 装到手机，后台复测：pi 完成后约 1 秒收到“luxiang 完成了”。

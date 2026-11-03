@@ -43,6 +43,17 @@ class AttentionTest {
         assertEquals(60_000L, t.observation(AgentKey("h", "p"))!!.finishedAtMs)
     }
 
+    @Test fun completionSeqNullWhileWorkingStillDetectsDone() {
+        // 实测 herdr 0.9.5（pi）：idle seq=37 → working seq=null → idle seq=39
+        val t = AttentionTracker()
+        t.update("h", listOf(pane("p", AgentStatus.IDLE, seq = 37)), 0)
+        val w = t.update("h", listOf(pane("p", AgentStatus.WORKING, seq = null)), 1_000)
+        assertFalse(w.single().completed)
+        val d = t.update("h", listOf(pane("p", AgentStatus.IDLE, seq = 39)), 13_000)
+        assertTrue(d.single().completed)
+        assertEquals(13_000L, t.observation(AgentKey("h", "p"))!!.finishedAtMs)
+    }
+
     @Test fun closedPanesAreForgotten_otherHostsUntouched() {
         val t = AttentionTracker()
         t.update("a", listOf(pane("p1", AgentStatus.IDLE), pane("p2", AgentStatus.IDLE)), 0)

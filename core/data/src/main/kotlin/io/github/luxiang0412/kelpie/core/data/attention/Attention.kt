@@ -50,10 +50,12 @@ class AttentionTracker {
             val old = table[key]
             val seqIncreased = old?.completionSeq != null && p.completionSeq != null && p.completionSeq!! > old.completionSeq!!
             val finishedAt = if (seqIncreased) nowMs else old?.finishedAtMs
+            // herdr 在 agent 工作期间不给 completion_seq（null），干完才回来；沿用上次的值，否则“完成”永远比不出来
+            val seq = p.completionSeq ?: old?.completionSeq
             val next = when {
-                old == null -> Observation(p.status, nowMs, sinceIsLowerBound = true, p.completionSeq, null)
-                old.status != p.status -> Observation(p.status, nowMs, sinceIsLowerBound = false, p.completionSeq, finishedAt)
-                else -> old.copy(completionSeq = p.completionSeq ?: old.completionSeq, finishedAtMs = finishedAt)
+                old == null -> Observation(p.status, nowMs, sinceIsLowerBound = true, seq, null)
+                old.status != p.status -> Observation(p.status, nowMs, sinceIsLowerBound = false, seq, finishedAt)
+                else -> old.copy(completionSeq = seq, finishedAtMs = finishedAt)
             }
             table[key] = next
             if (old == null || old.status != p.status || seqIncreased) {
