@@ -278,3 +278,7 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
   `OpenSshKeysTest` 用 ssh-keygen 生成的一次性密钥核对：Python 取出的种子在 Kotlin 里还原后，公钥和 ssh-keygen 的一致，sshj 能加载。
   真机：脚本生成的 v2 链接（临时 HOME、`--install no`，密钥没装到任何地方）经 `am start` 深链打开，确认页解析正确（名称、地址、默认 herdr 路径、ed25519 指纹、私钥），按返回取消，没有添加。
   .3 的 `~/kelpie_pair.py` 再次更新。`kelpie-v0.4.1` tag 移到这次提交（0.4.1 只装过这一台手机）。
+- 08:16 用户自己在两台机器上运行配对脚本（没加 `--phone`，两边各加了一把 `kelpie-phone-20261103`），正式版 0.4.1 扫码添加成功。
+  首页：2 台主机在线；通知权限已授予；`blocked_v2` 的提示音已被用户在系统里改成 StoneSkimming，两类振动节奏都在。
+  用户用正式版从手机给 .2 上的 Claude Code（`default` 会话 `wB5:p1`，即本对话）发了“可以了”，显示已送达。
+  .2 这台连的是 `default` 会话（日常工作会话），不是 `test`。之后的自动化测试仍然只对 `test` 会话做写操作。
