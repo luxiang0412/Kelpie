@@ -273,3 +273,8 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
   MIUI 那一页显示声音“无”、振动关，是因为正式版还没有通知权限（App 级 importance=NONE），类别本身的值是对的；授权后再核对。
 - 正式版 0.4.1 装到手机（`adb -s 10.144.144.6:37701`，端口变了），tag `kelpie-v0.4.1`。
 - 08:10 把新版 `kelpie_pair.py`（带 --phone）覆盖到 .3 的 `~/kelpie_pair.py`。
+
+- 08:20 用户反馈二维码太大、终端放不下（23 版，1048 字符）。改成配对格式 v2：私钥只带种子、只带 ed25519 指纹、省略默认值 → 292 字符、11 版。
+  `OpenSshKeysTest` 用 ssh-keygen 生成的一次性密钥核对：Python 取出的种子在 Kotlin 里还原后，公钥和 ssh-keygen 的一致，sshj 能加载。
+  真机：脚本生成的 v2 链接（临时 HOME、`--install no`，密钥没装到任何地方）经 `am start` 深链打开，确认页解析正确（名称、地址、默认 herdr 路径、ed25519 指纹、私钥），按返回取消，没有添加。
+  .3 的 `~/kelpie_pair.py` 再次更新。`kelpie-v0.4.1` tag 移到这次提交（0.4.1 只装过这一台手机）。

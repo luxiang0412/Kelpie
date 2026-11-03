@@ -27,6 +27,23 @@ class PairingPayloadTest {
         assertTrue("toString 不能带私钥", !p.toString().contains("PRIVATE"))
     }
 
+    @Test fun v2CompactPayload() {
+        // kelpie_pair.py v2：指纹不带 SHA256: 前缀，私钥只给 32 字节种子（同 OpenSshKeysTest 的一次性测试密钥）
+        val seed = "S-tVtF_poCvXGkrrwx8ltqVeaIGTvqbGVhGmHQnhSao"
+        val l = link("""{"v":2,"n":"MS-7E07","h":"10.0.0.2","u":"lx","s":"test","exp":1000,"k":{"ssh-ed25519":"${"A".repeat(43)}"},"ks":"$seed"}""")
+        val p = PairingPayload.parse(l, nowSec = 900).getOrThrow()
+        assertEquals(mapOf("ssh-ed25519" to fp), p.hostKeys)
+        assertEquals(22, p.port); assertEquals("/home/lx/.local/bin/herdr", p.herdrBin)
+        assertTrue(p.privateKey!!.startsWith("-----BEGIN OPENSSH PRIVATE KEY-----"))
+        val pub = io.github.luxiang0412.kelpie.core.ssh.OpenSshKeys.ed25519PublicLine(Base64.getUrlDecoder().decode(seed))
+        assertEquals("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGTD7+0ITYyciNq1JrlSF+RzVVO0UaarO0HatdwLHZOm", pub)
+    }
+
+    @Test fun v2BadSeedRejected() {
+        val l = link("""{"v":2,"h":"h","u":"u","k":{"ssh-ed25519":"${"A".repeat(43)}"},"ks":"AAAA"}""")
+        assertTrue(PairingPayload.parse(l).isFailure)
+    }
+
     @Test fun approvalsDir() {
         assertEquals(ApprovalsPath.DEFAULT, PairingPayload.parse(ok(), nowSec = 900).getOrThrow().approvalsDir)
         assertEquals("/srv/appr", PairingPayload.parse(ok(""","a":"/srv/appr/""""), nowSec = 900).getOrThrow().approvalsDir)

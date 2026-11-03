@@ -1,5 +1,6 @@
 package io.github.luxiang0412.kelpie.core.data
 
+import io.github.luxiang0412.kelpie.core.ssh.OpenSshKeys
 import io.github.luxiang0412.kelpie.core.herdr.t
 import io.github.luxiang0412.kelpie.core.ssh.HostKeyId
 import io.github.luxiang0412.kelpie.core.ssh.TrustStore
@@ -55,8 +56,9 @@ data class PairingPayload(
             val o = runCatching { Json.parseToJsonElement(raw.decodeToString()).jsonObject }.getOrNull()
             requireNotNull(o) { t("配对二维码损坏（不是有效的 JSON）", "The pairing code is damaged (bad JSON)") }
 
+            // v1：指纹带 SHA256: 前缀、完整私钥 key；v2：指纹不带前缀、私钥只给 32 字节种子 ks（二维码小一半多）
             val v = o.int("v")
-            require(v == 1) { t("配对二维码版本不支持（$v），请更新 App", "Unsupported pairing version ($v); update the app") }
+            require(v == 1 || v == 2) { t("配对二维码版本不支持（$v），请更新 App", "Unsupported pairing version ($v); update the app") }
             val exp = o["exp"]?.jsonPrimitive?.longOrNull
             if (exp != null) require(nowSec <= exp + SKEW_SEC) { t("配对二维码已过期，请在电脑上重新生成", "This pairing code has expired; generate a new one on the computer") }
 
@@ -73,12 +75,19 @@ data class PairingPayload(
             val approvalsDir = o.str("a")?.let { ApprovalsPath.normalize(it).getOrNull() } ?: ApprovalsPath.DEFAULT
 
             val keys = (o["k"] as? JsonObject)?.mapNotNull { (alg, fp) ->
-                val f = runCatching { fp.jsonPrimitive.contentOrNull }.getOrNull() ?: return@mapNotNull null
+                val raw = runCatching { fp.jsonPrimitive.contentOrNull }.getOrNull() ?: return@mapNotNull null
+                val f = if (raw.startsWith("SHA256:")) raw else "SHA256:$raw"
                 if (ALG.matches(alg) && FP.matches(f)) alg to f else null
             }?.toMap().orEmpty()
             require(keys.isNotEmpty()) { t("配对二维码里没有主机指纹，不能安全地添加", "The pairing code has no host fingerprint; can't add the host safely") }
 
-            val key = o.str("key")?.trim()?.takeIf { it.isNotEmpty() }
+            val seed = o.str("ks")?.let { s ->
+                val b = runCatching { Base64.getUrlDecoder().decode(s.trimEnd('=')) }.getOrNull()
+                require(b != null && b.size == 32) { t("配对二维码里的私钥格式不对", "The private key in the pairing code is malformed") }
+                b
+            }
+            val key = seed?.let { OpenSshKeys.ed25519PemFromSeed(it, "kelpie") }
+                ?: o.str("key")?.trim()?.takeIf { it.isNotEmpty() }
             if (key != null) require(key.contains("PRIVATE KEY-----")) { t("配对二维码里的私钥格式不对", "The private key in the pairing code is malformed") }
 
             PairingPayload(

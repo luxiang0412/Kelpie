@@ -11,11 +11,14 @@
 同一台手机（同一个 --phone）重复配对时，新公钥会**替换**它之前的公钥（先备份 authorized_keys），
 所以每台手机在每台开发机上始终只有一行；旧二维码里的私钥随之失效，手机要扫新的二维码。
 
-二维码内容是一个链接 `kelpie://pair?d=<base64url(JSON)>`，JSON 字段：
-    v 版本(1)  n 名称  h 地址  p 端口  u 用户  s herdr 会话  b herdr 路径
-    k {算法: "SHA256:…"}  本机全部 SSH host key 的指纹（手机据此固定指纹，不需要再人工核对）
-    key 手机专用的 OpenSSH 私钥（ed25519）   exp 过期时间（unix 秒）
-    a 审批请求目录（可选，和默认值不同时才有）
+二维码内容是一个链接 `kelpie://pair?d=<base64url(JSON)>`，JSON 字段（v2，尽量短，终端里放得下）：
+    v 版本(2)  n 名称  h 地址  u 用户  s herdr 会话  exp 过期时间（unix 秒）
+    p 端口（22 时省略）  b herdr 路径（/home/<用户>/.local/bin/herdr 时省略）  a 审批请求目录（默认值时省略）
+    k {算法: "<sha256 的 base64，不带 SHA256: 前缀>"}  主机指纹。有 ed25519 主机密钥时只放它（App 优先协商 ed25519），
+      没有才放全部；手机据此固定指纹，不需要再人工核对
+    ks 手机专用 ed25519 私钥的 32 字节种子（base64url），App 还原成 OpenSSH 私钥
+    key 完整的 OpenSSH 私钥：只有 --key-file 给的不是 ed25519 时才用（代替 ks）
+v1（0.4.1 及以前）：k 的值带 SHA256: 前缀、总是放全部指纹，私钥放完整的 key；App 两种都认。
 
 安全说明：
 - 二维码里有私钥。只在自己的屏幕上显示，不要截图外传。过期时间只限制手机端接受旧二维码，
@@ -352,6 +355,49 @@ def host_key_fingerprints(ssh_dir: str) -> dict:
     return out
 
 
+def ed25519_seed(pem: str):
+    """从 OpenSSH 私钥（未加密的 ed25519）里取出 32 字节种子；不是这种格式就返回 None。"""
+    try:
+        body = "".join(l for l in pem.strip().splitlines() if not l.startswith("-----"))
+        b = base64.b64decode(body)
+        magic = b"openssh-key-v1\0"
+        if not b.startswith(magic):
+            return None
+        i = len(magic)
+
+        def take():
+            nonlocal i
+            n = struct.unpack(">I", b[i:i + 4])[0]
+            v = b[i + 4:i + 4 + n]
+            i += 4 + n
+            return v
+        cipher, kdf, _opts = take(), take(), take()
+        if cipher != b"none" or kdf != b"none":
+            return None  # 有密码的私钥不处理
+        if struct.unpack(">I", b[i:i + 4])[0] != 1:
+            return None
+        i += 4
+        take()  # 公钥 blob
+        priv = take()
+        j = 8  # 两个 checkint
+
+        def ptake():
+            nonlocal j
+            n = struct.unpack(">I", priv[j:j + 4])[0]
+            v = priv[j + 4:j + 4 + n]
+            j += 4 + n
+            return v
+        if ptake() != b"ssh-ed25519":
+            return None
+        pub = ptake()
+        sk = ptake()  # 种子(32) + 公钥(32)
+        if len(pub) != 32 or len(sk) != 64 or sk[32:] != pub:
+            return None
+        return sk[:32]
+    except Exception:
+        return None
+
+
 def all_addresses() -> list:
     """本机所有非回环 IPv4（`ip -4 -o addr`），用来在有多块网卡 / VPN 时提醒用户选地址。"""
     try:
@@ -525,17 +571,31 @@ def main():
             for dev, ip in cands:
                 print(f"  {ip:<16} {dev}")
             print()
-    payload = {
-        "v": 1, "n": a.label, "h": host, "p": a.port, "u": a.user,
-        "s": a.session, "b": a.herdr_bin, "k": fps, "key": key, "exp": int(time.time()) + a.ttl,
-    }
+    payload = {"v": 2, "n": a.label, "h": host, "u": a.user, "s": a.session, "exp": int(time.time()) + a.ttl}
+    if a.port != 22:
+        payload["p"] = a.port
+    if a.herdr_bin != f"/home/{a.user}/.local/bin/herdr":
+        payload["b"] = a.herdr_bin
+    # App 优先协商 ed25519：有它就只放它的指纹；万一协商成别的算法，App 会让人工核对，不会悄悄信任
+    pinned = {"ssh-ed25519": fps["ssh-ed25519"]} if "ssh-ed25519" in fps else fps
+    payload["k"] = {alg: fp.removeprefix("SHA256:") for alg, fp in pinned.items()}
+    seed = ed25519_seed(key)
+    if seed is not None:
+        payload["ks"] = base64.urlsafe_b64encode(seed).decode().rstrip("=")
+    else:
+        payload["key"] = key
     if a.approvals_dir.rstrip("/") != DEFAULT_APPROVALS_DIR:  # 默认值不放进二维码，省点空间
         payload["a"] = a.approvals_dir.rstrip("/")
     link = build_link(payload)
     qr = QR(link.encode(), a.ecl)
+    need_cols, need_rows = qr.size + 4, (qr.size + 5) // 2
+    cols, rows = shutil.get_terminal_size((0, 0))
+    if cols and (cols < need_cols or rows < need_rows):
+        print(f"终端只有 {cols}×{rows}，二维码需要 {need_cols}×{need_rows}：请缩小字体（Ctrl + -）或拉大窗口后重新运行，"
+              f"或者加 --png qr.png 存成图片再扫。\n")
     print(qr.terminal())
     print(f"\n{a.label}  {a.user}@{payload['h']}:{a.port}  会话 {a.session}  （二维码 {a.ttl // 60} 分钟内有效，版本 {qr.ver}）")
-    for alg, fp in fps.items():
+    for alg, fp in pinned.items():
         print(f"  {alg:<22} {fp}")
     print("在 Kelpie 里：设置 → 添加主机 → 扫码。看完请清屏（二维码里有私钥）。")
     if a.png:
