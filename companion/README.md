@@ -4,7 +4,7 @@
 
 ```bash
 scp companion/pair/kelpie_pair.py user@devbox:~/
-ssh -t user@devbox python3 ~/kelpie_pair.py --session test --host <手机能连到的地址>
+ssh -t user@devbox python3 ~/kelpie_pair.py --session test --host <手机能连到的地址> --phone <手机名>
 ```
 
 `-t` 不能省：脚本要在终端里问你问题、画二维码。
@@ -14,13 +14,15 @@ ssh -t user@devbox python3 ~/kelpie_pair.py --session test --host <手机能连�
 在**要添加的那台开发机**上运行（还需要 `ssh-keygen`）：
 
 ```bash
-python3 kelpie_pair.py --session test --host <手机能连到的地址>
+python3 kelpie_pair.py --session test --host <手机能连到的地址> --phone <手机名>
 ```
 
 脚本会：
-1. 生成一把这台手机专用的 ed25519 密钥，注释是 `kelpie-<名称>-<日期>`；
-2. 问你是否把它加入 `~/.ssh/authorized_keys`；
+1. 生成一把这台手机专用的 ed25519 密钥，注释是 `kelpie-<手机名>-<日期>`（`--phone` 不填时是 `phone`）；
+2. 问你是否把它加入 `~/.ssh/authorized_keys`。这台手机以前配对过的话，**新公钥会替换旧的**（先备份），每台手机在每台开发机上始终只有一行；
 3. 在终端画出二维码，加 `--png` 可以另存成图片。
+
+私钥只在内存里放进二维码，不会留在开发机上。不想新增密钥时，可以用 `--key-file <私钥>` 让二维码带一把已经在 `authorized_keys` 里的私钥。
 
 二维码里有地址、本机全部 host key 指纹和私钥，10 分钟后手机不再接受。
 
@@ -29,7 +31,9 @@ App 里有三种方式：设置 → 添加主机 → 扫描二维码，或者从
 - 指纹来自开发机自己显示的二维码，视为已经核对过，直接固定；和已保存的指纹不一致时拒绝，不会覆盖。
 - 同一地址、用户、会话的主机已经存在时，会更新它，不会新增一条。
 - 多网卡或开着 VPN 的机器，务必用 `--host` 指定地址（脚本会列出候选）。
-- `--list` 列出发过的手机密钥，`--revoke <名称>` 撤销（会先备份 `authorized_keys`）。
+- `--list` 列出发过的手机密钥，`--revoke <手机名>` 撤销这台手机的（会先备份 `authorized_keys`）。
+  0.4.1 之前的脚本用开发机的名字代替手机名（例如 `kelpie-MS-7E07-…`）、改名前用 `herdr-signal-…`，`--list` 和 `--revoke` 都认。
+- 替换旧公钥以后，手机上原来那把私钥就失效了，要扫这次的新二维码（扫码会更新已有的主机，不会新增）。
 
 ## hooks/kelpie_approve.py：手机审批
 

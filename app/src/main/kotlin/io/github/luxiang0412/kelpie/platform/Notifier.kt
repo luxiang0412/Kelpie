@@ -83,20 +83,52 @@ class Notifier(private val context: Context, private val prefs: KelpiePrefs) {
         nm.notify(id, n)
     }
 
+    /**
+     * 两类通知各一个类别，声音用系统默认，用户可以在系统设置里给每类单独换声音（设置页有入口）。
+     * 振动节奏不同，静音时也能分辨：在等你 = 短振两下，完成 = 振一下。
+     * 类别建好后 App 就改不了它的声音和振动了，所以加振动时换了新 id（v2），并删掉旧类别。
+     */
     private fun ensureChannels() {
+        LEGACY_CHANNELS.forEach { runCatching { nm.deleteNotificationChannel(it) } }
         nm.createNotificationChannel(NotificationChannel(CH_BLOCKED, t("在等你", "Waiting for you"), NotificationManager.IMPORTANCE_HIGH).apply {
             description = t("agent 停下来等你回复或批准", "An agent stopped to wait for your reply or approval")
+            enableVibration(true)
+            vibrationPattern = VIBRATE_BLOCKED
         })
         nm.createNotificationChannel(NotificationChannel(CH_DONE, t("完成", "Done"), NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = t("agent 完成一轮工作", "An agent finished a round of work")
+            enableVibration(true)
+            vibrationPattern = VIBRATE_DONE
         })
     }
 
     private fun idOf(hostId: String, paneId: String) = ("$hostId/$paneId").hashCode()
 
     companion object {
-        const val CH_BLOCKED = "blocked"
-        const val CH_DONE = "done"
+        const val CH_BLOCKED = "blocked_v2"
+        const val CH_DONE = "done_v2"
+        private val LEGACY_CHANNELS = listOf("blocked", "done")
+        /** 停 0 → 振 180 ms → 停 120 → 振 180（两下短振）。 */
+        private val VIBRATE_BLOCKED = longArrayOf(0, 180, 120, 180)
+        /** 一下 300 ms。 */
+        private val VIBRATE_DONE = longArrayOf(0, 300)
+
+        /** 打开系统里某一类通知的设置页（声音、振动）；个别 ROM 不支持时退回本应用的通知设置。 */
+        fun openChannelSettings(context: Context, channel: String) {
+            val pkg = context.packageName
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, pkg)
+                        .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, channel),
+                )
+            }.recoverCatching {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, pkg),
+                )
+            }
+        }
         const val EXTRA_HOST = "host"
         const val EXTRA_PANE = "pane"
     }

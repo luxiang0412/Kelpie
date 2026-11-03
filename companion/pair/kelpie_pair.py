@@ -3,10 +3,13 @@
 
 在**要被添加的那台开发机**上运行（它需要读本机的 SSH host key）：
 
-    python3 kelpie_pair.py --session test            # 生成手机专用密钥，询问是否加入 authorized_keys，显示二维码
-    python3 kelpie_pair.py --session test --png qr.png
-    python3 kelpie_pair.py --list                    # 列出已发给手机的密钥
-    python3 kelpie_pair.py --revoke <名称>           # 从 authorized_keys 删除这台手机的密钥
+    python3 kelpie_pair.py --session test --phone mi12   # 给手机 mi12 生成专用密钥，询问是否加入 authorized_keys，显示二维码
+    python3 kelpie_pair.py --session test --phone mi12 --png qr.png
+    python3 kelpie_pair.py --list                        # 列出已发给手机的密钥（按手机名）
+    python3 kelpie_pair.py --revoke mi12                 # 从 authorized_keys 删除这台手机的密钥
+
+同一台手机（同一个 --phone）重复配对时，新公钥会**替换**它之前的公钥（先备份 authorized_keys），
+所以每台手机在每台开发机上始终只有一行；旧二维码里的私钥随之失效，手机要扫新的二维码。
 
 二维码内容是一个链接 `kelpie://pair?d=<base64url(JSON)>`，JSON 字段：
     v 版本(1)  n 名称  h 地址  p 端口  u 用户  s herdr 会话  b herdr 路径
@@ -17,7 +20,7 @@
 安全说明：
 - 二维码里有私钥。只在自己的屏幕上显示，不要截图外传。过期时间只限制手机端接受旧二维码，
   已经加入 authorized_keys 的公钥不会自动失效；不用了请 --revoke。
-- 每次配对生成一把新密钥，注释为 `kelpie-<名称>-<日期>`，方便单独撤销。
+- 每次配对生成一把新密钥，注释为 `kelpie-<手机名>-<日期>`，可以按手机单独撤销。
 - 不改 sshd 配置，不碰已有的密钥；只在你确认后往 ~/.ssh/authorized_keys 追加一行。
 
 只依赖 Python 3 标准库和 ssh-keygen。二维码编码器在本文件里（字节模式，自动选版本，纠错级别 L/M）。
@@ -390,15 +393,35 @@ def authorized_keys_path() -> str:
     return os.path.expanduser("~/.ssh/authorized_keys")
 
 
-def install_pubkey(pub: str):
+def phone_pattern(phone: str):
+    """匹配某台手机的公钥行（注释 kelpie-<手机名>-<日期>，也认改名前的 herdr-signal-…）。"""
+    return re.compile(r"\s(?:" + "|".join(re.escape(x) for x in ALL_PREFIXES) + r")" + re.escape(slug(phone)) + r"-\d{8}\s*$")
+
+
+def count_phone_keys(phone: str) -> int:
+    p = authorized_keys_path()
+    if not os.path.exists(p):
+        return 0
+    pat = phone_pattern(phone)
+    return sum(1 for l in open(p) if pat.search(l))
+
+
+def replace_pubkey(pub: str, phone: str) -> int:
+    """加入新公钥，同时删掉这台手机之前的公钥。返回删掉的行数（删了才备份）。"""
     p = authorized_keys_path()
     os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True)
-    existing = open(p).read() if os.path.exists(p) else ""
-    with open(p, "a") as f:
-        if existing and not existing.endswith("\n"):
-            f.write("\n")
-        f.write(pub + "\n")
-    os.chmod(p, 0o600)
+    lines = open(p).readlines() if os.path.exists(p) else []
+    pat = phone_pattern(phone)
+    keep = [l if l.endswith("\n") else l + "\n" for l in lines if not pat.search(l)]
+    removed = len(lines) - len(keep)
+    if removed:
+        shutil.copy2(p, p + f".bak.{int(time.time())}")
+    tmp = p + ".kelpie-tmp"
+    with open(tmp, "w") as f:
+        f.writelines(keep + [pub + "\n"])
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, p)  # 原子替换，写到一半中断也不会留下半个 authorized_keys
+    return removed
 
 
 def list_keys() -> list:
@@ -413,7 +436,7 @@ def revoke(label: str) -> int:
     if not os.path.exists(p):
         return 0
     lines = open(p).readlines()
-    pat = re.compile(r"\s(?:" + "|".join(re.escape(p) for p in ALL_PREFIXES) + r")" + re.escape(slug(label)) + r"-\d{8}\s*$")
+    pat = phone_pattern(label)
     keep = [l for l in lines if not pat.search(l)]
     removed = len(lines) - len(keep)
     if removed:
@@ -434,7 +457,8 @@ def build_link(payload: dict) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description="生成 Kelpie 配对二维码")
-    ap.add_argument("--label", default=socket.gethostname(), help="手机上显示的名称（默认主机名）")
+    ap.add_argument("--label", default=socket.gethostname(), help="这台开发机在手机上显示的名称（默认主机名）")
+    ap.add_argument("--phone", default="phone", help="手机的名字，写进密钥注释，用来区分、撤销、替换（默认 phone）")
     ap.add_argument("--host", default=None, help="手机连接用的地址（默认对外网卡 IP）")
     ap.add_argument("--port", type=int, default=22)
     ap.add_argument("--user", default=getpass.getuser())
@@ -450,12 +474,14 @@ def main():
     ap.add_argument("--png", help="另存一份 PNG")
     ap.add_argument("--link", action="store_true", help="同时打印链接文本")
     ap.add_argument("--list", action="store_true", help="列出已发给手机的密钥")
-    ap.add_argument("--revoke", metavar="LABEL", help="从 authorized_keys 删除某台手机的密钥")
+    ap.add_argument("--revoke", metavar="PHONE", help="从 authorized_keys 删除某台手机的密钥（--phone 用的名字）")
     a = ap.parse_args()
 
     if a.list:
         keys = list_keys()
         print("\n".join(k.split()[-1] for k in keys) if keys else "没有 kelpie 密钥")
+        if keys:
+            print("（注释格式 kelpie-<手机名>-<日期>；--revoke <手机名> 撤销。0.4 之前的版本用开发机名代替手机名）")
         return
     if a.revoke:
         n = revoke(a.revoke)
@@ -471,15 +497,22 @@ def main():
         if "PRIVATE KEY-----" not in key:
             sys.exit("--key-file 不像 OpenSSH 私钥")
     else:
-        comment = f"{COMMENT_PREFIX}{slug(a.label)}-{datetime.date.today():%Y%m%d}"
+        phone = slug(a.phone)
+        comment = f"{COMMENT_PREFIX}{phone}-{datetime.date.today():%Y%m%d}"
         key, pub = generate_key(comment)
+        old = count_phone_keys(phone)
         do = a.install
         if do == "ask":
-            print(f"新的手机专用公钥：\n  {pub}\n")
+            print(f"新的手机专用公钥（手机：{phone}）：\n  {pub}\n")
+            if old:
+                print(f"authorized_keys 里已经有 {old} 把 {phone} 的公钥，会被这把新的替换（先备份）。\n")
             do = "yes" if input(f"加入 {authorized_keys_path()}？[y/N] ").strip().lower() in ("y", "yes") else "no"
         if do == "yes":
-            install_pubkey(pub)
-            print(f"已加入。以后可以用 --revoke {slug(a.label)} 撤销。\n")
+            removed = replace_pubkey(pub, phone)
+            print(f"已加入。以后可以用 --revoke {phone} 撤销。")
+            if removed:
+                print(f"替换了 {phone} 之前的 {removed} 把公钥（已备份 authorized_keys）：手机要扫这个新二维码才能继续连接。")
+            print()
         else:
             print("没有安装公钥：手机能添加主机，但要等你把上面这行公钥加进 authorized_keys 才能连上。\n")
 

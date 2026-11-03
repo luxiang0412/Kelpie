@@ -101,7 +101,7 @@ App 端是 `ApprovalCenter`（读请求、写回答）和 `ApprovalSheet`（弹�
 
 ## 配对
 
-1. 开发机上运行 `companion/pair/kelpie_pair.py`：生成一把手机专用的 ed25519 密钥，把公钥加进 `authorized_keys`，再显示二维码。
+1. 开发机上运行 `companion/pair/kelpie_pair.py --phone <手机名>`：生成一把手机专用的 ed25519 密钥（注释 `kelpie-<手机名>-<日期>`），把公钥加进 `authorized_keys`，同一台手机以前的公钥一并替换掉，再显示二维码。
    二维码内容是 `kelpie://pair?d=<base64url(JSON)>`，JSON 里有地址、端口、用户、会话名、herdr 路径、这台机器全部的主机指纹、私钥和过期时间。
 2. 手机端 `Pairing.kt` 解析，`PairScreen` 显示确认页。不管从哪个入口进来（App 内扫码、从图片识别、系统相机打开链接），都必须在确认页按下按钮才写入。
 3. 指纹来自开发机自己显示的二维码，视为已经核对过，直接固定。和已保存的指纹不一致时拒绝，不覆盖。
@@ -123,6 +123,8 @@ App 端是 `ApprovalCenter`（读请求、写回答）和 `ApprovalSheet`（弹�
 
 - App 进入后台时，如果开着通知，`MonitorService` 以前台服务（dataSync 类型，一条低优先级常驻通知）维持连接。不开前台服务的话，MIUI 会把后台进程冻结，状态转换就检测不到了。
 - `Notifier` 订阅 `Fleet` 的状态转换：agent 开始等你、或者完成时发通知；App 在前台时不发。点通知直接打开那个对话；锁屏上只显示不含内容的版本。
+- 两类通知各是一个系统通知类别：“在等你”（重要，弹横幅，短振两下）和“完成”（普通，振一下），声音都是系统默认。用户可以在系统设置里给每类换声音，App 设置页有直达入口。
+  通知类别建好后 App 改不了它的声音和振动，所以要改默认值只能换新的类别 id（现在是 `blocked_v2` / `done_v2`，旧的 `blocked` / `done` 启动时删除）。
 - Android 15 起 dataSync 前台服务每天有 6 小时配额，用完系统会停掉服务，要等下次打开 App。
 - 没有推送：App 被系统彻底杀掉后收不到提醒。方案对比见 [push-options.md](push-options.md)，目前决定不做。
 

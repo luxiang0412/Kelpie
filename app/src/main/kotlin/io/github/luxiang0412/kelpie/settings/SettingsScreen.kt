@@ -151,6 +151,19 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
                 Divider()
                 SwitchRow(t("任务完成时通知", "Notify when a task finishes"), t("默认关闭，避免打扰", "Off by default to avoid noise"), nd, vm::setNotifyDone)
             }
+            Group {
+                LinkRow(t("“在等你”的声音和振动", "Sound & vibration: waiting"), t("默认：系统提示音，短振两下", "Default: system sound, two short buzzes")) {
+                    io.github.luxiang0412.kelpie.platform.Notifier.openChannelSettings(ctx, io.github.luxiang0412.kelpie.platform.Notifier.CH_BLOCKED)
+                }
+                Divider()
+                LinkRow(t("“完成”的声音和振动", "Sound & vibration: done"), t("默认：系统提示音，振一下", "Default: system sound, one buzz")) {
+                    io.github.luxiang0412.kelpie.platform.Notifier.openChannelSettings(ctx, io.github.luxiang0412.kelpie.platform.Notifier.CH_DONE)
+                }
+            }
+            Text(
+                t("在系统设置里可以给两类通知选不同的提示音。", "You can pick a different sound for each kind in system settings."),
+                style = Kelpie.type.caption, color = c.textSecondary, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
 
             GroupLabel(t("外观", "Appearance"))
             Group {
@@ -195,6 +208,23 @@ internal fun Group(content: @Composable () -> Unit) {
 @Composable
 internal fun Divider() {
     Spacer(Modifier.fillMaxWidth().padding(start = 16.dp).height(1.dp).background(Kelpie.colors.hairline))
+}
+
+@Composable
+private fun LinkRow(title: String, sub: String, onClick: () -> Unit) {
+    val c = Kelpie.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = Kelpie.type.rowTitle, color = c.textPrimary)
+            Text(sub, style = Kelpie.type.meta, color = c.textSecondary)
+        }
+        Icon(KelpieIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(18.dp))
+    }
 }
 
 @Composable

@@ -264,3 +264,11 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 验证：单元测试（`ApprovalsPathTest` 4 个、`PairingPayloadTest` 新增 1 个）、全部测试 / 截图回归 / lint / minified 构建通过；本机假 HOME 里跑 hook（`HERDR_*` 已 unset）：建出 `~/.local/state/kelpie/approvals`（700），2 秒超时退回 `ask`，请求文件已清理；拦截 `build_link` 确认二维码默认不带 `a`、`--approvals-dir /srv/appr/` 时带 `"a": "/srv/appr"`。
 - 还没做：真机端到端（手机的无线调试断开了，`10.144.144.6:42407` 拒绝连接）。
 - 注意：.2 上沙箱里的旧 hook（`signal_approve.py`）还写 `~/spike-sandbox/approvals`；新版 App 不填目录就读不到它们，需要的话在主机设置里填旧目录。
+- 07:58 为配对把 `kelpie_pair.py` 复制到 .3 的 `~/kelpie_pair.py`（只是放文件，没有运行）。
+
+## 0.4.1：配对按手机区分、通知振动和声音入口（2026-11-03 08:00–08:10，用户要求）
+
+- `kelpie_pair.py --phone <手机名>`：注释 `kelpie-<手机名>-<日期>`；同一台手机再次配对时替换旧公钥（先备份，原子写入）。在假 HOME 里测过：同名的两把（含 `herdr-signal-` 旧名）被替换，其他手机和用户自己的密钥不动，权限保持 600，`--revoke` 只删指定手机。
+- 通知类别换成 `blocked_v2`（短振两下）/ `done_v2`（振一下），旧类别启动时删除；设置页新增两个“声音和振动”入口，直达系统里对应类别。真机（正式版）：`dumpsys notification` 确认旧类别 deleted、新类别带振动节奏；点入口打开的是 MIUI 的“在等你”类别页。
+  MIUI 那一页显示声音“无”、振动关，是因为正式版还没有通知权限（App 级 importance=NONE），类别本身的值是对的；授权后再核对。
+- 正式版 0.4.1 装到手机（`adb -s 10.144.144.6:37701`，端口变了），tag `kelpie-v0.4.1`。
