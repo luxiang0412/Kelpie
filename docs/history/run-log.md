@@ -299,3 +299,24 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 真机核对：首页提问卡片（题目标签、第一题、看终端 / 看全部）、“看终端”直接拉起终端、对话页一次一题和切换、状态栏提示都和设计一致。
   发现并修了：切题时卡片高度变化导致标签移位（改为按最高一题固定高度）、“可多选”重复、用户消息里 `<pasted_content>` 标签原样显示、首页“等了 刚刚”。
 - 数据库 v1→v2 迁移没有在真机上跑过（debug 包是新装，直接建 v2）。
+
+## 实验：hook 能否替用户回答 AskUserQuestion（2026-11-05 10:20–10:26，用户授权）
+
+用户授权：做第三层的验证；隔离沙箱用 .2 环境变量里的 OpenRouter key（不复制 `~/.claude` 凭据）。
+
+| 时间 | 目标 | 操作 | 结果 |
+|---|---|---|---|
+| 10:2x | .2 ~/spike-sandbox/.claude-ask（新建） | 写 `settings.json`（PreToolUse matcher=AskUserQuestion → `ask_answer.py`）、`ask_answer.py`（固定答案，不等手机）、`run-claude.sh`（CLAUDE_CONFIG_DIR 隔离 + OpenRouter，Haiku 5.5） | — |
+| 10:2x | 无头 `claude -p` | 同样的提示词 | 无头模式没有 AskUserQuestion 工具，hook 未触发 |
+| 10:23:45 | `test` 会话 | 新建 tab `w8:t4`（pane `w8:p4`），cwd ~/spike-sandbox，标签 kelpie-ask-spike | — |
+| 10:23–10:24 | w8:p4 | `pane run` 启动 `run-claude.sh`；首次引导：Enter（主题）、Enter（安全提示）、Down 后确认光标在 Yes 再 Enter（信任目录） | Claude 就绪 |
+| 10:24:34 | w8:p4 | `pane run` 1 条提示词：一次问 3 道题（单选带 Recommended / 单选 / 多选），拿到回答后原样复述 | 见下 |
+| 10:25:25 | `test` 会话 | 关闭 tab `w8:t4` | — |
+
+结论（Claude Code 2.1.318）：
+- PreToolUse 返回 `permissionDecision: "allow"` + `updatedInput = 原 input + answers{题目原文: 答案}` 后，终端里**根本不弹选择框**，直接显示 “User answered Claude's questions”。
+- 单选（选项 label）、多选（label 用 ", " 连接）、自定义文字（任意字符串，相当于 Type something）三种都被原样接受；tool_result 为 `The user answered: "题"="答", …`，`toolUseResult` 里同样有 questions + answers，Kelpie 现有解析能直接显示。
+- hook 输入里有 `tool_use_id`、`transcript_path`、`permission_mode`（本次为 auto）。
+- 无头 `-p` 模式没有这个工具，不影响（手机场景都是交互式）。
+- 未验证：hook 等待期间用户在终端先答的情况（终端此时不弹框，可能只能等 hook 超时退回）；default 权限模式下的行为。
+- OpenRouter 用量：1.4302 → 1.4333 美元。沙箱配置目录保留在 ~/spike-sandbox/.claude-ask。
