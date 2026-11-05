@@ -40,6 +40,20 @@ data class SendRecord(
     val atMs: Long,
 )
 
+/** 在手机上回答选择题的进度 / 结果（见 [AskPicker]）。 */
+sealed interface AnswerState {
+    data object Sending : AnswerState
+    /** 提交后终端选择框关掉了；最终以会话记录里出现回答为准。 */
+    data class Submitted(val atMs: Long) : AnswerState
+    /** 停下了，没有提交。touched = 终端里已经选了一部分（没提交，对 Claude 没影响）。 */
+    data class Stopped(val reason: String, val touched: Boolean) : AnswerState
+    /** 不确定有没有提交：不会自动重发。 */
+    data class Unknown(val reason: String) : AnswerState
+}
+
+/** [callId] = 回答的是哪一次 AskUserQuestion（tool_use id），界面只把结果挂在这张卡片上。 */
+data class AnswerRecord(val id: String, val key: AgentKey, val callId: String?, val state: AnswerState, val atMs: Long)
+
 /** 发送前需要用户确认的情况（目标变了）。 */
 data class SendBlocked(val code: String, val message: String, val needsConfirm: Boolean)
 
@@ -57,6 +71,10 @@ class Sender(
     private val _records = MutableStateFlow<Map<AgentKey, SendRecord>>(emptyMap())
     /** 每个 pane 最近一次发送。 */
     val records: StateFlow<Map<AgentKey, SendRecord>> = _records.asStateFlow()
+
+    private val _answers = MutableStateFlow<Map<AgentKey, AnswerRecord>>(emptyMap())
+    /** 每个 pane 最近一次在手机上回答选择题。 */
+    val answers: StateFlow<Map<AgentKey, AnswerRecord>> = _answers.asStateFlow()
 
     /**
      * 进程重建后：未确认的写操作回到账本，**也回到界面**（首页“结果未知”），否则用户看不到。
@@ -111,6 +129,70 @@ class Sender(
             if (receipt is Receipt.Accepted) fleet.refresh(key.hostId)
         }
         return null
+    }
+
+    /**
+     * 在手机上回答 Claude 的 AskUserQuestion：替用户在终端选择框里按键，每一步读屏核对（[AskPicker]）。
+     * 只发一次；停下 / 不确定都不会自动重来。
+     */
+    fun answerQuestions(
+        key: AgentKey,
+        callId: String?,
+        questions: List<io.github.luxiang0412.kelpie.core.herdr.AskQuestion>,
+        replies: List<AskPicker.Reply>,
+        editedAgentSession: String?,
+        editedOccupancy: String?,
+    ): SendBlocked? {
+        if (questions.isEmpty() || questions.size != replies.size || questions.indices.any { !replies[it].isComplete(questions[it]) }) {
+            return SendBlocked("incomplete", t("还有题没答完", "Some questions aren't answered yet"), false)
+        }
+        if (_answers.value[key]?.state == AnswerState.Sending || _records.value[key]?.receipt == Receipt.Sending) {
+            return SendBlocked("busy", t("上一次还在发送", "The previous send is still in progress"), false)
+        }
+        val pane = fleet.pane(key)
+        when (val c = SendTargetCheck.check(pane, fleet.isOnline(key.hostId), editedAgentSession, editedOccupancy)) {
+            is SendTargetCheck.Result.Ok -> Unit
+            is SendTargetCheck.Result.Blocked -> return SendBlocked(c.code, c.reason, false)
+            // 选择题不提供“仍然发送”：目标变了，选择框多半也不是这一组
+            is SendTargetCheck.Result.NeedsConfirm -> return SendBlocked("target_changed", c.reason, false)
+        }
+        val api = fleet.runtime(key.hostId)?.api() ?: return SendBlocked("not_connected", t("主机未连接", "Host not connected"), false)
+
+        val payload = questions.indices.joinToString("\n") { questions[it].question + "=" + AskPicker.expectedAnswer(questions[it], replies[it]) }
+        val rec = ledger.begin("ask.answer", target(key), payload.toByteArray())
+        val id = rec.clientRequestId
+        _answers.value[key]?.let { old -> if (old.state is AnswerState.Unknown) ledger.acknowledge(old.id) }
+        _answers.update { it + (key to AnswerRecord(id, key, callId, AnswerState.Sending, clock())) }
+        val term = object : AskPicker.Terminal {
+            override suspend fun read() = api.readPane(key.paneId, "visible", 60)
+            override suspend fun key(k: String) = api.sendKeys(key.paneId, listOf(k))
+            override suspend fun text(s: String) = api.sendText(key.paneId, s)
+        }
+        scope.launch {
+            val state = try {
+                when (val o = AskPicker.answer(term, questions, replies)) {
+                    AskPicker.Outcome.Submitted -> { ledger.accept(id, "picker_closed"); AnswerState.Submitted(clock()) }
+                    is AskPicker.Outcome.Stopped -> { ledger.reject(id, if (o.touched) "partial" else "stopped", o.reason); AnswerState.Stopped(o.reason, o.touched) }
+                    is AskPicker.Outcome.Unsure -> { ledger.markUnknown(id, o.reason); AnswerState.Unknown(o.reason) }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // 网络中途断了：按到哪一步不知道，只能算不确定
+                val reason = e.message ?: e.javaClass.simpleName
+                ledger.markUnknown(id, reason)
+                AnswerState.Unknown(reason)
+            }
+            _answers.update { it + (key to AnswerRecord(id, key, callId, state, clock())) }
+            fleet.refresh(key.hostId)
+        }
+        return null
+    }
+
+    /** 关掉选择题的结果提示；Unknown 同时从账本确认掉。 */
+    fun dismissAnswer(key: AgentKey) {
+        _answers.value[key]?.let { if (it.state is AnswerState.Unknown) ledger.acknowledge(it.id) }
+        _answers.update { it - key }
     }
 
     /** 用户关掉了回执（含“结果未知”）：Unknown 同时从账本确认掉，重启后不再出现。 */

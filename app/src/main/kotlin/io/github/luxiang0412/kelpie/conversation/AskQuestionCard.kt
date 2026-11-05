@@ -36,7 +36,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.luxiang0412.kelpie.conversation.model.ConversationItem
+import io.github.luxiang0412.kelpie.core.data.runtime.AnswerRecord
+import io.github.luxiang0412.kelpie.core.data.runtime.AnswerState
 import io.github.luxiang0412.kelpie.core.designsystem.Kelpie
+import io.github.luxiang0412.kelpie.core.designsystem.KelpieButton
+import io.github.luxiang0412.kelpie.core.designsystem.KelpieChip
+import io.github.luxiang0412.kelpie.core.designsystem.KelpieSize
 import io.github.luxiang0412.kelpie.core.designsystem.KelpieIcons
 import io.github.luxiang0412.kelpie.core.designsystem.KelpieRadius
 import io.github.luxiang0412.kelpie.core.herdr.AskQuestion
@@ -48,17 +53,25 @@ import io.github.luxiang0412.kelpie.core.herdr.t
  * - 等你选：一次显示一道题，上面一排题目标签可切换（对应终端里的题目 tab）；
  * - 答完 / 取消：收起成「题 → 答」，点开看全部题目和选项。
  *
- * 只展示，不能在这里作答：终端里的选择框要用方向键操作，手机看不到光标位置，
- * 发按键选错了撤不回来。以后从手机作答要走审批 hook（updatedInput.answers），不发按键。
+ * 等你选时可以「在手机上回答」（[AnswerSheet]）：提交后替你在终端选择框里按键，每步读屏核对
+ * （[io.github.luxiang0412.kelpie.core.data.runtime.AskPicker]）。进度和结果挂在这张卡片上。
  */
 @Composable
-internal fun AskQuestionCard(tool: ConversationItem.Tool) {
+internal fun AskQuestionCard(
+    tool: ConversationItem.Tool,
+    answer: AnswerRecord? = null,
+    onAnswer: (() -> Unit)? = null,
+    onTerminal: () -> Unit = {},
+    onDismissAnswer: () -> Unit = {},
+) {
     val c = Kelpie.colors
     val pending = tool.result == null
     val answered = tool.answers != null
     // 有结果但没有结构化回答：被拒绝 / Esc 取消 / 出错，原样给出结果文字
     val dismissed = !pending && !answered
     val qs = tool.questions
+    // 只认这张卡片自己的那次回答（同一个 pane 之前的提问不算）
+    val mine = answer?.takeIf { it.callId == tool.callId }
     var open by rememberSaveable(tool.index) { mutableStateOf(false) }
     var page by rememberSaveable(tool.index) { mutableIntStateOf(0) }
     val at = page.coerceIn(0, qs.lastIndex)
@@ -83,6 +96,10 @@ internal fun AskQuestionCard(tool: ConversationItem.Tool) {
             )
             when {
                 pending -> Text(t("等你选择", "Waiting for you"), style = Kelpie.type.caption, color = c.attentionText)
+                answered && mine?.state is AnswerState.Submitted -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(KelpieIcons.Check, null, tint = c.done, modifier = Modifier.size(14.dp))
+                    Text(t("手机上回答 · ${clockText(mine.atMs)}", "Answered on phone · ${clockText(mine.atMs)}"), style = Kelpie.type.caption, color = c.done)
+                }
                 answered -> Icon(KelpieIcons.Check, t("已回答", "Answered"), tint = c.done, modifier = Modifier.size(14.dp))
                 else -> Text(t("未回答", "Not answered"), style = Kelpie.type.caption, color = c.textTertiary)
             }
@@ -105,9 +122,28 @@ internal fun AskQuestionCard(tool: ConversationItem.Tool) {
                     Modifier.fillMaxWidth().background(c.hairline).heightIn(min = 1.dp, max = 1.dp),
                 ) {}
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(t("在电脑终端里选择", "Choose in the terminal on your computer"), style = Kelpie.type.caption, color = c.textTertiary, modifier = Modifier.weight(1f))
+                    val hint = when (mine?.state) {
+                        AnswerState.Sending -> t("正在终端里替你选择…", "Choosing in the terminal for you…")
+                        is AnswerState.Submitted -> t("已提交，等 Claude 记下回答…", "Submitted, waiting for Claude to record it…")
+                        else -> if (onAnswer != null) t("也可以在电脑终端里选", "Or choose in the terminal") else t("在电脑终端里选择", "Choose in the terminal on your computer")
+                    }
+                    Text(hint, style = Kelpie.type.caption, color = c.textTertiary, modifier = Modifier.weight(1f))
                     if (at > 0) PageLink(t("‹ 上一题", "‹ Previous")) { page = at - 1 }
                     if (at < qs.lastIndex) PageLink(t("下一题 ›", "Next ›")) { page = at + 1 }
+                }
+                when (val st = mine?.state) {
+                    is AnswerState.Stopped -> AnswerNotice(
+                        title = if (st.touched) t("停下了，没有提交", "Stopped without submitting") else t("没有替你选", "Didn't answer for you"),
+                        body = st.reason + t("。", ". ") + if (st.touched) t("终端里已经选了一部分，但还没提交，对 Claude 没有影响；去电脑上接着选或改。", "Some choices were made in the terminal but nothing was submitted; finish or change them on the computer.") else t("手机没有在终端里按任何键。", "Your phone didn't press anything in the terminal."),
+                        warn = false, onTerminal = onTerminal, onClose = onDismissAnswer,
+                    )
+                    is AnswerState.Unknown -> AnswerNotice(
+                        title = t("不确定 Claude 有没有收到", "Not sure whether Claude got it"),
+                        body = t("选择框可能还开在终端里。不会自动重发；看一眼终端再决定。", "The question box may still be open in the terminal. It won't be resent automatically; check the terminal first.") + "\n" + st.reason,
+                        warn = true, onTerminal = onTerminal, onClose = onDismissAnswer,
+                    )
+                    AnswerState.Sending, is AnswerState.Submitted -> Unit
+                    null -> if (onAnswer != null) KelpieButton(t("在手机上回答", "Answer on phone"), onClick = onAnswer, modifier = Modifier.fillMaxWidth(), height = 46.dp)
                 }
             }
             open -> qs.forEach { q -> QuestionBlock(q, tool.answers?.get(q.question), answered, showHeader = true) }
@@ -143,6 +179,24 @@ private fun QuestionTabs(qs: List<AskQuestion>, current: Int, onPick: (Int) -> U
         }
     }
 }
+
+@Composable
+private fun AnswerNotice(title: String, body: String, warn: Boolean, onTerminal: () -> Unit, onClose: () -> Unit) {
+    val c = Kelpie.colors
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(KelpieRadius.m)).background(if (warn) c.attentionContainer else c.surfaceSubtle).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(title, style = Kelpie.type.metaStrong, color = if (warn) c.attentionText else c.textPrimary)
+        Text(body, style = Kelpie.type.caption, color = c.textSecondary)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            KelpieChip(t("看终端", "View terminal"), onClick = onTerminal, container = c.surface, border = c.outlineCard, height = KelpieSize.chipSmall)
+            KelpieChip(t("知道了", "Got it"), onClick = onClose, container = c.surface, border = c.outlineCard, height = KelpieSize.chipSmall)
+        }
+    }
+}
+
+private fun clockText(ms: Long): String = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(ms))
 
 @Composable
 private fun PageLink(label: String, onClick: () -> Unit) {

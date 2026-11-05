@@ -339,3 +339,16 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 只有 1 道题时没有 Submit 页和 Review 页，按下就直接提交。
 - transcript 里的 answers 与按键结果完全一致：`"订单模块, 另加 2 张日志表"`，自定义文字与选项用 ", " 连接，annotations 为空。
 - OpenRouter 用量：1.4333 → 1.4414 美元。
+
+## 手机作答 AskUserQuestion，debug 包真机验证（2026-11-05 10:42–10:46）
+
+| 时间 | 目标 | 操作 |
+|---|---|---|
+| 10:42 | 手机 | `install -r` 新 debug 包（手机上回答选择题） |
+| 10:42 | .2 ~/spike-sandbox/.claude-ask | `settings.json` 换成只有 SessionStart → 引用 herdr 现有集成脚本 `~/.claude/hooks/herdr-agent-state.sh session`（不改它），让 herdr 知道沙箱会话文件 |
+| 10:43:06 | `test` 会话 | 新建 tab `w8:t6`（pane `w8:p6`），启动沙箱 Claude；10:43:14 `pane run` 1 条提示词（问 3 题） |
+| 10:4x | — | 发现 debug 包连的是 `default` 会话，看不到沙箱 pane；我没有对 `default` 做任何写操作 |
+| 10:45 | `default` 会话 `wBT:p1`（用户自己的 pane） | **用户本人**在手机上用「在手机上回答」答了自己的 3 道题；App 替用户按键提交 |
+| 10:46:04 | `test` 会话 | 关闭 tab `w8:t6`（沙箱里的 3 道题没有答，随 pane 关闭） |
+
+结果：transcript 里的 answers = `{"知识库的访问权限应该怎么设置？": "按团队授权 (Recommended)", "现有数据怎么迁移？": "分批渐进迁移", "这次要覆盖哪些范围？（可多选）": "嘻嘻"}`，与手机上选的一致（第 3 题是多选题里只写了自己的答案）；卡片收起并显示「手机上回答 · 10:45」。我对用户 pane 只做了只读（读屏、读 transcript）。OpenRouter 用量：1.4414 → 1.443153958 美元。

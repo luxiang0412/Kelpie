@@ -80,14 +80,14 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
         if (stale || offline) {
             Text(t("联网后才能回复 · 草稿会保留", "Can't reply while offline · draft is kept"), style = Kelpie.type.meta, color = c.attentionOnContainerMeta)
         } else if (questions.isNotEmpty()) {
-            // 选择题：答案只能在终端里选（手机作答要等审批 hook），给“看终端”直达
+            // 选择题：点开对话就能在手机上回答（替你在终端里按键），也给“看终端”直达
             // 窄屏上提示和两个按钮挤在一行会折成两行，提示单独放一行
-            Text(t("在电脑终端里选择", "Choose in the terminal"), style = Kelpie.type.meta, color = c.attentionOnContainerMeta)
+            Text(t("可以在手机上回答，也可以在电脑终端里选", "Answer here, or in the terminal"), style = Kelpie.type.meta, color = c.attentionOnContainerMeta)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Spacer(Modifier.weight(1f))
                 KelpieChip(t("看终端", "Terminal"), onClick = { onOpenTerminal(item.key) }, container = c.attentionContainerInner, content = c.attentionOnContainerBody)
                 KelpieChip(
-                    if (questions.size > 1) t("看全部 ${questions.size} 题", "All ${questions.size} questions") else t("打开", "Open"),
+                    if (questions.size > 1) t("去回答 ${questions.size} 题", "Answer ${questions.size}") else t("去回答", "Answer"),
                     onClick = { onOpen(item.key, null) }, container = c.primary, content = c.onPrimary, trailing = KelpieIcons.ChevronRight,
                 )
             }

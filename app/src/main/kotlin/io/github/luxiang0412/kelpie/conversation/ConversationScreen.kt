@@ -103,6 +103,9 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
     val terminal by vm.terminal.collectAsStateWithLifecycle()
     val receipt by vm.receipt.collectAsStateWithLifecycle()
     val online by vm.online.collectAsStateWithLifecycle()
+    val answer by vm.answer.collectAsStateWithLifecycle()
+    var answering by remember { mutableStateOf<ConversationItem.Tool?>(null) }
+    var answerBlocked by remember { mutableStateOf<String?>(null) }
     // 从首页提问卡片的“看终端”进来：直接拉起终端（只读）
     var showTerminal by rememberSaveable { mutableStateOf(openTerminal) }
     androidx.compose.runtime.LaunchedEffect(Unit) { if (openTerminal) vm.refreshTerminal() }
@@ -177,6 +180,11 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
                     loading = s is Source.Locating,
                     highlight = current,
                     onFullTool = { fullTool = it },
+                    answer = answer,
+                    // 只有 Claude、在线、而且是最后一道还没答的选择题，才能在手机上回答
+                    onAnswer = if (online && item?.lastSeen != true && item?.pane?.agent?.startsWith("claude") == true) { tool -> answerBlocked = null; answering = tool } else null,
+                    onTerminal = { vm.refreshTerminal(); showTerminal = true },
+                    onDismissAnswer = vm::dismissAnswer,
                 )
             }
         }
@@ -208,6 +216,27 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
     }
 
     fullTool?.let { tool -> FullToolOutput(tool, onDismiss = { fullTool = null }) }
+
+    answering?.let { tool ->
+        AnswerSheet(
+            questions = tool.questions,
+            subtitle = listOfNotNull(item?.title, item?.agentName).joinToString(" · "),
+            onDismiss = { answering = null },
+            onSubmit = { replies ->
+                val b = vm.answerQuestions(tool, replies)
+                if (b == null) answering = null else answerBlocked = b.message
+            },
+        )
+        answerBlocked?.let { msg ->
+            AlertDialog(
+                onDismissRequest = { answerBlocked = null },
+                containerColor = c.surface,
+                title = { Text(t("没有提交", "Not submitted"), style = Kelpie.type.headline, color = c.textPrimary) },
+                text = { Text(msg, style = Kelpie.type.body, color = c.textSecondary) },
+                confirmButton = { TextButton(onClick = { answerBlocked = null }) { Text(t("知道了", "OK"), color = c.textPrimary) } },
+            )
+        }
+    }
 
     if (showTerminal) {
         ModalBottomSheet(
@@ -250,12 +279,17 @@ internal fun MessageList(
     loading: Boolean,
     highlight: Int? = null,
     onFullTool: (ConversationItem.Tool) -> Unit = {},
+    answer: io.github.luxiang0412.kelpie.core.data.runtime.AnswerRecord? = null,
+    onAnswer: ((ConversationItem.Tool) -> Unit)? = null,
+    onTerminal: () -> Unit = {},
+    onDismissAnswer: () -> Unit = {},
 ) {
     val c = Kelpie.colors
     val state = rememberLazyListState()
     // 倒序布局：最新的在底部，新消息到来时如果用户停在底部就保持贴底
     val reversed = remember(items) { items.asReversed() }
     val lastUserIdx = remember(items) { items.indexOfLast { it is ConversationItem.User } }
+    val lastToolIndex = remember(items) { items.lastOrNull { it is ConversationItem.Tool }?.index }
     LaunchedEffect(highlight) {
         val h = highlight ?: return@LaunchedEffect
         val pos = reversed.indexOfFirst { it.index == h }
@@ -290,7 +324,10 @@ internal fun MessageList(
                 }
                 is ConversationItem.Assistant -> MarkdownText(m.text, Modifier.fillMaxWidth())
                 is ConversationItem.Thinking -> ThinkingRow(m.text)
-                is ConversationItem.Tool -> if (m.questions.isNotEmpty()) AskQuestionCard(m) else ToolCard(m, onFull = { onFullTool(m) })
+                is ConversationItem.Tool -> if (m.questions.isNotEmpty()) {
+                    val last = m.result == null && m.index == lastToolIndex
+                    AskQuestionCard(m, answer, onAnswer = if (last && onAnswer != null) ({ onAnswer(m) }) else null, onTerminal = onTerminal, onDismissAnswer = onDismissAnswer)
+                } else ToolCard(m, onFull = { onFullTool(m) })
                 is ConversationItem.Unknown -> Text(m.text, style = Kelpie.type.caption, color = c.textTertiary)
             } }
         }

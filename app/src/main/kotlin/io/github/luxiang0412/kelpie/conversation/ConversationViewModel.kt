@@ -71,6 +71,10 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
     lateinit var online: StateFlow<Boolean>
         private set
 
+    /** 最近一次在手机上回答选择题（进度 / 结果）。 */
+    lateinit var answer: StateFlow<io.github.luxiang0412.kelpie.core.data.runtime.AnswerRecord?>
+        private set
+
     private var editedAgentSession: String? = null
     private var editedOccupancy: String? = null
     private var draftKey: String? = null
@@ -84,6 +88,7 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
         key = AgentKey(hostId, paneId)
         c.notifier.clear(hostId, paneId)
         receipt = c.sender.records.map { it[key] }.stateIn(viewModelScope, SharingStarted.Eagerly, c.sender.records.value[key])
+        answer = c.sender.answers.map { it[key] }.stateIn(viewModelScope, SharingStarted.Eagerly, c.sender.answers.value[key])
         online = c.fleet.links.map { it[hostId]?.reach == io.github.luxiang0412.kelpie.core.data.attention.HostReach.Online }
             .stateIn(viewModelScope, SharingStarted.Eagerly, c.fleet.isOnline(hostId))
 
@@ -175,6 +180,12 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
             if (t.isBlank()) c.drafts.clear(k) else c.drafts.save(k, key.hostId, c.fleet.config(key.hostId)?.session ?: "test", editedAgentSession, t)
         }
     }
+
+    /** 在手机上回答选择题：替你在终端里按键（每步读屏核对），只发一次。返回拦下的原因。 */
+    fun answerQuestions(tool: ConversationItem.Tool, replies: List<io.github.luxiang0412.kelpie.core.data.runtime.AskPicker.Reply>): SendBlocked? =
+        c.sender.answerQuestions(key, tool.callId, tool.questions, replies, editedAgentSession, editedOccupancy)
+
+    fun dismissAnswer() = c.sender.dismissAnswer(key)
 
     /** 快捷回复：填进输入框（追加），绝不直接发送。 */
     fun applyQuick(q: String) = setText(if (_text.value.isBlank()) q else _text.value.trimEnd() + " " + q)
