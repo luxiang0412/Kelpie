@@ -105,7 +105,7 @@ class HomeScreenshotTest {
                 io.github.luxiang0412.kelpie.core.herdr.AskQuestion.Option("照计划接入权限包", "权限包新增「外部知识库」资源类型。"),
             ),
         )
-        val previews = mapOf(blocked.key to BlockedPreview("开始 K1。先看几处要复用的现有代码：权限服务怎么判断资源授权、平台工具怎么注册。", BlockedPreview.Source.Transcript, "AskUserQuestion", null, listOf(q, q.copy(question = "要不要写迁移？", header = "迁移"))))
+        val previews = mapOf(blocked.key to BlockedPreview("开始 K1。先看几处要复用的现有代码：权限服务怎么判断资源授权、平台工具怎么注册。", BlockedPreview.Source.Transcript, "AskUserQuestion", null, listOf(q, q.copy(question = "旧的 session 表要不要写迁移？", header = "迁移"), q.copy(question = "这一轮要一起做哪些？", header = "范围", multiSelect = true))))
         shot("home_ask_question_zh", ThemeMode.Light, HomeViewModel.build(state, previews, emptyList(), emptyMap(), emptyMap(), phoneOnline = true, now = now))
     }
 

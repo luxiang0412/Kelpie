@@ -41,11 +41,12 @@ val QuickReplies: List<String> get() = listOf(t("继续", "Continue"), t("好的
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOpen: (AgentKey, String?) -> Unit) {
+fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOpen: (AgentKey, String?) -> Unit, onOpenTerminal: (AgentKey) -> Unit = {}) {
     val c = Kelpie.colors
     val item = e.item
     val waited = Durations.waited(item.sinceMs, item.sinceIsLowerBound, nowMs)
     val stale = item.lastSeen
+    val questions = e.preview?.questions.orEmpty()
     Column(
         Modifier
             .fillMaxWidth()
@@ -60,7 +61,11 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             CardHeader(
-                icon = if (e.preview?.pendingTool != null && e.preview.questions.isEmpty()) KelpieIcons.Terminal else KelpieIcons.Spark,
+                icon = when {
+                    e.preview?.questions?.isNotEmpty() == true -> KelpieIcons.Question
+                    e.preview?.pendingTool != null -> KelpieIcons.Terminal
+                    else -> KelpieIcons.Spark
+                },
                 title = item.title,
                 sub = "${item.agentName} · ${item.hostLabel}",
                 trailing = when {
@@ -73,6 +78,18 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
         }
         if (stale || offline) {
             Text(t("联网后才能回复 · 草稿会保留", "Can't reply while offline · draft is kept"), style = Kelpie.type.meta, color = c.attentionOnContainerMeta)
+        } else if (questions.isNotEmpty()) {
+            // 选择题：答案只能在终端里选（手机作答要等审批 hook），给“看终端”直达
+            // 窄屏上提示和两个按钮挤在一行会折成两行，提示单独放一行
+            Text(t("在电脑终端里选择", "Choose in the terminal"), style = Kelpie.type.meta, color = c.attentionOnContainerMeta)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.weight(1f))
+                KelpieChip(t("看终端", "Terminal"), onClick = { onOpenTerminal(item.key) }, container = c.attentionContainerInner, content = c.attentionOnContainerBody)
+                KelpieChip(
+                    if (questions.size > 1) t("看全部 ${questions.size} 题", "All ${questions.size} questions") else t("打开", "Open"),
+                    onClick = { onOpen(item.key, null) }, container = c.primary, content = c.onPrimary, trailing = KelpieIcons.ChevronRight,
+                )
+            }
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // 在等批准（终端里的选择框）时不给“继续 / 好的”：那是给提问用的，发到选择框里没有意义
@@ -97,7 +114,10 @@ private fun PreviewBody(p: BlockedPreview?, stale: Boolean) {
         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val asking = p.questions.isNotEmpty()
             if (asking) {
-                Text(t("在问你 · 要在终端里选择", "Asking you · choose in the terminal"), style = Kelpie.type.metaStrong, color = c.attentionText)
+                Text(
+                    if (p.questions.size > 1) t("在问你 · ${p.questions.size} 个问题", "Asking you · ${p.questions.size} questions") else t("在问你", "Asking you"),
+                    style = Kelpie.type.metaStrong, color = c.attentionText,
+                )
             } else if (p.pendingTool != null) {
                 Text(t("等待批准 · ${p.pendingTool}", "Waiting for approval · ${p.pendingTool}"), style = Kelpie.type.metaStrong, color = c.attentionText)
             }

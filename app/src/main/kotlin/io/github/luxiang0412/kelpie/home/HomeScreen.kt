@@ -73,12 +73,13 @@ fun HomeRoute(
     onOpen: (AgentKey, String?) -> Unit,
     onSettings: () -> Unit,
     onAddHost: () -> Unit,
+    onOpenTerminal: (AgentKey) -> Unit = {},
     vm: HomeViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prompt by vm.hostKeyPrompt.collectAsStateWithLifecycle()
     var sheet by remember { mutableStateOf<ApprovalItem?>(null) }
-    HomeScreen(ui, onOpen, { sheet = it }, onSettings, onAddHost, onRetry = vm::retry)
+    HomeScreen(ui, onOpen, { sheet = it }, onSettings, onAddHost, onRetry = vm::retry, onOpenTerminal = onOpenTerminal)
     prompt?.let { HostKeyDialog(it, vm::answerHostKey) }
     sheet?.let { a ->
         // 请求从列表里消失（已回答 / 过期 / 电脑上处理了）时自动关闭
@@ -100,6 +101,8 @@ fun HomeScreen(
     onSettings: () -> Unit,
     onAddHost: () -> Unit,
     onRetry: () -> Unit,
+    /** 打开对话页并直接拉起终端（提问卡片上的“看终端”）。 */
+    onOpenTerminal: (AgentKey) -> Unit = {},
 ) {
     val c = Kelpie.colors
     val s = ui.state
@@ -124,7 +127,7 @@ fun HomeScreen(
             items(ui.entries, key = { it.stableKey }) { e ->
                 Box(Modifier.padding(bottom = 12.dp)) {
                     when (e) {
-                        is AttentionEntry.Question -> QuestionCard(e, ui.nowMs, offline, onOpen)
+                        is AttentionEntry.Question -> QuestionCard(e, ui.nowMs, offline, onOpen, onOpenTerminal)
                         is AttentionEntry.Permission -> PermissionCard(e, ui.nowMs, offline) { onOpenApproval(e.approval) }
                     }
                 }

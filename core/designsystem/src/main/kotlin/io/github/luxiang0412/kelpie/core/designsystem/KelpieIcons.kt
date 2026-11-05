@@ -20,6 +20,8 @@ object KelpieIcons {
     val Spark = stroke("M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8", 2f)
     val Shield = stroke("M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z", 2f)
     val Info = stroke(circle(12f, 12f, 9f) + "M12 8v4M12 16h.01", 2f)
+    /** 问号：agent 在问你一道选择题（AskUserQuestion）。 */
+    val Question = stroke(circle(12f, 12f, 9f) + "M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01", 2f)
     val InfoSmall = stroke(circle(12f, 12f, 9f) + "M12 11v5M12 8h.01", 2f)
     val Check = stroke("M5 12l5 5L20 7", 2.4f)
     val Terminal = stroke(rect(3f, 4f, 18f, 16f, 3f) + "M7 9l3 3-3 3M13 15h4", 1.8f)

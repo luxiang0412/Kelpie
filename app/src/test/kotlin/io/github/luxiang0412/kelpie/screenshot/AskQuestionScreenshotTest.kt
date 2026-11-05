@@ -26,10 +26,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** 对话里 AskUserQuestion 卡片的各个状态（等你选 / 已选 / 打字回答 / 取消 / 多题多选）。 */
+/** 对话里 AskUserQuestion 卡片的各个状态（等你选 / 多题等你选 / 已选 / 打字回答 / 取消 / 多题多选已答）。 */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w360dp-h1200dp-xxhdpi")
+@Config(sdk = [34], qualifiers = "w360dp-h1700dp-xxhdpi")
 class AskQuestionScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
@@ -60,6 +60,7 @@ class AskQuestionScreenshotTest {
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     AskQuestionCard(tool(listOf(q1)))
+                    AskQuestionCard(tool(listOf(q1, q2.copy(question = "旧的 session 表要不要写迁移？", header = "迁移", multiSelect = false), q2)))
                     AskQuestionCard(tool(listOf(q1), "answered", mapOf(q1.question to "先按助手绑定控制 (Recommended)")))
                     AskQuestionCard(tool(listOf(q1), "answered", mapOf(q1.question to "先按助手绑定，但给业务人员留只读入口")))
                     AskQuestionCard(tool(listOf(q1), "The user doesn't want to proceed with this tool use. The tool use was rejected."))

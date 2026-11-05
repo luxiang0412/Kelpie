@@ -93,7 +93,7 @@ import io.github.luxiang0412.kelpie.ui.BackTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: () -> Unit, vm: ConversationViewModel = viewModel()) {
+fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: () -> Unit, openTerminal: Boolean = false, vm: ConversationViewModel = viewModel()) {
     remember(hostId, paneId) { vm.start(hostId, paneId, prefill); paneId } // 幂等；必须在读取下面的 flow 之前（同步执行，所以不用 LaunchedEffect）
     val item by vm.item.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
@@ -103,7 +103,9 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
     val terminal by vm.terminal.collectAsStateWithLifecycle()
     val receipt by vm.receipt.collectAsStateWithLifecycle()
     val online by vm.online.collectAsStateWithLifecycle()
-    var showTerminal by rememberSaveable { mutableStateOf(false) }
+    // 从首页提问卡片的“看终端”进来：直接拉起终端（只读）
+    var showTerminal by rememberSaveable { mutableStateOf(openTerminal) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { if (openTerminal) vm.refreshTerminal() }
     var menu by remember { mutableStateOf(false) }
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -269,7 +271,7 @@ internal fun MessageList(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = KelpieSpace.pageConversation, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.Bottom),
     ) {
-        item(key = "status") { LiveStatus(agent, now) }
+        item(key = "status") { LiveStatus(agent, now, asking = pendingQuestion(items)) }
         // 回执挂在最后一条用户消息下面；如果那条还没出现在会话文件里，先单独显示
         if (receipt != null && (lastUserIdx < 0 || (items[lastUserIdx] as ConversationItem.User).text.trim() != receipt.text)) {
             item(key = "pending-send") {
@@ -302,12 +304,14 @@ internal fun MessageList(
 }
 
 @Composable
-private fun LiveStatus(agent: AgentItem?, now: Long) {
+private fun LiveStatus(agent: AgentItem?, now: Long, asking: Boolean = false) {
     val c = Kelpie.colors
     agent ?: return
     val (color, text) = when {
         agent.lastSeen -> c.idle to t("连不上主机 · 下面是最后看到的内容", "Host unreachable · showing what was last seen")
-        agent.status == AgentStatus.BLOCKED -> c.attention to t("在等你回答 · ", "Waiting for your answer · ") + Durations.waited(agent.sinceMs, agent.sinceIsLowerBound, now)
+        agent.status == AgentStatus.BLOCKED -> c.attention to t("在等你回答 · ", "Waiting for your answer · ") + Durations.waited(agent.sinceMs, agent.sinceIsLowerBound, now) +
+            // 选择题开着时发消息会被终端当成按键
+            if (asking) t(" · 先在终端里答完选择题再发消息", " · answer the question in the terminal before sending") else ""
         agent.status == AgentStatus.WORKING -> c.working to t("正在工作 · ", "Working · ") + Durations.waited(agent.sinceMs, agent.sinceIsLowerBound, now)
         else -> return
     }

@@ -27,7 +27,7 @@ import kotlinx.serialization.Serializable
 /** 类型安全路由（规范 8.3）：没有底部导航，首页是唯一的根。 */
 object Routes {
     @Serializable data object Home
-    @Serializable data class Conversation(val hostId: String, val paneId: String, val prefill: String? = null)
+    @Serializable data class Conversation(val hostId: String, val paneId: String, val prefill: String? = null, val terminal: Boolean = false)
     @Serializable data object Settings
     @Serializable data class HostEdit(val hostId: String? = null)
     /** 配对确认页。链接里有私钥，所以不放进路由参数（会进 saved state），只放在内存里的 [AppContainer.pairLink]。 */
@@ -81,13 +81,14 @@ fun KelpieNavHost(
             composable<Routes.Home> {
                 HomeRoute(
                     onOpen = { key, prefill -> nav.navigate(Routes.Conversation(key.hostId, key.paneId, prefill)) },
+                    onOpenTerminal = { key -> nav.navigate(Routes.Conversation(key.hostId, key.paneId, terminal = true)) },
                     onSettings = { nav.navigate(Routes.Settings) },
                     onAddHost = { nav.navigate(Routes.HostEdit()) },
                 )
             }
             composable<Routes.Conversation> { entry ->
                 val r = entry.toRoute<Routes.Conversation>()
-                ConversationRoute(r.hostId, r.paneId, r.prefill, onBack = { nav.popBackStack() })
+                ConversationRoute(r.hostId, r.paneId, r.prefill, onBack = { nav.popBackStack() }, openTerminal = r.terminal)
             }
             composable<Routes.Settings> {
                 SettingsRoute(
