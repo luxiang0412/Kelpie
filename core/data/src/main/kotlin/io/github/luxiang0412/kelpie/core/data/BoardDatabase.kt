@@ -133,7 +133,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {
@@ -144,7 +144,7 @@ abstract class BoardDatabase : RoomDatabase() {
         /** 新工程从 version 1 起步；以后每次加字段都写显式迁移，绝不清库。 */
         fun build(context: android.content.Context): BoardDatabase =
             androidx.room.Room.databaseBuilder(context, BoardDatabase::class.java, "kelpie-board.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
 
         /**
@@ -155,6 +155,18 @@ abstract class BoardDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transcript_messages ADD COLUMN structured TEXT")
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        }
+
+        /**
+         * 2 → 3：再清一次 transcript 缓存和游标。
+         * 0.5.0 之前回填跳行只探 8KB，起点落在超长行里时游标直接记到文件末尾、一条消息都没读到，
+         * 之后永远是空对话（0.5.0 清缓存后大会话几乎全中）。修好跳行后，卡住的游标要清掉才能重读。
+         */
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("DELETE FROM transcript_messages")
                 db.execSQL("DELETE FROM transcript_cursor")
             }

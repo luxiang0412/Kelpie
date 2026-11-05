@@ -23,4 +23,30 @@ class TranscriptTailerStartTest {
         val size = TranscriptTailer.DEFAULT_BACKFILL.toLong()
         assertEquals(0L, TranscriptTailer.initialStart(size))
     }
+
+    private fun reader(bytes: ByteArray): (Long, ByteArray) -> Int = { at, buf ->
+        val n = minOf(buf.size.toLong(), bytes.size - at).toInt()
+        if (n <= 0) 0 else { System.arraycopy(bytes, at.toInt(), buf, 0, n); n }
+    }
+
+    @Test
+    fun `line start is found past a very long line`() {
+        // 真机所见：回填起点落在一行几百 KB 的工具输出中间；以前只探 8KB，直接跳到文件末尾、对话全空
+        val long = ByteArray(300 * 1024) { 'x'.code.toByte() }
+        val bytes = long + "\n{\"next\":1}\n".toByteArray()
+        assertEquals(long.size + 1L, TranscriptTailer.findLineStart(1000, bytes.size.toLong(), reader(bytes), step = 8 * 1024))
+    }
+
+    @Test
+    fun `newline right at the offset and no newline at all`() {
+        val bytes = "ab\ncd".toByteArray()
+        assertEquals(3L, TranscriptTailer.findLineStart(2, bytes.size.toLong(), reader(bytes)))
+        assertEquals(bytes.size.toLong(), TranscriptTailer.findLineStart(3, bytes.size.toLong(), reader(bytes)))
+    }
+
+    @Test
+    fun `gives up after the limit`() {
+        val bytes = ByteArray(100) { 'x'.code.toByte() } + "\n".toByteArray()
+        assertEquals(bytes.size.toLong(), TranscriptTailer.findLineStart(0, bytes.size.toLong(), reader(bytes), step = 16, limit = 50))
+    }
 }

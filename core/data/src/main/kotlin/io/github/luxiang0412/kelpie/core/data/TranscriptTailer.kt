@@ -94,27 +94,41 @@ class TranscriptTailer(
             if (size <= backfillBytes) 0L else size - backfillBytes
 
         const val DEFAULT_BACKFILL: Int = 1024 * 1024
+
+        /**
+         * 从 [offset] 起找下一个换行之后的位置，按 [step] 分块一直往后找，最多找 [limit] 字节；
+         * 找不到（文件剩下的部分是一整行、或者超过 limit）返回 [size]。
+         *
+         * 以前只探 8KB：Claude / Pi 会话里常有几十上百 KB 的一行（大段工具输出），
+         * 起点落在这样的行里就直接返回文件末尾，回填一条消息都没有。
+         * [read] = 从某个偏移读进缓冲区，返回读到的字节数（≤0 表示读不到）。
+         */
+        fun findLineStart(offset: Long, size: Long, read: (Long, ByteArray) -> Int, step: Int = 64 * 1024, limit: Long = 2L * 1024 * 1024): Long {
+            var pos = offset
+            val end = minOf(size, offset + limit)
+            while (pos < end) {
+                val buf = ByteArray(minOf(step.toLong(), end - pos).toInt())
+                val n = read(pos, buf)
+                if (n <= 0) break
+                for (i in 0 until n) if (buf[i] == 0x0A.toByte()) return pos + i + 1
+                pos += n
+            }
+            return size
+        }
     }
 
-    /** 从 [offset] 起找到下一个 '
-' 之后的位置（最多探 8KB）。 */
-    private fun skipToLineStart(client: SFTPClient, offset: Long, size: Long): Long {
-        val probe = minOf(8L * 1024, size - offset).toInt()
-        if (probe <= 0) return size
-        val b = ByteArray(probe)
-        var read = 0
+    private fun skipToLineStart(client: SFTPClient, offset: Long, size: Long): Long =
         client.open(path, EnumSet.of(OpenMode.READ)).use { f ->
-            while (read < probe) {
-                val n = f.read(offset + read, b, read, probe - read)
-                if (n <= 0) break
-                read += n
-            }
+            findLineStart(offset, size, read = { at, buf ->
+                var got = 0
+                while (got < buf.size) {
+                    val n = f.read(at + got, buf, got, buf.size - got)
+                    if (n <= 0) break
+                    got += n
+                }
+                got
+            })
         }
-        for (i in 0 until read) {
-            if (b[i] == 0x0A.toByte()) return offset + i + 1
-        }
-        return size
-    }
 
     private fun readHeadHash(client: SFTPClient, size: Long): String? {
         if (size <= 0) return null
