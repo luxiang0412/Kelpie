@@ -185,7 +185,8 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
             onSend = { vm.send() },
             enabled = online && item?.lastSeen != true,
             placeholder = if (!online) t("联网后才能发送 · 草稿会保留", "Can't send while offline · draft is kept") else t("回复 ${item?.title ?: ""}…", "Reply to ${item?.title ?: ""}…"),
-            quick = if (item?.status == AgentStatus.BLOCKED && online) QuickReplies else emptyList(),
+            // 卡在一道选择题上时“继续 / 好的”没有意义（发进选择框只会被当成按键）
+            quick = if (item?.status == AgentStatus.BLOCKED && online && !pendingQuestion(items)) QuickReplies else emptyList(),
             onQuick = vm::applyQuick,
             sending = receipt?.receipt == Receipt.Sending,
         )
@@ -287,7 +288,7 @@ internal fun MessageList(
                 }
                 is ConversationItem.Assistant -> MarkdownText(m.text, Modifier.fillMaxWidth())
                 is ConversationItem.Thinking -> ThinkingRow(m.text)
-                is ConversationItem.Tool -> ToolCard(m, onFull = { onFullTool(m) })
+                is ConversationItem.Tool -> if (m.questions.isNotEmpty()) AskQuestionCard(m) else ToolCard(m, onFull = { onFullTool(m) })
                 is ConversationItem.Unknown -> Text(m.text, style = Kelpie.type.caption, color = c.textTertiary)
             } }
         }
@@ -579,3 +580,7 @@ internal fun FullToolOutput(tool: ConversationItem.Tool, onDismiss: () -> Unit) 
         }
     }
 }
+
+/** 最后一个工具条目是还没回答的 AskUserQuestion。 */
+internal fun pendingQuestion(items: List<ConversationItem>): Boolean =
+    (items.lastOrNull { it is ConversationItem.Tool } as? ConversationItem.Tool)?.let { it.questions.isNotEmpty() && it.result == null } == true

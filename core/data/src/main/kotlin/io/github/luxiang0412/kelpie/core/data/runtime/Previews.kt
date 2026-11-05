@@ -4,6 +4,7 @@ import io.github.luxiang0412.kelpie.core.data.ClaudeSessionResolver
 import io.github.luxiang0412.kelpie.core.data.CodexSessionResolver
 import io.github.luxiang0412.kelpie.core.data.attention.AgentItem
 import io.github.luxiang0412.kelpie.core.data.attention.AgentKey
+import io.github.luxiang0412.kelpie.core.herdr.AskQuestion
 import io.github.luxiang0412.kelpie.core.herdr.ChatMessage
 import io.github.luxiang0412.kelpie.core.herdr.TranscriptLoader
 import io.github.luxiang0412.kelpie.core.herdr.t
@@ -23,6 +24,8 @@ data class BlockedPreview(
     val pendingTool: String? = null,
     /** 待批准工具调用的参数摘要（命令 / 文件路径），没有时为 null。 */
     val pendingArgs: String? = null,
+    /** 待回答的 AskUserQuestion（Claude 在终端里弹的选择题）；不是提问时为空。 */
+    val questions: List<AskQuestion> = emptyList(),
 ) {
     enum class Source { Transcript, Screen }
 }
@@ -98,10 +101,12 @@ class Previews(
             val lastResultIdx = turn.indexOfLast { it.kind == ChatMessage.Kind.TOOL_RESULT }
             val toolPending = lastTool != null && turn.lastIndexOf(lastTool) > lastResultIdx
             val assistant = turn.lastOrNull { it.kind == ChatMessage.Kind.ASSISTANT && it.text.isNotBlank() }
-            val args = if (toolPending) argsSummary(lastTool!!.text) else null
+            val questions = if (toolPending) lastTool!!.questions else emptyList()
+            // 选择题的内容由 questions 展示，不再重复一段参数摘要
+            val args = if (toolPending && questions.isEmpty()) argsSummary(lastTool!!.text) else null
             return when {
-                assistant != null -> BlockedPreview(assistant.text.trim().take(MAX), BlockedPreview.Source.Transcript, lastTool?.toolName?.takeIf { toolPending }, args)
-                toolPending -> BlockedPreview("", BlockedPreview.Source.Transcript, lastTool!!.toolName ?: "tool", args)
+                assistant != null -> BlockedPreview(assistant.text.trim().take(MAX), BlockedPreview.Source.Transcript, lastTool?.toolName?.takeIf { toolPending }, args, questions)
+                toolPending -> BlockedPreview("", BlockedPreview.Source.Transcript, lastTool!!.toolName ?: "tool", args, questions)
                 else -> null
             }
         }

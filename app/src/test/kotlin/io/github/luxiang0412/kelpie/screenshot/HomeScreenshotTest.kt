@@ -92,6 +92,23 @@ class HomeScreenshotTest {
     }
     @Test fun busyDark() = shot("home_busy_dark", ThemeMode.Dark, busy())
 
+    /** Claude 在终端里弹 AskUserQuestion：首页显示题目和选项，不是一段 JSON。 */
+    @Test fun askUserQuestionZh() {
+        io.github.luxiang0412.kelpie.core.herdr.L10n.update(java.util.Locale.SIMPLIFIED_CHINESE)
+        val blocked = item("p1", "claude", "ADR-041 重构交接", AgentStatus.BLOCKED, 2)
+        val state = HomeState(listOf(blocked), emptyList(), emptyList(), emptyList(), hosts, noHosts = false, loading = false)
+        val q = io.github.luxiang0412.kelpie.core.herdr.AskQuestion(
+            question = "智能体工作台目前只开放给 FDE 和管理员，业务人员没有助手入口。知识库的可见范围，K1 怎么控制？",
+            header = "知识库权限",
+            options = listOf(
+                io.github.luxiang0412.kelpie.core.herdr.AskQuestion.Option("先按助手绑定控制 (Recommended)", "能查哪些库 = 助手版本绑定的库 ∩ 已登记且启用的库。"),
+                io.github.luxiang0412.kelpie.core.herdr.AskQuestion.Option("照计划接入权限包", "权限包新增「外部知识库」资源类型。"),
+            ),
+        )
+        val previews = mapOf(blocked.key to BlockedPreview("开始 K1。先看几处要复用的现有代码：权限服务怎么判断资源授权、平台工具怎么注册。", BlockedPreview.Source.Transcript, "AskUserQuestion", null, listOf(q, q.copy(question = "要不要写迁移？", header = "迁移"))))
+        shot("home_ask_question_zh", ThemeMode.Light, HomeViewModel.build(state, previews, emptyList(), emptyMap(), emptyMap(), phoneOnline = true, now = now))
+    }
+
     @Test fun phoneOffline() {
         val state = HomeState(
             needsYou = emptyList(), working = listOf(item("p2", "claude", "Running tests", AgentStatus.WORKING, 3)),

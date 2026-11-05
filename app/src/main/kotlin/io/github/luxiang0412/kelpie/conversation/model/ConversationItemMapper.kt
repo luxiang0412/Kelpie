@@ -1,5 +1,6 @@
 package io.github.luxiang0412.kelpie.conversation.model
 
+import io.github.luxiang0412.kelpie.core.herdr.AskQuestion
 import io.github.luxiang0412.kelpie.core.herdr.ChatMessage
 
 /** 对话列表的一条可渲染条目（M2-C1：与传输层 ChatMessage 解耦，且不再因位置猜测而虚构关联）。 */
@@ -22,6 +23,9 @@ sealed interface ConversationItem {
         val resultError: Boolean,
         val pairedById: Boolean,
         val callId: String? = null,
+        /** AskUserQuestion 的问题（来自调用）与回答（来自结果）；其他工具为空 / null。 */
+        val questions: List<AskQuestion> = emptyList(),
+        val answers: Map<String, String>? = null,
     ) : ConversationItem
 
     data class Unknown(override val index: Int, val text: String) : ConversationItem

@@ -110,6 +110,7 @@ class IncrementalConversationMapper {
                                 result = m.text,
                                 resultError = ConversationItemMapper.looksLikeError(m.text),
                                 pairedById = true,
+                                answers = m.answers,
                             )
                         }
                         patched++
@@ -122,6 +123,7 @@ class IncrementalConversationMapper {
                             resultError = ConversationItemMapper.looksLikeError(m.text),
                             pairedById = false,
                             callId = id,
+                            answers = m.answers,
                         )
                         mapped++
                     }
@@ -203,6 +205,7 @@ class IncrementalConversationMapper {
             resultError = false,
             pairedById = false,
             callId = m.toolCallId,
+            questions = m.questions,
         )
         else -> ConversationItem.Unknown(index, m.text)
     }

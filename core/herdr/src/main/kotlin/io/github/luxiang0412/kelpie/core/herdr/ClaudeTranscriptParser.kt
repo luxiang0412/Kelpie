@@ -76,11 +76,12 @@ object ClaudeTranscriptParser {
                     "tool_use" -> {
                         val name = (b["name"] as? JsonPrimitive)?.content ?: "tool"
                         val id = (b["id"] as? JsonPrimitive)?.content
-                        val input = b["input"]?.toString() ?: ""
+                        val input = b["input"]
                         out += ChatMessage(
                             ChatMessage.Kind.TOOL_CALL,
-                            preview(input),
+                            ToolCalls.summary(name, input),
                             toolName = name,
+                            questions = ToolCalls.questions(name, input),
                             timestamp = ts,
                             toolCallId = id,
                             id = uuid,
@@ -97,6 +98,8 @@ object ClaudeTranscriptParser {
                         out += ChatMessage(
                             ChatMessage.Kind.TOOL_RESULT,
                             text,
+                            // AskUserQuestion 的结构化回答在行级 toolUseResult 里（tool_result 正文只是拼好的一句话）
+                            answers = ToolCalls.answers(obj["toolUseResult"]),
                             timestamp = ts,
                             toolCallId = id,
                             id = uuid,
@@ -129,7 +132,4 @@ object ClaudeTranscriptParser {
     private fun parseIsoMillis(s: String): Long? = runCatching {
         java.time.Instant.parse(s).toEpochMilli()
     }.getOrNull()
-
-    private fun preview(s: String, max: Int = 300): String =
-        if (s.length <= max) s else s.take(max) + "…"
 }

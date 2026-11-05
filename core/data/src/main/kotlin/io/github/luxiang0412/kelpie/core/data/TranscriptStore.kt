@@ -1,6 +1,7 @@
 package io.github.luxiang0412.kelpie.core.data
 
 import io.github.luxiang0412.kelpie.core.herdr.ChatMessage
+import io.github.luxiang0412.kelpie.core.herdr.ToolCalls
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -17,6 +18,7 @@ class TranscriptStore(private val dao: TranscriptDao) {
     fun observe(hostId: String, path: String): Flow<List<ChatMessage>> =
         dao.observe(hostId, path).map { rows ->
             rows.map { r ->
+                val (questions, answers) = ToolCalls.decode(r.structured)
                 ChatMessage(
                     kind = runCatching { ChatMessage.Kind.valueOf(r.kind) }
                         .getOrDefault(ChatMessage.Kind.SYSTEM),
@@ -26,6 +28,8 @@ class TranscriptStore(private val dao: TranscriptDao) {
                     parentId = r.parentId,
                     toolCallId = r.toolCallId,
                     timestamp = r.timestamp,
+                    questions = questions,
+                    answers = answers,
                 )
             }
         }
@@ -46,6 +50,7 @@ class TranscriptStore(private val dao: TranscriptDao) {
                     parentId = m.parentId,
                     toolCallId = m.toolCallId,
                     timestamp = m.timestamp,
+                    structured = ToolCalls.encode(m.questions, m.answers),
                 )
             },
         )

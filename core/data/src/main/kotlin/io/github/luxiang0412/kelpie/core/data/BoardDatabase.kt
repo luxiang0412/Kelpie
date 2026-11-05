@@ -58,6 +58,8 @@ data class TranscriptMessageEntity(
     /** tool_use.id / tool_use_id —— 工具卡配对的唯一依据（D50/D53）。 */
     val toolCallId: String? = null,
     val timestamp: Long?,
+    /** AskUserQuestion 的问题 / 回答（[io.github.luxiang0412.kelpie.core.herdr.ToolCalls.encode]），其他消息为 null。v2 起。 */
+    val structured: String? = null,
 )
 
 @Entity(tableName = "transcript_cursor", primaryKeys = ["hostId", "path"])
@@ -131,7 +133,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {
@@ -141,6 +143,21 @@ abstract class BoardDatabase : RoomDatabase() {
     companion object {
         /** 新工程从 version 1 起步；以后每次加字段都写显式迁移，绝不清库。 */
         fun build(context: android.content.Context): BoardDatabase =
-            androidx.room.Room.databaseBuilder(context, BoardDatabase::class.java, "kelpie-board.db").build()
+            androidx.room.Room.databaseBuilder(context, BoardDatabase::class.java, "kelpie-board.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
+
+        /**
+         * 1 → 2：transcript 加 `structured` 列（AskUserQuestion）。
+         * 同时清掉 transcript 缓存和续读游标：v1 存的工具调用是截断后的原始 JSON，留着就永远显示成 JSON。
+         * 这两张表只是远端会话文件的缓存，下次打开会话会重新读；主机、面板、草稿、待确认写入都不动。
+         */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transcript_messages ADD COLUMN structured TEXT")
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        }
     }
 }

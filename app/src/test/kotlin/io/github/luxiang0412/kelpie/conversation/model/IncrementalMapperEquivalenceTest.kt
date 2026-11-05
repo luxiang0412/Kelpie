@@ -42,11 +42,13 @@ class IncrementalMapperEquivalenceTest {
                 roll < 70 -> {
                     val cid = "call-${n}"
                     callIds += cid
-                    ChatMessage(ChatMessage.Kind.TOOL_CALL, """{"cmd":"ls $n"}""", toolName = "bash", toolCallId = cid, id = newId, parentId = lastId)
+                    // 每三个调用里有一个是 AskUserQuestion，覆盖 questions / answers 两个字段
+                    val qs = if (n % 3 == 0) listOf(io.github.luxiang0412.kelpie.core.herdr.AskQuestion("q$n", options = listOf(io.github.luxiang0412.kelpie.core.herdr.AskQuestion.Option("A")))) else emptyList()
+                    ChatMessage(ChatMessage.Kind.TOOL_CALL, """{"cmd":"ls $n"}""", toolName = "bash", toolCallId = cid, id = newId, parentId = lastId, questions = qs)
                 }
                 roll < 82 && callIds.isNotEmpty() -> {
                     val cid = callIds[rnd.nextInt(callIds.size)]
-                    ChatMessage(ChatMessage.Kind.TOOL_RESULT, "out $n", toolCallId = cid, id = newId, parentId = lastId)
+                    ChatMessage(ChatMessage.Kind.TOOL_RESULT, "out $n", toolCallId = cid, id = newId, parentId = lastId, answers = if (n % 2 == 0) mapOf("q" to "A") else null)
                 }
                 roll < 88 -> ChatMessage(ChatMessage.Kind.TOOL_RESULT, "orphan $n", toolCallId = "unknown-${n}", id = newId, parentId = lastId)
                 roll < 94 && messages.isNotEmpty() -> messages[rnd.nextInt(messages.size)].copy() // 重复事件（同 id）

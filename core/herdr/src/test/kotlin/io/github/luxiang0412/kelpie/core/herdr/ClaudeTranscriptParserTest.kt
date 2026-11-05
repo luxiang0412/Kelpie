@@ -93,4 +93,30 @@ class ClaudeTranscriptParserTest {
         val out = TranscriptParser.parse("/home/u/.claude/projects/-x/s.jsonl", lines)
         assertEquals(5, out.size)
     }
+
+    @Test
+    fun askUserQuestion_questionsAndAnswers() {
+        // 形状取自 2026-11 真实会话：结构化回答在行级 toolUseResult.answers，tool_result 正文是拼好的一句话
+        val q = "K1 怎么控制？"
+        val out = ClaudeTranscriptParser.parse(listOf(
+            """{"type":"assistant","uuid":"a","message":{"role":"assistant","content":[
+                {"type":"tool_use","id":"toolu_q","name":"AskUserQuestion","input":{"questions":[{"question":"$q","header":"权限","multiSelect":false,
+                  "options":[{"label":"先按助手绑定控制 (Recommended)","description":"${"很长的说明".repeat(60)}"},{"label":"照计划接入权限包","description":"d"}]}]}}]}}""",
+            """{"type":"user","uuid":"u","message":{"role":"user","content":[
+                {"type":"tool_result","tool_use_id":"toolu_q","content":"Your questions have been answered: \"$q\"=\"照计划接入权限包\". You can now continue with these answers in mind."}]},
+              "toolUseResult":{"questions":[],"answers":{"$q":"照计划接入权限包"},"annotations":{}}}""",
+        ))
+        val call = out[0]
+        assertEquals(q, call.text) // 摘要是问题本身，不是被截断的 JSON
+        assertEquals(listOf("先按助手绑定控制 (Recommended)", "照计划接入权限包"), call.questions.single().options.map { it.label })
+        assertEquals(mapOf(q to "照计划接入权限包"), out[1].answers)
+        assertEquals("toolu_q", out[1].toolCallId)
+    }
+
+    @Test
+    fun ordinaryToolResultHasNoAnswers() {
+        val r = ClaudeTranscriptParser.parse(lines).first { it.kind == ChatMessage.Kind.TOOL_RESULT }
+        assertNull(r.answers)
+        assertEquals("wc -l a.md", ClaudeTranscriptParser.parse(lines).first { it.kind == ChatMessage.Kind.TOOL_CALL }.text)
+    }
 }

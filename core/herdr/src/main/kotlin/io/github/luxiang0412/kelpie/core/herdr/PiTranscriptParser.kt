@@ -20,6 +20,10 @@ data class ChatMessage(
     val id: String? = null,
     /** 父事件 id（pi 的 parentId；用于分支重建）。 */
     val parentId: String? = null,
+    /** TOOL_CALL：AskUserQuestion 的问题（其他工具为空）。 */
+    val questions: List<AskQuestion> = emptyList(),
+    /** TOOL_RESULT：AskUserQuestion 的回答（问题原文 → 选项 / 文字）；不是这个工具时为 null。 */
+    val answers: Map<String, String>? = null,
 ) {
     enum class Kind { USER, ASSISTANT, THINKING, TOOL_CALL, TOOL_RESULT, SYSTEM }
 }
@@ -77,7 +81,7 @@ object PiTranscriptParser {
                                 val args = part["arguments"] ?: part["input"]
                                 out += ChatMessage(
                                     ChatMessage.Kind.TOOL_CALL,
-                                    args?.let { preview(it.toString()) } ?: "",
+                                    args?.let { ToolCalls.summary(name, it) } ?: "",
                                     toolName = name,
                                     timestamp = ts,
                                     toolCallId = part.str("id") ?: part.str("toolCallId") ?: part.str("tool_use_id"),
@@ -131,7 +135,4 @@ object PiTranscriptParser {
 
     private fun JsonObject.str(key: String): String? =
         (this[key] as? JsonPrimitive)?.content?.takeIf { it != "null" }
-
-    private fun preview(s: String, max: Int = 300): String =
-        if (s.length <= max) s else s.take(max) + "…"
 }

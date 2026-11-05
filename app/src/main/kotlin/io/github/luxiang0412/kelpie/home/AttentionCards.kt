@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.luxiang0412.kelpie.core.data.attention.AgentKey
 import io.github.luxiang0412.kelpie.core.data.attention.Durations
+import io.github.luxiang0412.kelpie.conversation.AskQuestionPreview
 import io.github.luxiang0412.kelpie.core.data.runtime.BlockedPreview
 import io.github.luxiang0412.kelpie.core.designsystem.Kelpie
 import io.github.luxiang0412.kelpie.core.designsystem.KelpieChip
@@ -59,7 +60,7 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             CardHeader(
-                icon = if (e.preview?.pendingTool != null) KelpieIcons.Terminal else KelpieIcons.Spark,
+                icon = if (e.preview?.pendingTool != null && e.preview.questions.isEmpty()) KelpieIcons.Terminal else KelpieIcons.Spark,
                 title = item.title,
                 sub = "${item.agentName} · ${item.hostLabel}",
                 trailing = when {
@@ -94,12 +95,20 @@ private fun PreviewBody(p: BlockedPreview?, stale: Boolean) {
             style = Kelpie.type.bodyCard, color = c.attentionOnContainerMeta,
         )
         else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (p.pendingTool != null) {
+            val asking = p.questions.isNotEmpty()
+            if (asking) {
+                Text(t("在问你 · 要在终端里选择", "Asking you · choose in the terminal"), style = Kelpie.type.metaStrong, color = c.attentionText)
+            } else if (p.pendingTool != null) {
                 Text(t("等待批准 · ${p.pendingTool}", "Waiting for approval · ${p.pendingTool}"), style = Kelpie.type.metaStrong, color = c.attentionText)
             }
             if (p.source == BlockedPreview.Source.Transcript && p.text.isNotBlank()) {
-                Text(stripMarkdown(p.text), style = Kelpie.type.bodyCard, color = c.attentionOnContainerBody, maxLines = if (p.pendingArgs != null) 3 else 6, overflow = TextOverflow.Ellipsis)
+                // 提问前那段铺垫只留两行，位置让给题目本身
+                Text(
+                    stripMarkdown(p.text), style = Kelpie.type.bodyCard, color = if (asking) c.attentionOnContainerMeta else c.attentionOnContainerBody,
+                    maxLines = when { asking -> 2; p.pendingArgs != null -> 3; else -> 6 }, overflow = TextOverflow.Ellipsis,
+                )
             }
+            if (asking) AskQuestionPreview(p.questions)
             val code = if (p.source == BlockedPreview.Source.Screen) p.text else p.pendingArgs
             if (!code.isNullOrBlank()) {
                 Text(

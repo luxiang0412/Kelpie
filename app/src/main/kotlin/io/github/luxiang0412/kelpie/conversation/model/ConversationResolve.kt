@@ -97,6 +97,8 @@ object ConversationResolve {
             // 只有双方都带 toolCallId 且相等，才是精确配对
             pairedById = entry.call?.toolCallId != null && entry.call?.toolCallId == entry.result?.toolCallId,
             callId = entry.call?.toolCallId ?: entry.result?.toolCallId,
+            questions = entry.call?.questions.orEmpty(),
+            answers = entry.result?.answers,
         )
     }
 }

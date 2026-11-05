@@ -44,6 +44,31 @@ class PreviewsTest {
         assertEquals("ls -la", p.pendingArgs)
     }
 
+    @Test fun pendingAskUserQuestionCarriesQuestions_noArgs() {
+        val q = io.github.luxiang0412.kelpie.core.herdr.AskQuestion("怎么控制？", "权限", options = listOf(io.github.luxiang0412.kelpie.core.herdr.AskQuestion.Option("A")))
+        val p = Previews.fromTranscript(listOf(
+            ChatMessage(Kind.USER, "开始"),
+            ChatMessage(Kind.ASSISTANT, "先确认一件事。"),
+            ChatMessage(Kind.TOOL_CALL, "怎么控制？", toolName = "AskUserQuestion", questions = listOf(q)),
+        ))!!
+        assertEquals("AskUserQuestion", p.pendingTool)
+        assertEquals(listOf(q), p.questions)
+        assertNull(p.pendingArgs)
+        assertEquals("先确认一件事。", p.text)
+    }
+
+    @Test fun answeredQuestionIsNotPending() {
+        val q = io.github.luxiang0412.kelpie.core.herdr.AskQuestion("怎么控制？")
+        val p = Previews.fromTranscript(listOf(
+            ChatMessage(Kind.USER, "开始"),
+            ChatMessage(Kind.TOOL_CALL, "怎么控制？", toolName = "AskUserQuestion", questions = listOf(q), toolCallId = "t"),
+            ChatMessage(Kind.TOOL_RESULT, "answered", toolCallId = "t", answers = mapOf("怎么控制？" to "A")),
+            ChatMessage(Kind.ASSISTANT, "好，按 A。"),
+        ))!!
+        assertNull(p.pendingTool)
+        assertEquals(emptyList<Any>(), p.questions)
+    }
+
     @Test fun nothingInThisTurnFallsBackToScreen() =
         assertNull(Previews.fromTranscript(listOf(ChatMessage(Kind.ASSISTANT, "old"), ChatMessage(Kind.USER, "new"))))
 
