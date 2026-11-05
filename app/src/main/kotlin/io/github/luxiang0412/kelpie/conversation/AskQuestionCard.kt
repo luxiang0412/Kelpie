@@ -1,6 +1,8 @@
 package io.github.luxiang0412.kelpie.conversation
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,15 +43,21 @@ import io.github.luxiang0412.kelpie.core.herdr.t
 @Composable
 internal fun AskQuestionCard(tool: ConversationItem.Tool) {
     val c = Kelpie.colors
+    val pending = tool.result == null
     val answered = tool.answers != null
     // 有结果但没有结构化回答：被拒绝 / Esc 取消 / 出错，原样给出结果文字
-    val dismissed = tool.result != null && tool.answers == null
+    val dismissed = !pending && !answered
+    // 答完的题收起成「题 → 答」，长对话里不占地方；点开看完整题目和选项。等你选的始终展开。
+    var open by rememberSaveable(tool.index) { mutableStateOf(false) }
+    val expanded = pending || open
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(KelpieRadius.l))
-            .border(1.dp, if (tool.result == null) c.attention else c.outlineCard, RoundedCornerShape(KelpieRadius.l))
+            .border(1.dp, if (pending) c.attention else c.outlineCard, RoundedCornerShape(KelpieRadius.l))
+            .then(if (pending) Modifier else Modifier.clickable(onClickLabel = if (open) t("收起", "Collapse") else t("展开", "Expand")) { open = !open })
+            .animateContentSize()
             .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(if (expanded) 14.dp else 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(KelpieIcons.Steps, null, tint = c.iconMuted, modifier = Modifier.size(16.dp))
@@ -54,16 +66,35 @@ internal fun AskQuestionCard(tool: ConversationItem.Tool) {
                 style = Kelpie.type.metaStrong, color = c.textSecondary, modifier = Modifier.weight(1f),
             )
             when {
-                tool.result == null -> Text(t("等你选择", "Waiting for you"), style = Kelpie.type.caption, color = c.attentionText)
+                pending -> Text(t("等你选择", "Waiting for you"), style = Kelpie.type.caption, color = c.attentionText)
                 answered -> Icon(KelpieIcons.Check, t("已回答", "Answered"), tint = c.done, modifier = Modifier.size(14.dp))
                 else -> Text(t("未回答", "Not answered"), style = Kelpie.type.caption, color = c.textTertiary)
             }
+            if (!pending) Icon(if (open) KelpieIcons.ChevronDown else KelpieIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(14.dp))
         }
-        tool.questions.forEach { q -> QuestionBlock(q, tool.answers?.get(q.question), answered) }
+        if (expanded) {
+            tool.questions.forEach { q -> QuestionBlock(q, tool.answers?.get(q.question), answered) }
+        } else {
+            tool.questions.forEach { q -> AnswerLine(q, tool.answers?.get(q.question)) }
+        }
         when {
-            tool.result == null -> Text(t("在电脑终端里选择", "Choose in the terminal on your computer"), style = Kelpie.type.caption, color = c.textTertiary)
-            dismissed -> Text(tool.result.orEmpty(), style = Kelpie.type.caption, color = c.textTertiary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            pending -> Text(t("在电脑终端里选择", "Choose in the terminal on your computer"), style = Kelpie.type.caption, color = c.textTertiary)
+            dismissed -> Text(tool.result.orEmpty(), style = Kelpie.type.caption, color = c.textTertiary, maxLines = if (open) 6 else 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/** 收起时的一行：题目（有 header 用 header）→ 回答。 */
+@Composable
+private fun AnswerLine(q: AskQuestion, answer: String?) {
+    val c = Kelpie.colors
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(q.header ?: q.question, style = Kelpie.type.caption, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            answer?.let { a -> a.split(", ").joinToString(", ") { part -> q.options.firstOrNull { it.label == part.trim() }?.plainLabel ?: part } }
+                ?: t("没有回答", "No answer"),
+            style = Kelpie.type.metaStrong, color = if (answer != null) c.textPrimary else c.textTertiary, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
