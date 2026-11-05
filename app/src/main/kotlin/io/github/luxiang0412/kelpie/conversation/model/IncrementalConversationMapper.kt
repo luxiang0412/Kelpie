@@ -1,6 +1,7 @@
 package io.github.luxiang0412.kelpie.conversation.model
 
 import io.github.luxiang0412.kelpie.core.herdr.ChatMessage
+import io.github.luxiang0412.kelpie.core.herdr.ClaudeTranscriptParser
 
 /**
  * 增量映射器（M2-C1 / I-79）。
@@ -194,7 +195,7 @@ class IncrementalConversationMapper {
         m.kind == ChatMessage.Kind.TOOL_CALL || m.kind == ChatMessage.Kind.TOOL_RESULT
 
     private fun single(m: ChatMessage, index: Int): ConversationItem = when (m.kind) {
-        ChatMessage.Kind.USER -> ConversationItem.User(index, m.text)
+        ChatMessage.Kind.USER -> ConversationItem.User(index, ClaudeTranscriptParser.unwrapPasted(m.text))
         ChatMessage.Kind.ASSISTANT -> ConversationItem.Assistant(index, m.text)
         ChatMessage.Kind.THINKING -> ConversationItem.Thinking(index, m.text)
         ChatMessage.Kind.TOOL_CALL -> ConversationItem.Tool(

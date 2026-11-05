@@ -70,7 +70,8 @@ fun QuestionCard(e: AttentionEntry.Question, nowMs: Long, offline: Boolean, onOp
                 sub = "${item.agentName} · ${item.hostLabel}",
                 trailing = when {
                     stale -> t("最后看到", "Last seen")
-                    waited == Durations.JUST_NOTICED() -> waited
+                    // “刚发现 / 刚刚”前面不加“等了”
+                    waited == Durations.JUST_NOTICED() || waited == Durations.JUST_NOW() -> waited
                     else -> t("等了 $waited", "waiting $waited")
                 },
             )

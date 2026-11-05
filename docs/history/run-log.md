@@ -291,3 +291,11 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
   又从 .2 经 `remote-api-bridge` 的 `agent.prompt` 发了四条同类指令（只 sleep 后回复）。App 在后台时都没有“完成”通知。
   轮询快照发现 herdr 在 agent 工作期间 `completion_seq` 为 null（idle 37 → working null → idle 39），AttentionTracker 在状态变化时记下了 null，
   干完时没有旧值可比。修复后升 0.4.2 装到手机，后台复测：pi 完成后约 1 秒收到“luxiang 完成了”。
+
+## AskUserQuestion 显示适配，debug 包真机验证（2026-11-05 10:05–10:20，用户要求）
+
+- 手机（`adb -s 10.144.144.6:37231`，端口变了）装了 debug 包 `io.github.luxiang0412.kelpie.debug`（第一次被 MIUI 拦截，用户在手机上允许后装上；之后 `install -r` 更新一次）。正式版 0.4.2 没动。
+- 用户自己在 .2 运行 `kelpie_pair.py --phone debug --session test` 配对 debug 包（authorized_keys 多一把 `kelpie-debug-*`，测完可 `--revoke debug`），并自己在 `test` 会话的 Claude 里粘贴提示词，让它用 AskUserQuestion 问 3 道题。我这边对开发机没有写操作，只在手机上点按、截图（只读）。
+- 真机核对：首页提问卡片（题目标签、第一题、看终端 / 看全部）、“看终端”直接拉起终端、对话页一次一题和切换、状态栏提示都和设计一致。
+  发现并修了：切题时卡片高度变化导致标签移位（改为按最高一题固定高度）、“可多选”重复、用户消息里 `<pasted_content>` 标签原样显示、首页“等了 刚刚”。
+- 数据库 v1→v2 迁移没有在真机上跑过（debug 包是新装，直接建 v2）。

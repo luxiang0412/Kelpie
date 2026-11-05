@@ -51,7 +51,7 @@ object ClaudeTranscriptParser {
                 // content 可能是纯字符串
                 val text = (msg["content"] as? JsonPrimitive)?.content
                 if (!text.isNullOrBlank() && role == "user") {
-                    out += ChatMessage(ChatMessage.Kind.USER, text, timestamp = ts, id = uuid, parentId = null)
+                    out += ChatMessage(ChatMessage.Kind.USER, unwrapPasted(text), timestamp = ts, id = uuid, parentId = null)
                 }
                 return@forEach
             }
@@ -63,7 +63,7 @@ object ClaudeTranscriptParser {
                         val text = (b["text"] as? JsonPrimitive)?.content ?: return@forEach
                         if (text.isBlank()) return@forEach
                         val kind = if (role == "assistant") ChatMessage.Kind.ASSISTANT else ChatMessage.Kind.USER
-                        out += ChatMessage(kind, text, timestamp = ts, id = uuid, parentId = null)
+                        out += ChatMessage(kind, if (kind == ChatMessage.Kind.USER) unwrapPasted(text) else text, timestamp = ts, id = uuid, parentId = null)
                     }
 
                     "thinking" -> {
@@ -115,6 +115,15 @@ object ClaudeTranscriptParser {
         }
         return out
     }
+
+    private val PASTED = Regex("""<pasted_content(?:\s+id="[^"]*")?>\s*([\s\S]*?)\s*</pasted_content(?:\s+id="[^"]*")?>""")
+
+    /**
+     * 用户粘贴的文本在 transcript 里被包成 `<pasted_content id="…">…</pasted_content id="…">`（2026-11 真机所见）。
+     * 只显示里面的内容，去掉标签和标签两侧的空行。
+     */
+    fun unwrapPasted(text: String): String =
+        if (!text.contains("<pasted_content")) text else PASTED.replace(text) { it.groupValues[1] }.trim()
 
     /** tool_result.content 可能是字符串，也可能是 [{type:text,text:...}] 数组。 */
     private fun textOfResult(b: JsonObject): String {

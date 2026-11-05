@@ -119,4 +119,14 @@ class ClaudeTranscriptParserTest {
         assertNull(r.answers)
         assertEquals("wc -l a.md", ClaudeTranscriptParser.parse(lines).first { it.kind == ChatMessage.Kind.TOOL_CALL }.text)
     }
+
+    @Test
+    fun pastedContentTagsAreStripped() {
+        val raw = "\n\n<pasted_content id=\"ca3c\">\n用 AskUserQuestion 问我\n问完等我。\n</pasted_content id=\"ca3c\">\n\n"
+        assertEquals("用 AskUserQuestion 问我\n问完等我。", ClaudeTranscriptParser.unwrapPasted(raw))
+        assertEquals("先看这段：\nabc\n就这些", ClaudeTranscriptParser.unwrapPasted("先看这段：\n<pasted_content id=\"x\">abc</pasted_content id=\"x\">\n就这些"))
+        assertEquals("没有标签", ClaudeTranscriptParser.unwrapPasted("没有标签"))
+        val line = """{"type":"user","uuid":"u","message":{"role":"user","content":[{"type":"text","text":${kotlinx.serialization.json.JsonPrimitive(raw)}}]}}"""
+        assertEquals("用 AskUserQuestion 问我\n问完等我。", ClaudeTranscriptParser.parse(listOf(line)).single().text)
+    }
 }

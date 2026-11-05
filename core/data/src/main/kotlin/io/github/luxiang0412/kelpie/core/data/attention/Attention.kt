@@ -210,13 +210,14 @@ object HomeDerivation {
 /** “等了多久”的文案（规范 5.4）。 */
 object Durations {
     val JUST_NOTICED = { t("刚发现", "just noticed") }
+    val JUST_NOW = { t("刚刚", "just now") }
 
     fun waited(sinceMs: Long?, lowerBound: Boolean, nowMs: Long): String {
-        if (sinceMs == null) return t("刚刚", "just now")
+        if (sinceMs == null) return JUST_NOW()
         val m = ((nowMs - sinceMs) / 60_000).coerceAtLeast(0)
         val core = when {
             // 只知道下限且不到 1 分钟：其实是“刚发现”，不知道已经等了多久
-            m < 1 -> return if (lowerBound) JUST_NOTICED() else t("刚刚", "just now")
+            m < 1 -> return if (lowerBound) JUST_NOTICED() else JUST_NOW()
             m < 60 -> t("$m 分钟", "$m min")
             m < 24 * 60 -> t("${m / 60} 小时", "${m / 60} h") + if (m % 60 >= 10) t(" ${m % 60} 分", " ${m % 60} min") else ""
             else -> t("${m / (24 * 60)} 天", "${m / (24 * 60)} d")

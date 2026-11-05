@@ -25,9 +25,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -89,7 +91,16 @@ internal fun AskQuestionCard(tool: ConversationItem.Tool) {
         when {
             pending -> {
                 if (qs.size > 1) QuestionTabs(qs, at, onPick = { page = it })
-                QuestionBlock(qs[at], answer = null, answered = false, showHeader = qs.size == 1)
+                // 所有题叠在一起、只显示当前题：卡片高度固定为最高那道，切题时标签不跟着跳
+                //（对话列表从底部排，卡片一变高，上面的标签就挪位置，第二下就点空了——真机所见）
+                Box {
+                    qs.forEachIndexed { i, q ->
+                        val shown = i == at
+                        Box(if (shown) Modifier else Modifier.alpha(0f).clearAndSetSemantics {}) {
+                            QuestionBlock(q, answer = null, answered = false, showHeader = qs.size == 1, tabsShown = qs.size > 1)
+                        }
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth().background(c.hairline).heightIn(min = 1.dp, max = 1.dp),
                 ) {}
@@ -158,7 +169,7 @@ private fun AnswerLine(q: AskQuestion, answer: String?) {
 }
 
 @Composable
-private fun QuestionBlock(q: AskQuestion, answer: String?, answered: Boolean, showHeader: Boolean) {
+private fun QuestionBlock(q: AskQuestion, answer: String?, answered: Boolean, showHeader: Boolean, tabsShown: Boolean = false) {
     val c = Kelpie.colors
     // 多选题的回答是逗号分隔的标签
     val picked = answer?.split(", ")?.map { it.trim() }?.toSet().orEmpty()
@@ -166,7 +177,10 @@ private fun QuestionBlock(q: AskQuestion, answer: String?, answered: Boolean, sh
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (showHeader) q.header?.let { HeaderTag(it) }
         Text(q.question, style = Kelpie.type.body, color = c.textPrimary, modifier = Modifier.semantics { heading() })
-        if (q.multiSelect) Text(t("可多选", "Multiple choice"), style = Kelpie.type.caption, color = c.textTertiary)
+        // 标签上已写“· 多选”，或题目自己写了“（可多选）”，就不再重复
+        // "\u591a\u9009" = 「多选」：匹配题目原文用的关键词，不是界面文案（写成转义，免得 i18n 检查当成未翻译）
+        val saysMulti = q.question.contains("\u591a\u9009") || q.question.contains("multi", ignoreCase = true) || q.question.contains("all that apply", ignoreCase = true)
+        if (q.multiSelect && !tabsShown && !saysMulti) Text(t("可多选", "Multiple choice"), style = Kelpie.type.caption, color = c.textTertiary)
         q.options.forEachIndexed { i, op ->
             val chosen = op in matched
             val dim = answered && !chosen

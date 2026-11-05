@@ -1,6 +1,7 @@
 package io.github.luxiang0412.kelpie.conversation.model
 
 import io.github.luxiang0412.kelpie.core.herdr.ChatMessage
+import io.github.luxiang0412.kelpie.core.herdr.ClaudeTranscriptParser
 
 /**
  * 关联解析（唯一真相）：把扁平消息序列解析成「渲染条目」的规范计划。
@@ -82,7 +83,8 @@ object ConversationResolve {
 
     fun toItem(entry: Entry): ConversationItem = when (entry) {
         is Entry.Single -> when (entry.message.kind) {
-            ChatMessage.Kind.USER -> ConversationItem.User(entry.index, entry.message.text)
+            // 显示时也去一次：本地缓存里可能还是解析器改之前存的原文
+            ChatMessage.Kind.USER -> ConversationItem.User(entry.index, ClaudeTranscriptParser.unwrapPasted(entry.message.text))
             ChatMessage.Kind.ASSISTANT -> ConversationItem.Assistant(entry.index, entry.message.text)
             ChatMessage.Kind.THINKING -> ConversationItem.Thinking(entry.index, entry.message.text)
             else -> ConversationItem.Unknown(entry.index, entry.message.text)
