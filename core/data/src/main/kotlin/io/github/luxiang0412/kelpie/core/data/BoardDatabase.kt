@@ -69,6 +69,9 @@ data class TranscriptCursorEntity(
     val offset: Long,
     val headHash: String?,
     val updatedAtMs: Long,
+    /** 本地缓存是从文件中间开始回填的（更早的消息没有加载）。v4 起。 */
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val truncated: Boolean = false,
 )
 
 @Dao
@@ -133,7 +136,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {
@@ -144,7 +147,7 @@ abstract class BoardDatabase : RoomDatabase() {
         /** 新工程从 version 1 起步；以后每次加字段都写显式迁移，绝不清库。 */
         fun build(context: android.content.Context): BoardDatabase =
             androidx.room.Room.databaseBuilder(context, BoardDatabase::class.java, "kelpie-board.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
 
         /**
@@ -167,6 +170,18 @@ abstract class BoardDatabase : RoomDatabase() {
          */
         val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        }
+
+        /**
+         * 3 → 4：游标加 `truncated`（“更早的消息没有加载”提示以前只在回填那一次显示，重开就没了）。
+         * 旧游标不知道当初是不是从中间回填的，所以连同消息一起清掉、下次打开重新回填尾部。
+         */
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transcript_cursor ADD COLUMN truncated INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("DELETE FROM transcript_messages")
                 db.execSQL("DELETE FROM transcript_cursor")
             }

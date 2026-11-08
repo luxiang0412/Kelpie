@@ -64,9 +64,9 @@ class TranscriptStore(private val dao: TranscriptDao) {
 
     suspend fun cursor(hostId: String, path: String): TranscriptCursorEntity? = dao.cursor(hostId, path)
 
-    suspend fun saveCursor(hostId: String, path: String, offset: Long, headHash: String?) {
+    suspend fun saveCursor(hostId: String, path: String, offset: Long, headHash: String?, truncated: Boolean) {
         dao.saveCursor(
-            TranscriptCursorEntity(hostId, path, offset, headHash, System.currentTimeMillis()),
+            TranscriptCursorEntity(hostId, path, offset, headHash, System.currentTimeMillis(), truncated),
         )
     }
 

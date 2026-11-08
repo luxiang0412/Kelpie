@@ -35,7 +35,7 @@ class TranscriptTailer(
 
     private var sftp: SFTPClient? = null
 
-    /** 首次回填是否从文件中间开始（更早的消息没有加载）—— 用于 UI 如实提示。 */
+    /** 本地缓存是否从文件中间开始回填（更早的消息没有加载）—— 用于 UI 如实提示；随游标持久化。 */
     var backfillTruncated: Boolean = false
         private set
 
@@ -51,11 +51,12 @@ class TranscriptTailer(
         if (plan.reset) {
             // 从中间起读时必须跳到下一行行首，避免把半行 JSON 当数据
             if (start > 0) start = skipToLineStart(client, start, size)
-            backfillTruncated = start > 0
             store.reset(hostId, path)
         }
+        val truncated = if (plan.reset) start > 0 else cursor?.truncated == true
+        backfillTruncated = truncated
         if (size <= start) {
-            store.saveCursor(hostId, path, start.coerceAtMost(size), headHash)
+            store.saveCursor(hostId, path, start.coerceAtMost(size), headHash, truncated)
             return@withContext 0
         }
 
@@ -77,13 +78,13 @@ class TranscriptTailer(
                 chunk = JsonlChunker.consume(start, buf, 0, read)
             } else {
                 // 超过上限的单行直接跳过（不解析），游标越过它
-                store.saveCursor(hostId, path, end, headHash)
+                store.saveCursor(hostId, path, end, headHash, truncated)
                 return@withContext 0
             }
         }
         val messages = io.github.luxiang0412.kelpie.core.herdr.TranscriptParser.parse(path, chunk.lines)
         val added = store.append(hostId, path, messages)
-        store.saveCursor(hostId, path, chunk.nextOffset, headHash)
+        store.saveCursor(hostId, path, chunk.nextOffset, headHash, truncated)
         added
     }
 
