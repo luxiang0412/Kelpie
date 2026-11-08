@@ -52,6 +52,16 @@ sealed interface AnswerState {
 }
 
 /** [callId] = 回答的是哪一次 AskUserQuestion（tool_use id），界面只把结果挂在这张卡片上。 */
+/** 从手机新开 agent 的进度 / 结果。 */
+sealed interface LaunchState {
+    data object Sending : LaunchState
+    data class Started(val paneId: String) : LaunchState
+    data class Failed(val message: String) : LaunchState
+    data class Unknown(val reason: String) : LaunchState
+}
+
+data class LaunchRecord(val id: String, val hostId: String, val dir: String, val kind: String, val state: LaunchState, val atMs: Long)
+
 data class AnswerRecord(val id: String, val key: AgentKey, val callId: String?, val state: AnswerState, val atMs: Long)
 
 /** 发送前需要用户确认的情况（目标变了）。 */
@@ -76,6 +86,12 @@ class Sender(
     /** 每个 pane 最近一次在手机上回答选择题。 */
     val answers: StateFlow<Map<AgentKey, AnswerRecord>> = _answers.asStateFlow()
 
+    private val _launch = MutableStateFlow<LaunchRecord?>(null)
+    /** 最近一次从手机新开 agent。 */
+    val launch: StateFlow<LaunchRecord?> = _launch.asStateFlow()
+    /** 最近一次新开 agent 在账本里的 id（Unknown 时用户关掉提示要确认掉）。 */
+    @Volatile private var launchLedgerId: String? = null
+
     private val _interrupts = MutableStateFlow<Map<AgentKey, SendRecord>>(emptyMap())
     /** 每个 pane 最近一次从手机中断（发一次 Esc）。text 固定为 "Esc"。 */
     val interrupts: StateFlow<Map<AgentKey, SendRecord>> = _interrupts.asStateFlow()
@@ -86,8 +102,10 @@ class Sender(
      */
     fun restore(pending: List<WriteRecord>) {
         ledger.restore(pending, t("发送时 App 被关闭", "The app was closed while sending"))
+        // 新开 agent 没有对应的 pane 可以挂“结果未知”，结果在首页 / herdr 里看得到：直接确认掉，不重做
+        pending.filter { it.method == LAUNCH_METHOD }.forEach { ledger.acknowledge(it.clientRequestId) }
         val restored = pending.mapNotNull { ledger.get(it.clientRequestId) }
-            .filter { it.outcome is WriteOutcome.Unknown }
+            .filter { it.outcome is WriteOutcome.Unknown && it.method != LAUNCH_METHOD }
             .mapNotNull { r ->
                 val key = targetKey(r.target) ?: return@mapNotNull null
                 SendRecord(r.clientRequestId, key, "", Receipt.Unknown((r.outcome as WriteOutcome.Unknown).reason), r.sentAtMs)
@@ -228,6 +246,86 @@ class Sender(
         return null
     }
 
+    /**
+     * 在 [hostId] 上新开一个 agent：`workspace.create`（[dir]，不抢焦点）→ `agent.start`（[kind]）。
+     * 先用 SFTP 确认目录存在（只读）。一次只开一个；任何一步结果不确定都**不重做**。
+     * agent 没启动起来（herdr 明确报错）时关掉刚建的空 workspace；不确定时留着，告诉用户去哪看。
+     */
+    fun launch(hostId: String, dir: String, kind: String): SendBlocked? {
+        if (_launch.value?.state == LaunchState.Sending) return SendBlocked("busy", t("上一个还在启动", "The previous one is still starting"), false)
+        if (NewAgent.KINDS.none { it.first == kind }) return SendBlocked("kind", t("不支持的 agent", "Unsupported agent"), false)
+        val wanted = NewAgent.normalizeDir(dir).getOrElse { return SendBlocked("dir", it.message ?: "", false) }
+        if (!fleet.isOnline(hostId)) return SendBlocked("offline", t("主机不在线", "Host is offline"), false)
+        val rt = fleet.runtime(hostId)
+        val conn = rt?.connection()
+        val api = rt?.api()
+        if (conn == null || api == null) return SendBlocked("not_connected", t("主机未连接", "Host not connected"), false)
+
+        val token = "l${clock()}"
+        fun set(s: LaunchState, path: String = wanted) { _launch.value = LaunchRecord(token, hostId, path, kind, s, clock()) }
+        set(LaunchState.Sending)
+        scope.launch {
+            // 1. 目录（只读）
+            val path = try {
+                val sftp = conn.sharedSftp()
+                val p = NewAgent.resolve(wanted) { sftp.canonicalize(".") }
+                val attrs = runCatching { sftp.statExistence(p) }.getOrNull()
+                if (attrs == null) { set(LaunchState.Failed(t("目录不存在：$p", "No such directory: $p"))); return@launch }
+                if (attrs.type != net.schmizz.sshj.sftp.FileMode.Type.DIRECTORY) { set(LaunchState.Failed(t("不是目录：$p", "Not a directory: $p"))); return@launch }
+                p
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                set(LaunchState.Failed(t("读不到目录：", "Couldn't check the directory: ") + (e.message ?: e.javaClass.simpleName))); return@launch
+            }
+            // 2. workspace
+            val rec = ledger.begin(LAUNCH_METHOD, "$hostId/+new", "$kind $path".toByteArray())
+            val id = rec.clientRequestId
+            launchLedgerId = id
+            val ws = try {
+                api.createWorkspace(path, NewAgent.label(path))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                set(when (val r = classify(id, e)) {
+                    is Receipt.Rejected -> LaunchState.Failed(t("herdr 没有建 workspace：", "herdr didn't create the workspace: ") + r.message)
+                    is Receipt.Unknown -> LaunchState.Unknown(t("不确定 workspace 建了没有（${r.reason}）。不会重试，请在首页或 herdr 里看一眼。",
+                        "Not sure whether the workspace was created (${r.reason}). Not retrying; check home or herdr."))
+                    else -> LaunchState.Failed(e.message ?: "")
+                }, path)
+                fleet.refresh(hostId)
+                return@launch
+            }
+            // 3. agent
+            try {
+                api.startAgent(ws.paneId, kind, NewAgent.name(path, kind, clock()))
+                ledger.accept(id, "agent_started:${ws.paneId}")
+                set(LaunchState.Started(ws.paneId), path)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                when (val r = classify(id, e)) {
+                    is Receipt.Rejected -> {
+                        // herdr 明确没启动：这个 workspace 是刚建的空 shell，收掉
+                        val closed = runCatching { api.closeWorkspace(ws.workspaceId) }.isSuccess
+                        set(LaunchState.Failed(t("agent 没启动起来：", "The agent didn't start: ") + r.message +
+                            if (closed) t("。空 workspace 已关掉。", ". The empty workspace was closed.") else t("。空 workspace ${ws.workspaceId} 没关掉，可以在电脑上关。", ". Couldn't close the empty workspace ${ws.workspaceId}; close it on the computer.")), path)
+                    }
+                    else -> set(LaunchState.Unknown(t("workspace 已建好（pane ${ws.paneId}），但不确定 agent 起来没有：${(r as? Receipt.Unknown)?.reason ?: ""}。不会重试。",
+                        "The workspace exists (pane ${ws.paneId}) but it's unclear whether the agent started: ${(r as? Receipt.Unknown)?.reason ?: ""}. Not retrying.")), path)
+                }
+            }
+            fleet.refresh(hostId)
+        }
+        return null
+    }
+
+    /** 关掉新开 agent 的结果。Unknown 同时从账本确认掉。 */
+    fun dismissLaunch() {
+        if (_launch.value?.state is LaunchState.Unknown) launchLedgerId?.let(ledger::acknowledge)
+        _launch.value = null
+    }
+
     /** 关掉中断的回执；Unknown 同时从账本确认掉。 */
     fun dismissInterrupt(key: AgentKey) {
         _interrupts.value[key]?.let { if (it.receipt is Receipt.Unknown) ledger.acknowledge(it.id) }
@@ -267,6 +365,7 @@ class Sender(
     }
 
     companion object {
+        const val LAUNCH_METHOD = "agent.start"
         fun target(key: AgentKey) = "${key.hostId}/${key.paneId}"
         fun targetKey(target: String): AgentKey? {
             val i = target.indexOf('/')

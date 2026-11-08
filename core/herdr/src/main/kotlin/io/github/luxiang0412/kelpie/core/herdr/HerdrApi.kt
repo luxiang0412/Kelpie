@@ -68,6 +68,42 @@ class HerdrApi(
         requireResult(request("pane.send_keys", params, timeoutMs))
     }
 
+    /** 新建的 workspace 和它的第一个 pane。 */
+    data class NewWorkspace(val workspaceId: String, val paneId: String)
+
+    /** 在 [cwd] 新建一个 workspace（写操作），不抢电脑上的焦点。 */
+    suspend fun createWorkspace(cwd: String, label: String?, timeoutMs: Long = 20_000): NewWorkspace {
+        val params = buildJsonObject {
+            put("cwd", cwd)
+            label?.let { put("label", it) }
+            put("focus", false)
+        }
+        val r = requireResult(request("workspace.create", params, timeoutMs))
+        val ws = r["workspace"]?.jsonObject?.get("workspace_id")?.jsonPrimitive?.content
+        val pane = r["root_pane"]?.jsonObject?.get("pane_id")?.jsonPrimitive?.content
+        if (ws == null || pane == null) throw SshFailure.Protocol("unexpected: workspace.create returned no root pane")
+        return NewWorkspace(ws, pane)
+    }
+
+    /**
+     * 在一个停在 shell 提示符的 pane 里启动 agent（写操作）。
+     * herdr 等到 agent 可以输入才返回；[name] 在一个会话里必须唯一（否则 `agent_name_taken`）。
+     */
+    suspend fun startAgent(paneId: String, kind: String, name: String, readyTimeoutMs: Long = 45_000) {
+        val params = buildJsonObject {
+            put("name", name)
+            put("kind", kind)
+            put("pane_id", paneId)
+            put("timeout_ms", JsonPrimitive(readyTimeoutMs))
+        }
+        requireResult(request("agent.start", params, readyTimeoutMs + 15_000))
+    }
+
+    /** 关闭 workspace（写操作）。只用来收拾自己刚建、agent 没启动起来的空 workspace。 */
+    suspend fun closeWorkspace(workspaceId: String, timeoutMs: Long = 15_000) {
+        requireResult(request("workspace.close", buildJsonObject { put("workspace_id", workspaceId) }, timeoutMs))
+    }
+
     /** 读终端输出（只读）。source: visible / recent / recent_unwrapped / detection */
     suspend fun readPane(paneId: String, source: String = "recent", lines: Int = 80, timeoutMs: Long = 15_000): String {
         val params = buildJsonObject {

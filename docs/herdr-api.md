@@ -15,12 +15,12 @@
 | 全量状态 | `session.snapshot` | 在用（10 s 对账） |
 | 状态变化 | `events.subscribe`：`pane_updated`、`pane_agent_status_changed`、`pane_output_changed` 等 26 种 | 在用（只当失效信号） |
 | 读屏 | `pane.read` / `agent.read` | 在用（终端回退、阻塞预览） |
-| 发文本 | `agent.prompt`、`pane.send_text`、`pane.send_keys` | 在用（`agent.prompt`） |
+| 发文本 | `agent.prompt`、`pane.send_text`、`pane.send_keys` | 在用（`agent.prompt`；选择题和“中断”用 `pane.send_keys`） |
 | **pane 元数据** | `pane.report_metadata`：`tokens`（≤16 个，键 `[A-Za-z0-9_-]{1,32}`，带 `ttl_ms` ≤ 24 h）、`state_labels`、`title`、`display_agent` | **本次接入**：snapshot 的 `PaneInfo.tokens` / `AgentInfo.tokens` 能读到 |
 | agent 状态上报 | `pane.report_agent`（state: idle / working / blocked / unknown）、`pane.report_agent_session` | herdr 自带的集成在用；我们不碰（会和 `herdr:claude` 的上报权限冲突） |
 | 环境注入 | pane 内进程有 `HERDR_ENV=1`、`HERDR_PANE_ID`、`HERDR_SOCKET_PATH` | **本次接入**：审批 hook 用它确定自己属于哪个 pane |
-| 新建 tab / pane | `tab.create`（可带 cwd、env、label）、`pane.split` | 只用于本次授权的 1 个沙箱 pane |
-| 启动 agent | `agent.start`（name、kind、pane_id、args） | 未用 |
+| 新建 workspace / tab / pane | `workspace.create`（cwd、label、focus；返回 `root_pane`）、`tab.create`、`pane.split` | 在用：首页“新开 agent”用 `workspace.create`（focus=false）；失败时 `workspace.close` 收掉空 workspace |
+| 启动 agent | `agent.start`（name、kind、pane_id、args、timeout_ms；pane 要停在 shell 提示符；name 在会话里唯一，重名报 `agent_name_taken`） | 在用：新开 agent，名字 `<目录名>-<kind>-<4 位>` |
 | 插件 | `plugin.*`（list / link / action.invoke / pane.open） | 未用；将来可以考虑把"审批"做成 herdr 插件 |
 
 ## 集成现状（.2）

@@ -359,3 +359,16 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 10:49–10:51 升级后打开大会话（ADR-041、trans-audit-app）是空的。原因是回填跳行最多只探 8KB；两个文件从回填起点到下一个换行分别是 436KB、221KB（只读核对开发机上的会话文件）。0.5.0 升级清了缓存，这个老 bug 就暴露出来了。
 - 10:53 发 0.5.1：跳行改为最多找 2MB，数据库 v2 → v3 再清一次缓存。`install -r dist/kelpie-0.5.1.apk` 覆盖安装，两个会话都恢复显示。
 - 10:57 用户确认发布到 GitHub：`git push origin main` 和 tag `kelpie-v0.5.0` / `kelpie-v0.5.1`；`gh release create kelpie-v0.5.1` 附 `kelpie-0.5.1.apk`（SHA-256 eb2828d1…57cd，下载回来核对一致），设为 Latest。0.5.0 只推了 tag，没有单独发布。
+
+## 从手机新建 agent：herdr 端探测（2026-11-08）
+
+| 时间 | 目标 | 操作 | 结果 |
+|---|---|---|---|
+| 21:30:29 | `test` 会话 | `workspace create --cwd ~/spike-sandbox --label kelpie-new`（得到 `wC`，`root_pane` = `wC:p1`） | 返回里直接带 root_pane |
+| 21:30:30 | `wC:p1` | `agent start kelpie-probe --kind pi --pane wC:p1 --timeout 60000`（不发提示词，不调用模型） | 3.1 s 就绪，`agent_status: idle`，带 agent_session 路径 |
+| 21:31 | `test` 会话 | `workspace close wC` | 关闭 |
+| 21:31:29–21:31:32 | `test` 会话 | 再建两个 workspace（`wD`、`wE`），都用名字 `kelpie-dup` 启动 Pi：第二次 `agent_name_taken`，空 workspace 留着 → 都关掉 | 名字要唯一；失败要收拾空 workspace |
+| 21:33 | 手机 debug 包 | 停掉 App，把它主机配置里的 session 从 `default` 改成 `test`（改 shared_prefs，原文件备份在本机） | — |
+| 21:35 | 手机 debug 包 → `test` | 「新开 agent」填不存在的目录 `//nope-kelpie`：只读 stat 后拦下，“目录不存在”，没建 workspace | 符合预期 |
+| 21:35:53 | 手机 debug 包 → `test` | 「新开 agent」Pi + `~/spike-sandbox`：建 `wF`，启动 `spike-sandbox-pi-l479`，App 直接进了它的对话（无提示词，未调用模型） | 成功 |
+| 21:37 | `test` 会话 / 手机 | `workspace close wF`；debug 包的 session 改回 `default`（原文件写回） | 已恢复 |

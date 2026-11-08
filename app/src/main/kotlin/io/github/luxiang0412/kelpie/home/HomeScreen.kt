@@ -79,7 +79,29 @@ fun HomeRoute(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val prompt by vm.hostKeyPrompt.collectAsStateWithLifecycle()
     var sheet by remember { mutableStateOf<ApprovalItem?>(null) }
-    HomeScreen(ui, onOpen, { sheet = it }, onSettings, onAddHost, onRetry = vm::retry, onOpenTerminal = onOpenTerminal)
+    val launch by vm.launch.collectAsStateWithLifecycle()
+    var newAgent by remember { mutableStateOf(false) }
+    var launchBlocked by remember { mutableStateOf<String?>(null) }
+    HomeScreen(ui, onOpen, { sheet = it }, onSettings, onAddHost, onRetry = vm::retry, onOpenTerminal = onOpenTerminal,
+        onNewAgent = if (ui.onlineHosts > 0) ({ launchBlocked = null; if (launch?.state !is io.github.luxiang0412.kelpie.core.data.runtime.LaunchState.Sending) vm.dismissLaunch(); newAgent = true }) else null)
+    // 启动成功：直接进它的对话（只跳一次）
+    androidx.compose.runtime.LaunchedEffect(launch) {
+        val l = launch ?: return@LaunchedEffect
+        val s = l.state
+        if (s is io.github.luxiang0412.kelpie.core.data.runtime.LaunchState.Started) {
+            newAgent = false
+            vm.dismissLaunch()
+            onOpen(AgentKey(l.hostId, s.paneId), null)
+        }
+    }
+    if (newAgent) {
+        NewAgentSheet(
+            hosts = ui.state.hosts, launch = launch, blocked = launchBlocked,
+            onStart = { h, d, k -> launchBlocked = vm.startAgent(h, d, k) },
+            onDismiss = { newAgent = false },
+            onEdit = { launchBlocked = null; if (launch?.state !is io.github.luxiang0412.kelpie.core.data.runtime.LaunchState.Sending && launch != null) vm.dismissLaunch() },
+        )
+    }
     prompt?.let { HostKeyDialog(it, vm::answerHostKey) }
     sheet?.let { a ->
         // 请求从列表里消失（已回答 / 过期 / 电脑上处理了）时自动关闭
@@ -103,6 +125,8 @@ fun HomeScreen(
     onRetry: () -> Unit,
     /** 打开对话页并直接拉起终端（提问卡片上的“看终端”）。 */
     onOpenTerminal: (AgentKey) -> Unit = {},
+    /** 新开 agent；null = 没有在线主机，不显示入口。 */
+    onNewAgent: (() -> Unit)? = null,
 ) {
     val c = Kelpie.colors
     val s = ui.state
@@ -111,7 +135,7 @@ fun HomeScreen(
     val offline = ui.banner != null
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
-        HomeTopBar(attention = ui.entries.isNotEmpty(), onSettings = onSettings)
+        HomeTopBar(attention = ui.entries.isNotEmpty(), onSettings = onSettings, onNewAgent = onNewAgent)
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = KelpieSpace.pageHome, end = KelpieSpace.pageHome, top = 4.dp),
@@ -178,7 +202,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeTopBar(attention: Boolean, onSettings: () -> Unit) {
+private fun HomeTopBar(attention: Boolean, onSettings: () -> Unit, onNewAgent: (() -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().height(KelpieSize.topBarHome).padding(start = 20.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -186,6 +210,7 @@ private fun HomeTopBar(attention: Boolean, onSettings: () -> Unit) {
     ) {
         KelpieLogo(size = 22.dp, attention = attention)
         Text("Kelpie", style = Kelpie.type.appName, color = Kelpie.colors.textPrimary, modifier = Modifier.weight(1f))
+        onNewAgent?.let { KelpieIconButton(KelpieIcons.Plus, t("新开 agent", "New agent"), it, tint = Kelpie.colors.textPrimary) }
         KelpieIconButton(KelpieIcons.Settings, t("设置", "Settings"), onSettings, tint = Kelpie.colors.textPrimary)
     }
 }

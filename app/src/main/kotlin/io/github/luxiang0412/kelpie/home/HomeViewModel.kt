@@ -75,6 +75,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .copy(disabledHosts = hosts.count { !it.enabled })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), build(c.fleet.home.value, emptyMap(), emptyList(), emptyMap(), emptyMap(), true, System.currentTimeMillis()))
 
+    /** 最近一次从手机新开 agent。 */
+    val launch = c.sender.launch
+
+    /** 新开 agent。返回拦下的原因（null = 已开始，看 [launch]）。 */
+    fun startAgent(hostId: String, dir: String, kind: String): String? = c.sender.launch(hostId, dir, kind)?.message
+
+    fun dismissLaunch() = c.sender.dismissLaunch()
+
     fun answerHostKey(accept: Boolean) = c.fleet.answerHostKey(accept)
     fun retry() = c.fleet.reconnectAll()
     fun dismissSend(key: AgentKey) = c.sender.dismiss(key)
