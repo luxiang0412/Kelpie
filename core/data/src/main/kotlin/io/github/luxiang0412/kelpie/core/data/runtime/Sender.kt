@@ -58,7 +58,7 @@ data class AnswerRecord(val id: String, val key: AgentKey, val callId: String?, 
 data class SendBlocked(val code: String, val message: String, val needsConfirm: Boolean)
 
 /**
- * 写操作：只有 `agent.prompt`。每次发送都先进 [WriteLedger]（未确认的写会落库，进程重建后可见）。
+ * 写操作：`agent.prompt`（发消息）、选择题按键、中断（一次 Esc）。每次发送都先进 [WriteLedger]（未确认的写会落库，进程重建后可见）。
  */
 class Sender(
     private val fleet: Fleet,
@@ -75,6 +75,10 @@ class Sender(
     private val _answers = MutableStateFlow<Map<AgentKey, AnswerRecord>>(emptyMap())
     /** 每个 pane 最近一次在手机上回答选择题。 */
     val answers: StateFlow<Map<AgentKey, AnswerRecord>> = _answers.asStateFlow()
+
+    private val _interrupts = MutableStateFlow<Map<AgentKey, SendRecord>>(emptyMap())
+    /** 每个 pane 最近一次从手机中断（发一次 Esc）。text 固定为 "Esc"。 */
+    val interrupts: StateFlow<Map<AgentKey, SendRecord>> = _interrupts.asStateFlow()
 
     /**
      * 进程重建后：未确认的写操作回到账本，**也回到界面**（首页“结果未知”），否则用户看不到。
@@ -187,6 +191,47 @@ class Sender(
             fleet.refresh(key.hostId)
         }
         return null
+    }
+
+    /**
+     * 中断正在工作的 agent：在它的终端里按一次 Esc（Claude Code / Codex / Pi 都是这个键）。
+     * 和发消息一样先进账本、给回执；结果不确定时**不会自动重发**（多按一次 Esc 在有的界面里含义不同）。
+     * 只在它还在工作时发：已经停下（或者变成在等你）就拦下，免得 Esc 落到别的界面上。
+     */
+    fun interrupt(key: AgentKey, editedAgentSession: String?, editedOccupancy: String?): SendBlocked? {
+        if (_interrupts.value[key]?.receipt == Receipt.Sending) return SendBlocked("busy", t("上一次中断还在发送", "The previous interrupt is still sending"), false)
+        val pane = fleet.pane(key)
+        when (val c = SendTargetCheck.check(pane, fleet.isOnline(key.hostId), editedAgentSession, editedOccupancy)) {
+            is SendTargetCheck.Result.Ok -> Unit
+            is SendTargetCheck.Result.Blocked -> return SendBlocked(c.code, c.reason, false)
+            // 目标变了就不按：Esc 会落到另一个 agent 上
+            is SendTargetCheck.Result.NeedsConfirm -> return SendBlocked("target_changed", c.reason, false)
+        }
+        if (pane?.status != io.github.luxiang0412.kelpie.core.herdr.AgentStatus.WORKING) {
+            return SendBlocked("not_working", t("它已经不在工作了，没有发送", "It's no longer working; nothing was sent"), false)
+        }
+        val api = fleet.runtime(key.hostId)?.api() ?: return SendBlocked("not_connected", t("主机未连接", "Host not connected"), false)
+
+        val rec = ledger.begin("pane.interrupt", target(key), "Escape".toByteArray())
+        val id = rec.clientRequestId
+        _interrupts.value[key]?.let { old -> if (old.receipt is Receipt.Unknown) ledger.acknowledge(old.id) }
+        _interrupts.update { it + (key to SendRecord(id, key, "Esc", Receipt.Sending, clock())) }
+        scope.launch {
+            val r = runCatching { api.sendKeys(key.paneId, listOf("Escape")) }
+            val receipt = r.fold(
+                onSuccess = { ledger.accept(id, "key_sent"); Receipt.Accepted(clock()) },
+                onFailure = { e -> classify(id, e) },
+            )
+            _interrupts.update { it + (key to SendRecord(id, key, "Esc", receipt, clock())) }
+            fleet.refresh(key.hostId)
+        }
+        return null
+    }
+
+    /** 关掉中断的回执；Unknown 同时从账本确认掉。 */
+    fun dismissInterrupt(key: AgentKey) {
+        _interrupts.value[key]?.let { if (it.receipt is Receipt.Unknown) ledger.acknowledge(it.id) }
+        _interrupts.update { it - key }
     }
 
     /** 关掉选择题的结果提示；Unknown 同时从账本确认掉。 */

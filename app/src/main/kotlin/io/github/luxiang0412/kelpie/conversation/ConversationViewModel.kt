@@ -71,6 +71,10 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
     lateinit var online: StateFlow<Boolean>
         private set
 
+    /** 最近一次从手机中断（回执）。 */
+    lateinit var interrupt: StateFlow<SendRecord?>
+        private set
+
     /** 最近一次在手机上回答选择题（进度 / 结果）。 */
     lateinit var answer: StateFlow<io.github.luxiang0412.kelpie.core.data.runtime.AnswerRecord?>
         private set
@@ -89,6 +93,7 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
         c.notifier.clear(hostId, paneId)
         receipt = c.sender.records.map { it[key] }.stateIn(viewModelScope, SharingStarted.Eagerly, c.sender.records.value[key])
         answer = c.sender.answers.map { it[key] }.stateIn(viewModelScope, SharingStarted.Eagerly, c.sender.answers.value[key])
+        interrupt = c.sender.interrupts.map { it[key] }.stateIn(viewModelScope, SharingStarted.Eagerly, c.sender.interrupts.value[key])
         online = c.fleet.links.map { it[hostId]?.reach == io.github.luxiang0412.kelpie.core.data.attention.HostReach.Online }
             .stateIn(viewModelScope, SharingStarted.Eagerly, c.fleet.isOnline(hostId))
 
@@ -186,6 +191,11 @@ class ConversationViewModel(app: Application) : AndroidViewModel(app) {
         c.sender.answerQuestions(key, tool.callId, tool.questions, replies, editedAgentSession, editedOccupancy)
 
     fun dismissAnswer() = c.sender.dismissAnswer(key)
+
+    /** 中断：按一次 Esc。返回拦下的原因（null = 已提交，看回执）。 */
+    fun interruptAgent(): SendBlocked? = c.sender.interrupt(key, editedAgentSession, editedOccupancy)
+
+    fun dismissInterrupt() = c.sender.dismissInterrupt(key)
 
     /** 快捷回复：填进输入框（追加），绝不直接发送。 */
     fun applyQuick(q: String) = setText(if (_text.value.isBlank()) q else _text.value.trimEnd() + " " + q)

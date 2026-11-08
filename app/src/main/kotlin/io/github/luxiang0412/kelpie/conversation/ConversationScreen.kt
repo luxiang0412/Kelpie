@@ -57,6 +57,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import io.github.luxiang0412.kelpie.core.designsystem.KelpieButton
+import io.github.luxiang0412.kelpie.core.designsystem.HoldToConfirmButton
 import io.github.luxiang0412.kelpie.core.herdr.plural
 import androidx.compose.ui.draw.shadow
 import kotlinx.coroutines.launch
@@ -115,6 +117,9 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
     val receipt by vm.receipt.collectAsStateWithLifecycle()
     val online by vm.online.collectAsStateWithLifecycle()
     val answer by vm.answer.collectAsStateWithLifecycle()
+    val interrupt by vm.interrupt.collectAsStateWithLifecycle()
+    var interrupting by remember { mutableStateOf(false) }
+    var interruptBlocked by remember { mutableStateOf<String?>(null) }
     var answering by remember { mutableStateOf<ConversationItem.Tool?>(null) }
     var answerBlocked by remember { mutableStateOf<String?>(null) }
     // 从首页提问卡片的“看终端”进来：直接拉起终端（只读）
@@ -193,6 +198,10 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
                     highlight = current,
                     onFullTool = { fullTool = it },
                     onCopy = { copying = it },
+                    interrupt = interrupt,
+                    // 只有在线、它正在工作时才能中断
+                    onInterrupt = if (online && item?.lastSeen != true && item?.status == AgentStatus.WORKING) ({ interruptBlocked = null; interrupting = true }) else null,
+                    onDismissInterrupt = vm::dismissInterrupt,
                     answer = answer,
                     // 只有 Claude、在线、而且是最后一道还没答的选择题，才能在手机上回答
                     onAnswer = if (online && item?.lastSeen != true && item?.pane?.agent?.startsWith("claude") == true) { tool -> answerBlocked = null; answering = tool } else null,
@@ -226,6 +235,18 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
                 dismissButton = { TextButton(onClick = vm::dismissBlocked) { Text(t("取消", "Cancel"), color = c.textSecondary) } },
             )
         }
+    }
+
+    if (interrupting) {
+        InterruptSheet(
+            title = listOfNotNull(item?.title, item?.agentName).joinToString(" · "),
+            blocked = interruptBlocked,
+            onConfirm = {
+                val b = vm.interruptAgent()
+                if (b == null) interrupting = false else interruptBlocked = b.message
+            },
+            onDismiss = { interrupting = false },
+        )
     }
 
     fullTool?.let { tool -> FullToolOutput(tool, onDismiss = { fullTool = null }) }
@@ -295,6 +316,10 @@ internal fun MessageList(
     onFullTool: (ConversationItem.Tool) -> Unit = {},
     /** 长按消息：打开全文（可复制 / 选择）。 */
     onCopy: (ConversationItem) -> Unit = {},
+    /** 最近一次中断的回执；[onInterrupt] 为 null 时不显示“中断”。 */
+    interrupt: SendRecord? = null,
+    onInterrupt: (() -> Unit)? = null,
+    onDismissInterrupt: () -> Unit = {},
     answer: io.github.luxiang0412.kelpie.core.data.runtime.AnswerRecord? = null,
     onAnswer: ((ConversationItem.Tool) -> Unit)? = null,
     onTerminal: () -> Unit = {},
@@ -327,7 +352,12 @@ internal fun MessageList(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = KelpieSpace.pageConversation, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.Bottom),
     ) {
-        item(key = "status") { LiveStatus(agent, now, asking = pendingQuestion(items)) }
+        item(key = "status") {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LiveStatus(agent, now, asking = pendingQuestion(items), onInterrupt = onInterrupt)
+                interrupt?.let { InterruptLine(it, onDismissInterrupt) }
+            }
+        }
         // 回执挂在最后一条用户消息下面；如果那条还没出现在会话文件里，先单独显示
         if (receipt != null && (lastUserIdx < 0 || (items[lastUserIdx] as ConversationItem.User).text.trim() != receipt.text)) {
             item(key = "pending-send") {
@@ -375,7 +405,7 @@ internal fun MessageList(
 }
 
 @Composable
-private fun LiveStatus(agent: AgentItem?, now: Long, asking: Boolean = false) {
+private fun LiveStatus(agent: AgentItem?, now: Long, asking: Boolean = false, onInterrupt: (() -> Unit)? = null) {
     val c = Kelpie.colors
     agent ?: return
     val (color, text) = when {
@@ -392,7 +422,67 @@ private fun LiveStatus(agent: AgentItem?, now: Long, asking: Boolean = false) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Dot(color, 6.dp)
-        Text(text, style = Kelpie.type.metaStrong.copy(fontSize = Kelpie.type.caption.fontSize), color = if (agent.status == AgentStatus.BLOCKED) c.attentionText else c.textSecondary)
+        Text(text, style = Kelpie.type.metaStrong.copy(fontSize = Kelpie.type.caption.fontSize), color = if (agent.status == AgentStatus.BLOCKED) c.attentionText else c.textSecondary,
+            modifier = Modifier.weight(1f, fill = false))
+        if (onInterrupt != null && agent.status == AgentStatus.WORKING && !agent.lastSeen) {
+            Spacer(Modifier.weight(1f))
+            KelpieChip(t("中断", "Interrupt"), onClick = onInterrupt, container = c.surface, border = c.outline, height = KelpieSize.chipSmall)
+        }
+    }
+}
+
+/** 中断的回执：已发送 / 失败 / 结果未知（不会自动重发）。 */
+@Composable
+private fun InterruptLine(r: SendRecord, onDismiss: () -> Unit) {
+    val c = Kelpie.colors
+    val (text, color) = when (val x = r.receipt) {
+        Receipt.Sending -> t("正在发送中断…", "Sending interrupt…") to c.textSecondary
+        is Receipt.Accepted -> t("已按下 Esc", "Esc sent") to c.textSecondary
+        is Receipt.Rejected -> t("中断没有发出去：${x.message}", "Interrupt not sent: ${x.message}") to c.error
+        is Receipt.Unknown -> t("中断结果未知（不会自动重发）：${x.reason}", "Interrupt result unknown (won't resend): ${x.reason}") to c.warning
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, style = Kelpie.type.caption, color = color, modifier = Modifier.weight(1f))
+        if (r.receipt != Receipt.Sending) {
+            Text(t("知道了", "Dismiss"), style = Kelpie.type.caption, color = c.textSecondary,
+                modifier = Modifier.clip(RoundedCornerShape(KelpieRadius.m)).clickable(onClick = onDismiss).padding(horizontal = 8.dp, vertical = 6.dp))
+        }
+    }
+}
+
+/**
+ * 确认中断：说明会发生什么，按住 600ms 才发（和“允许”一样）。
+ * 读屏用户按不住：这张表本身就是确认步骤，语义点击直接发送。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InterruptSheet(title: String, blocked: String?, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val c = Kelpie.colors
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = c.surface,
+        shape = RoundedCornerShape(topStart = KelpieRadius.sheet, topEnd = KelpieRadius.sheet),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(t("中断它？", "Interrupt it?"), style = Kelpie.type.headline, color = c.textPrimary)
+            if (title.isNotBlank()) Text(title, style = Kelpie.type.metaStrong, color = c.textSecondary)
+            Text(
+                t("相当于在它的终端里按一次 Esc：停下正在进行的这一步，回到等你输入。已经执行完的命令不会撤回。只发一次，不会自动重发。",
+                  "Same as pressing Esc once in its terminal: it stops the current step and waits for you. Commands that already ran aren't undone. Sent once, never resent automatically."),
+                style = Kelpie.type.body, color = c.textSecondary,
+            )
+            blocked?.let { Text(it, style = Kelpie.type.metaStrong, color = c.error) }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                KelpieButton(t("取消", "Cancel"), onDismiss, Modifier.weight(1f), primary = false)
+                HoldToConfirmButton(
+                    text = t("按住中断", "Hold to interrupt"),
+                    onConfirm = onConfirm,
+                    onAccessibilityConfirm = onConfirm,
+                    modifier = Modifier.weight(1.4f),
+                )
+            }
+        }
     }
 }
 
