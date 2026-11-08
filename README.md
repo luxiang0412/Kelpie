@@ -1,68 +1,70 @@
 # Kelpie
 
+English | [中文](README.zh-CN.md)
+
 <img src="art/logo-512.png" width="96" align="right" alt="logo">
 
-人离开电脑后，用手机监督远程开发机上由 [herdr](https://herdr.dev) 托管的 coding agent（Claude Code / Codex / Pi）。
-**不是**移动 SSH 终端。
+Supervise the coding agents (Claude Code / Codex / Pi) that [herdr](https://herdr.dev) hosts on your remote dev machines, from your phone, once you've stepped away from the computer.
+It is **not** a mobile SSH terminal, and it is not an official herdr project.
 
-- **首页**：所有主机、所有 agent 按注意力排序：在等你 → 工作中 → 刚完成 → 空闲。在等你的直接显示它问了什么、要运行什么。
-- **对话**：读 Claude Code / Codex / Pi 的结构化对话；对话内搜索，查看工具完整输出；补发指令，带送达回执。
-- **审批**：agent 要运行命令时，在手机上按住允许或拒绝（Claude Code / Codex，hook 见 [`companion/`](companion/)）。
-- **配对**：开发机上运行脚本生成二维码，手机扫一下就添加好主机；主机指纹固定，不做首次信任（TOFU）。
-- 后台通知（MIUI 可用）、中英文、日夜间主题。
+- **Home**: every agent on every host, sorted by what needs you: waiting on you → working → just finished → idle. Agents that are waiting show what they asked or what they want to run.
+- **Conversation**: read Claude Code / Codex / Pi sessions as structured conversations; search inside a conversation, open full tool output, and send follow-up instructions with a delivery receipt.
+- **Approvals**: when an agent wants to run a command, press and hold to allow it, or deny it, from the phone (Claude Code / Codex; the hook is in [`companion/`](companion/)).
+- **Pairing**: run a script on the dev machine to show a QR code, scan it and the host is added. Host keys are pinned; there is no trust-on-first-use.
+- Background notifications (works on MIUI), Chinese and English UI (follows the system, or pick one in Settings), light and dark themes.
 
 <p>
-<img src="docs/images/home.png" width="19%" alt="首页：在等你的审批卡片">
-<img src="docs/images/approval.png" width="19%" alt="审批：按住允许或拒绝">
-<img src="docs/images/conversation.png" width="19%" alt="对话：结构化消息和工具调用">
-<img src="docs/images/settings.png" width="19%" alt="设置：主机与通知">
-<img src="docs/images/home-dark.png" width="19%" alt="夜间主题（示例数据）">
+<img src="docs/images/home.png" width="19%" alt="Home: an approval card waiting for you">
+<img src="docs/images/approval.png" width="19%" alt="Approval: hold to allow, or deny">
+<img src="docs/images/conversation.png" width="19%" alt="Conversation: structured messages and tool calls">
+<img src="docs/images/settings.png" width="19%" alt="Settings: hosts and notifications">
+<img src="docs/images/home-dark.png" width="19%" alt="Dark theme (sample data)">
 </p>
 
-当前版本 **0.4.2**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
+Current version: **0.5.1**. See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
 
-## 安装与使用
+## Install and use
 
-没有单独的服务端：手机直接用 SSH 连开发机，调用 herdr 自带的接口。
+There is no server component: the phone connects to each dev machine over SSH and calls the API that ships with herdr.
 
-1. **开发机**：SSH 能从手机连到；装 herdr 0.9.5（协议 22），会话一直开着，agent 在 herdr 里启动；装 herdr 的 claude / codex / pi 集成。
-2. **手机**：装 `dist/kelpie-<版本>.apk`（Android 8.0+），在开发机上运行配对脚本，手机扫码添加主机。
-3. 可选：装审批 hook，就能在手机上批准 agent 运行命令（目前还没有安装脚本）。
+1. **Dev machine**: reachable from the phone over SSH; herdr 0.9.5 (protocol 22) installed, with a session kept running and the agents started inside herdr; herdr's claude / codex / pi integrations installed.
+2. **Phone**: install `dist/kelpie-<version>.apk` (Android 8.0+), run the pairing script on the dev machine and scan the QR code to add the host.
+3. Optional: install the approval hook so you can approve agent commands on the phone (there is no install script yet).
 
-每一步的具体做法、自查清单和常见问题见 [`docs/setup.md`](docs/setup.md)。
+Step-by-step instructions, a checklist and an FAQ are in [`docs/setup.md`](docs/setup.md) (in Chinese).
 
-## 快速开始（开发）
+## Quick start (development)
 
-需要 JDK 17、Android SDK（compileSdk 37），`local.properties` 里写 `sdk.dir`。
+You need JDK 17 and the Android SDK (compileSdk 37); put `sdk.dir` in `local.properties`.
 
 ```bash
-./gradlew :app:assembleDebug     # 调试包，包名 io.github.luxiang0412.kelpie.debug
-./gradlew test                   # 单元测试
+./gradlew :app:assembleDebug     # debug build, package io.github.luxiang0412.kelpie.debug
+./gradlew test                   # unit tests
 ```
 
-完整的构建、测试、发版、调试说明见 [`docs/development.md`](docs/development.md)。
+Building, testing, releasing and debugging are covered in [`docs/development.md`](docs/development.md) (in Chinese).
 
-## 目录结构
+## Layout
 
 ```text
-app/                    # 应用：Activity、导航、各页面、通知、前台服务
+app/                    # the app: Activity, navigation, screens, notifications, foreground service
 core/
-  ssh/                  # SSH 连接、主机指纹信任
-  herdr/                # herdr 协议、连接监督、Claude / Codex / Pi 会话解析、中英文案
-  data/                 # 主机配置、缓存、草稿、审批；runtime/（多主机运行时）、attention/（首页排序）
-  designsystem/         # 颜色 / 字体 / 间距 token、图标、基础组件
-  markdown/             # Markdown 渲染
-benchmark/              # Macrobenchmark（冷启动、长对话滚动）
-build-logic/            # Gradle 约定插件：各模块共用的 Android 配置
-gradle/libs.versions.toml  # 依赖和插件版本
-companion/              # 装在开发机上的脚本：扫码配对、审批 hook
-docs/                   # 文档（索引见 docs/README.md）
-tools/                  # 开发脚本
-art/                    # 标志源文件
+  ssh/                  # SSH connections, host key trust
+  herdr/                # herdr protocol, connection supervision, Claude / Codex / Pi transcript parsing, UI copy
+  data/                 # host config, caches, drafts, approvals; runtime/ (multi-host runtime), attention/ (home ordering)
+  designsystem/         # color / type / spacing tokens, icons, base components
+  markdown/             # Markdown rendering
+benchmark/              # Macrobenchmark (cold start, long-conversation scrolling)
+build-logic/            # Gradle convention plugins: Android config shared by all modules
+gradle/libs.versions.toml  # dependency and plugin versions
+companion/              # scripts for the dev machine: QR pairing, approval hook
+docs/                   # documentation (index in docs/README.md)
+tools/                  # development scripts
+art/                    # logo sources
 ```
 
-依赖方向：`app` → `core:markdown` / `core:designsystem` / `core:data` → `core:herdr` → `core:ssh`。
+Dependency direction: `app` → `core:markdown` / `core:designsystem` / `core:data` → `core:herdr` → `core:ssh`.
 
-## 文档
+## Documentation
 
-架构见 [`docs/architecture.md`](docs/architecture.md)，安装配置见 [`docs/setup.md`](docs/setup.md)，其余文档的索引见 [`docs/README.md`](docs/README.md)。
+The docs are written in Chinese. Architecture: [`docs/architecture.md`](docs/architecture.md); setup: [`docs/setup.md`](docs/setup.md); index of everything else: [`docs/README.md`](docs/README.md).

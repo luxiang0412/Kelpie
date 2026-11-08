@@ -74,6 +74,7 @@ class KelpieApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        io.github.luxiang0412.kelpie.core.herdr.L10n.force(KelpiePrefs.languageOf(getSharedPreferences("kelpie-prefs", MODE_PRIVATE)).forcedZh)
         io.github.luxiang0412.kelpie.core.herdr.L10n.update(resources.configuration.locales[0])
         container = AppContainer(this)
         DebugHooks.onAppStart(this, container)
@@ -106,6 +107,23 @@ class KelpiePrefs(context: Context) {
     fun setTheme(m: ThemeMode) {
         sp.edit().putString("theme", m.name).apply()
         _theme.value = m
+    }
+
+    private val _language = MutableStateFlow(languageOf(sp))
+    val language: StateFlow<io.github.luxiang0412.kelpie.core.herdr.Language> = _language.asStateFlow()
+
+    /** 改界面语言：立即生效到文案函数；调用方负责重建 Activity。 */
+    fun setLanguage(l: io.github.luxiang0412.kelpie.core.herdr.Language) {
+        sp.edit().putString("language", l.name).apply() // 重建后的界面读的是 L10n（下面立即更新），不等落盘
+        _language.value = l
+        io.github.luxiang0412.kelpie.core.herdr.L10n.force(l.forcedZh)
+    }
+
+    companion object {
+        /** Application 创建时就要用（容器建好之前），所以单独读。 */
+        fun languageOf(sp: android.content.SharedPreferences) =
+            runCatching { io.github.luxiang0412.kelpie.core.herdr.Language.valueOf(sp.getString("language", null)!!) }
+                .getOrDefault(io.github.luxiang0412.kelpie.core.herdr.Language.System)
     }
 
     private val _notifyBlocked = MutableStateFlow(sp.getBoolean("notify_blocked", true))

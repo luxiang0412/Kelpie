@@ -21,12 +21,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** 连接的用户可见描述（设置页 / 横幅）。 */
 data class HostLink(
     val reach: HostReach,
-    /** 一句话状态：“已连接 · herdr 0.9.5”“重连中（第 3 次）”。 */
-    val text: String,
     /** 失败类别（决定横幅文案与可操作项）。 */
     val failure: ConnectionSupervisor.Kind? = null,
     val version: String = "",
-)
+    private val state: ConnectionSupervisor.State? = null,
+    private val hasKey: Boolean = true,
+) {
+    /**
+     * 一句话状态：“已连接 · herdr 0.9.5”“重连中（第 3 次）”。
+     * 每次读取时按当前语言生成：设置里切换语言后不用等连接状态变化。
+     */
+    val text: String get() = state?.let { HostRuntime.describe(it, hasKey) } ?: ""
+}
 
 data class HostKeyPrompt(val hostId: String, val label: String, val host: String, val fingerprint: String, val algorithm: String = "")
 
@@ -93,18 +99,26 @@ internal class HostRuntime(
     companion object {
         fun link(st: ConnectionSupervisor.State, hasKey: Boolean): HostLink = when (st) {
             is ConnectionSupervisor.State.Idle ->
-                if (hasKey) HostLink(HostReach.Connecting, t("未连接", "Not connected")) else HostLink(HostReach.Unreachable, t("未导入私钥", "No private key imported"), ConnectionSupervisor.Kind.KEY)
-            is ConnectionSupervisor.State.Connecting -> HostLink(HostReach.Connecting, if (st.attempt <= 1) t("连接中…", "Connecting…") else t("连接中（第 ${st.attempt} 次）", "Connecting (attempt ${st.attempt})"))
-            is ConnectionSupervisor.State.AwaitingHostKey -> HostLink(HostReach.Connecting, t("等待确认主机指纹", "Waiting for fingerprint confirmation"), ConnectionSupervisor.Kind.HOST_KEY_UNKNOWN)
-            is ConnectionSupervisor.State.Connected -> HostLink(HostReach.Online, t("已连接 · herdr ${st.version}", "Connected · herdr ${st.version}"), version = st.version)
+                if (hasKey) HostLink(HostReach.Connecting, state = st, hasKey = true) else HostLink(HostReach.Unreachable, ConnectionSupervisor.Kind.KEY, state = st, hasKey = false)
+            is ConnectionSupervisor.State.Connecting -> HostLink(HostReach.Connecting, state = st, hasKey = hasKey)
+            is ConnectionSupervisor.State.AwaitingHostKey -> HostLink(HostReach.Connecting, ConnectionSupervisor.Kind.HOST_KEY_UNKNOWN, state = st, hasKey = hasKey)
+            is ConnectionSupervisor.State.Connected -> HostLink(HostReach.Online, version = st.version, state = st, hasKey = hasKey)
             // Stale：连接还在，但超过 25 秒没刷新成功。对用户来说数据已不可信。
-            is ConnectionSupervisor.State.Stale -> HostLink(HostReach.Unreachable, t("数据可能过期：${st.reason}", "Data may be stale: ${st.reason}"), ConnectionSupervisor.Kind.NETWORK)
-            is ConnectionSupervisor.State.Reconnecting -> HostLink(
-                HostReach.Unreachable,
-                listOfNotNull(reason(st.lastError), t("${st.delayMs / 1000} 秒后第 ${st.attempt} 次重连", "retry ${st.attempt} in ${st.delayMs / 1000}s")).joinToString(" · "),
-                ConnectionSupervisor.Kind.NETWORK,
-            )
-            is ConnectionSupervisor.State.Failed -> HostLink(HostReach.Unreachable, reason(st.message) ?: st.message, st.kind)
+            is ConnectionSupervisor.State.Stale -> HostLink(HostReach.Unreachable, ConnectionSupervisor.Kind.NETWORK, state = st, hasKey = hasKey)
+            is ConnectionSupervisor.State.Reconnecting -> HostLink(HostReach.Unreachable, ConnectionSupervisor.Kind.NETWORK, state = st, hasKey = hasKey)
+            is ConnectionSupervisor.State.Failed -> HostLink(HostReach.Unreachable, st.kind, state = st, hasKey = hasKey)
+        }
+
+        /** [link] 的一句话状态，按当前语言。 */
+        fun describe(st: ConnectionSupervisor.State, hasKey: Boolean): String = when (st) {
+            is ConnectionSupervisor.State.Idle -> if (hasKey) t("未连接", "Not connected") else t("未导入私钥", "No private key imported")
+            is ConnectionSupervisor.State.Connecting -> if (st.attempt <= 1) t("连接中…", "Connecting…") else t("连接中（第 ${st.attempt} 次）", "Connecting (attempt ${st.attempt})")
+            is ConnectionSupervisor.State.AwaitingHostKey -> t("等待确认主机指纹", "Waiting for fingerprint confirmation")
+            is ConnectionSupervisor.State.Connected -> t("已连接 · herdr ${st.version}", "Connected · herdr ${st.version}")
+            is ConnectionSupervisor.State.Stale -> t("数据可能过期：${st.reason}", "Data may be stale: ${st.reason}")
+            is ConnectionSupervisor.State.Reconnecting ->
+                listOfNotNull(reason(st.lastError), t("${st.delayMs / 1000} 秒后第 ${st.attempt} 次重连", "retry ${st.attempt} in ${st.delayMs / 1000}s")).joinToString(" · ")
+            is ConnectionSupervisor.State.Failed -> reason(st.message) ?: st.message
         }
 
         /** 把底层异常文字翻成一句人话；认不出来就截短原文。 */

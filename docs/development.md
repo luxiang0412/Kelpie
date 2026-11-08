@@ -1,6 +1,6 @@
 # 开发指南
 
-构建、测试、发版、调试。项目介绍和目录结构见根目录 [README](../README.md)。
+构建、测试、发版、调试。项目介绍和目录结构见根目录 [README.zh-CN.md](../README.zh-CN.md)（英文版 [README.md](../README.md)）。
 
 ## 架构
 

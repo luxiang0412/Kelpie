@@ -4,15 +4,26 @@ import java.util.Locale
 
 /**
  * 中英双语文案。两种语言写在一起（`t("中文", "English")`），纯 Kotlin 模块和 UI 共用一套做法。
- * 语言跟随系统：App 在 Application / Activity 创建时用当前配置调用 [update]；
+ * 默认跟随系统：App 在 Application / Activity 创建时用当前配置调用 [update]；
  * 系统语言变化会重建 Activity，界面随之重新取值。中文以外的语言一律显示英文。
+ * 用户也可以在设置里固定成中文或英文（[force]），这时系统语言不再起作用。
  */
 object L10n {
     @Volatile var zh: Boolean = Locale.getDefault().language == "zh"
         private set
 
-    fun update(locale: Locale) { zh = locale.language == "zh" }
+    @Volatile private var system: Boolean = zh
+    /** null = 跟随系统；true = 中文；false = English。 */
+    @Volatile var forced: Boolean? = null
+        private set
+
+    fun update(locale: Locale) { system = locale.language == "zh"; zh = forced ?: system }
+
+    fun force(zh: Boolean?) { forced = zh; this.zh = zh ?: system }
 }
+
+/** 界面语言设置。 */
+enum class Language(val forcedZh: Boolean?) { System(null), Chinese(true), English(false) }
 
 fun t(zh: String, en: String): String = if (L10n.zh) zh else en
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -64,6 +65,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val notifyBlocked = c.prefs.notifyBlocked
     val notifyDone = c.prefs.notifyDone
     fun setTheme(m: ThemeMode) = c.prefs.setTheme(m)
+    val language = c.prefs.language
+    fun setLanguage(l: io.github.luxiang0412.kelpie.core.herdr.Language) = c.prefs.setLanguage(l)
     fun setNotifyBlocked(v: Boolean) { c.prefs.setNotifyBlocked(v); syncService() }
     fun setNotifyDone(v: Boolean) { c.prefs.setNotifyDone(v); syncService() }
     private fun syncService() {
@@ -82,6 +85,8 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
     val links by vm.links.collectAsStateWithLifecycle()
     val home by vm.home.collectAsStateWithLifecycle()
     val theme by vm.theme.collectAsStateWithLifecycle()
+    val language by vm.language.collectAsStateWithLifecycle()
+    val activity = androidx.activity.compose.LocalActivity.current
     val nb by vm.notifyBlocked.collectAsStateWithLifecycle()
     val nd by vm.notifyDone.collectAsStateWithLifecycle()
 
@@ -182,17 +187,21 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
             Group {
                 Row(Modifier.fillMaxWidth().padding(6.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf(ThemeMode.System to t("跟随系统", "System"), ThemeMode.Light to t("日间", "Light"), ThemeMode.Dark to t("夜间", "Dark")).forEach { (m, label) ->
-                        val sel = theme == m
-                        Text(
-                            label,
-                            style = Kelpie.type.label,
-                            color = if (sel) c.onPrimary else c.textPrimary,
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(KelpieRadius.m))
-                                .background(if (sel) c.primary else c.surface)
-                                .selectable(sel, role = Role.RadioButton) { vm.setTheme(m) }
-                                .padding(vertical = 12.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
+                        Segment(label, theme == m) { vm.setTheme(m) }
+                    }
+                }
+            }
+
+            GroupLabel(t("语言", "Language"))
+            Group {
+                Row(Modifier.fillMaxWidth().padding(6.dp).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // 语言名用各自的语言写，切错了也认得回来
+                    listOf(io.github.luxiang0412.kelpie.core.herdr.Language.System to t("跟随系统", "System"),
+                        io.github.luxiang0412.kelpie.core.herdr.Language.Chinese to "\u4E2D\u6587", // “中文”：两种界面下都这样写
+                        io.github.luxiang0412.kelpie.core.herdr.Language.English to "English").forEach { (l, label) ->
+                        Segment(label, language == l) {
+                            if (language != l) { vm.setLanguage(l); activity?.recreate() }
+                        }
                     }
                 }
             }
@@ -206,6 +215,22 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).height(24.dp))
         }
     }
+}
+
+/** 分段选择里的一项（主题、语言）。 */
+@Composable
+private fun RowScope.Segment(label: String, selected: Boolean, onClick: () -> Unit) {
+    val c = Kelpie.colors
+    Text(
+        label,
+        style = Kelpie.type.label,
+        color = if (selected) c.onPrimary else c.textPrimary,
+        modifier = Modifier.weight(1f).clip(RoundedCornerShape(KelpieRadius.m))
+            .background(if (selected) c.primary else c.surface)
+            .selectable(selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 12.dp),
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+    )
 }
 
 @Composable

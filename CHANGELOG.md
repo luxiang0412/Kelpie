@@ -14,6 +14,8 @@
   失败时关掉刚建的空 workspace；结果不确定时不重试，提示去哪看。
 - 新开 Claude Code / Codex 时可以选“跳过权限确认”，分别加 `--dangerously-skip-permissions` /
   `--dangerously-bypass-approvals-and-sandbox`。每种 agent 记住上次的选择；打开时有醒目提示。
+- 设置里可以选界面语言：跟随系统 / 中文 / English（以前只能跟随系统）。
+- README 默认英文，中文版在 `README.zh-CN.md`。
 - 审批 hook：Claude 处在跳过权限模式（`bypassPermissions`）时不再把命令发到手机上审批。
 - 对话里 agent 正在工作时，状态行右边有“中断”：确认后按住 600ms，相当于在终端里按一次 Esc。
   有回执；结果不确定时不会自动重发；它已经停下或目标变了就不发。
