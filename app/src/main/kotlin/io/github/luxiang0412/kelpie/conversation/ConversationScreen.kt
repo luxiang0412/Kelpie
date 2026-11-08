@@ -57,6 +57,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import io.github.luxiang0412.kelpie.core.herdr.plural
+import androidx.compose.ui.draw.shadow
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +88,7 @@ import io.github.luxiang0412.kelpie.core.data.runtime.Receipt
 import io.github.luxiang0412.kelpie.core.data.runtime.SendRecord
 import io.github.luxiang0412.kelpie.core.herdr.AgentStatus
 import io.github.luxiang0412.kelpie.conversation.model.ConversationItem
+import io.github.luxiang0412.kelpie.conversation.model.NoticeFold
 import io.github.luxiang0412.kelpie.core.designsystem.Dot
 import io.github.luxiang0412.kelpie.core.designsystem.Kelpie
 import io.github.luxiang0412.kelpie.core.designsystem.KelpieChip
@@ -296,7 +303,7 @@ internal fun MessageList(
     val c = Kelpie.colors
     val state = rememberLazyListState()
     // 倒序布局：最新的在底部，新消息到来时如果用户停在底部就保持贴底
-    val reversed = remember(items) { items.asReversed() }
+    val reversed = remember(items) { NoticeFold.fold(items).asReversed() }
     val lastUserIdx = remember(items) { items.indexOfLast { it is ConversationItem.User } }
     val lastToolIndex = remember(items) { items.lastOrNull { it is ConversationItem.Tool }?.index }
     LaunchedEffect(highlight) {
@@ -307,6 +314,12 @@ internal fun MessageList(
         val head = state.layoutInfo.visibleItemsInfo.count { it.key == "status" || it.key == "pending-send" }.coerceAtLeast(1)
         state.animateScrollToItem(pos + head)
     }
+    // 不在底部时：右下角浮一个“回到最新 / N 条新消息”。在底部看过的条数记为已读
+    val atBottom by remember { derivedStateOf { state.firstVisibleItemIndex <= 1 } }
+    var seen by remember { mutableIntStateOf(items.size) }
+    LaunchedEffect(atBottom, items.size) { if (atBottom) seen = items.size }
+    val scope = rememberCoroutineScope()
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(
         Modifier.fillMaxSize(),
         state = state,
@@ -337,7 +350,7 @@ internal fun MessageList(
                     val last = m.result == null && m.index == lastToolIndex
                     AskQuestionCard(m, answer, onAnswer = if (last && onAnswer != null) ({ onAnswer(m) }) else null, onTerminal = onTerminal, onDismissAnswer = onDismissAnswer)
                 } else ToolCard(m, cwd = agent?.pane?.cwd, onFull = { onFullTool(m) })
-                is ConversationItem.Unknown -> Text(m.text, style = Kelpie.type.caption, color = c.textTertiary)
+                is ConversationItem.Unknown -> NoticeRow(m)
             } }
         }
         if (truncated) item(key = "truncated") {
@@ -346,6 +359,18 @@ internal fun MessageList(
         if (loading && items.isEmpty()) item(key = "loading") {
             Text(t("正在读取会话…", "Loading conversation…"), style = Kelpie.type.meta, color = c.textSecondary)
         }
+    }
+    if (!atBottom) {
+        val fresh = (items.size - seen).coerceAtLeast(0)
+        KelpieChip(
+            if (fresh > 0) t("$fresh 条新消息", plural(fresh, "new message")) else t("回到最新", "Back to latest"),
+            onClick = { scope.launch { state.scrollToItem(0) } },
+            container = c.surface, border = c.outline, height = KelpieSize.chipSmall,
+            trailing = KelpieIcons.ChevronDown,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)
+                .shadow(4.dp, RoundedCornerShape(50)),
+        )
+    }
     }
 }
 
@@ -409,6 +434,38 @@ private fun ThinkingRow(text: String) {
             Text(t("思考过程", "Thinking"), style = Kelpie.type.meta, color = c.textSecondary)
         }
         if (open) Text(text, style = Kelpie.type.meta, color = c.textSecondary, modifier = Modifier.padding(start = 20.dp, top = 6.dp))
+    }
+}
+
+/** 说明：只有一行时原样显示；有内容时默认收起成一行（标题 · ×N · N 行），点开看内容。 */
+@Composable
+private fun NoticeRow(m: ConversationItem.Unknown) {
+    val c = Kelpie.colors
+    val title = NoticeFold.title(m.text)
+    val body = NoticeFold.body(m.text)
+    if (body.isBlank() && m.count == 1) {
+        Text(title, style = Kelpie.type.caption, color = c.textTertiary)
+        return
+    }
+    var open by rememberSaveable(m.index) { mutableStateOf(false) }
+    val lines = if (body.isBlank()) 0 else body.lines().size
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(KelpieRadius.m))
+            .clickable(onClickLabel = if (open) t("收起", "Collapse") else t("展开", "Expand")) { open = !open }
+            .padding(vertical = 4.dp)
+            .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = Kelpie.type.caption, color = c.textTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            val meta = listOfNotNull(
+                if (m.count > 1) "×${m.count}" else null,
+                if (lines > 0) t("$lines 行", plural(lines, "line")) else null,
+            ).joinToString(" · ")
+            if (meta.isNotEmpty()) Text(meta, style = Kelpie.type.caption, color = c.textTertiary)
+            if (lines > 0) Icon(if (open) KelpieIcons.ChevronUp else KelpieIcons.ChevronDown, null, tint = c.iconMuted, modifier = Modifier.size(14.dp))
+        }
+        if (open && lines > 0) Text(body, style = Kelpie.type.caption, color = c.textTertiary)
     }
 }
 

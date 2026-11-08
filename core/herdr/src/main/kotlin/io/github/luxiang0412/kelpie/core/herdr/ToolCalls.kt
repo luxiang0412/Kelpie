@@ -69,7 +69,7 @@ object ToolCalls {
     fun title(name: String, input: JsonElement?): String? {
         val o = input as? JsonObject ?: return null
         return when (name) {
-            "Bash", "PowerShell", "BashOutput" -> o.str("description")?.trim()?.takeIf { it.isNotEmpty() }?.let(::cap)
+            "Bash", "PowerShell", "Monitor" -> o.str("description")?.trim()?.takeIf { it.isNotEmpty() }?.let(::cap)
             else -> null
         }
     }

@@ -135,8 +135,8 @@ fun HomeScreen(
                 }
             }
 
-            val dupTitles = (s.needsYou + s.working + s.recentlyDone + s.quiet)
-                .groupBy { it.key.hostId to it.title }.filterValues { it.size > 1 }.values.flatten().map { it.key }.toSet()
+            val allAgents = s.needsYou + s.working + s.recentlyDone + s.quiet
+            val dupTitles = RowLabels.ambiguous(allAgents)
             items(ui.unknownSends, key = { "u:" + it.first.id }) { (rec, title) ->
                 Box(Modifier.padding(bottom = 12.dp)) { UnknownSendRow(title) { onOpen(rec.key, null) } }
             }
@@ -144,7 +144,7 @@ fun HomeScreen(
             if (s.working.isNotEmpty()) {
                 item(key = "working-label") { SectionLabel(if (offline) t("离线前在工作 · ${s.working.size}", "Working before offline · ${s.working.size}") else t("工作中 · ${s.working.size}", "Working · ${s.working.size}")) }
                 items(s.working, key = { "w:" + it.key.hostId + it.key.paneId }) { item ->
-                    AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, showPane = item.key in dupTitles) { onOpen(item.key, null) }
+                    AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, ambiguous = dupTitles, all = allAgents) { onOpen(item.key, null) }
                 }
             }
 
@@ -163,13 +163,13 @@ fun HomeScreen(
             if (showDone) {
                 if (showQuiet) item(key = "done-label") { SectionLabel(t("刚完成 · ${s.recentlyDone.size}", "Just done · ${s.recentlyDone.size}")) }
                 items(s.recentlyDone, key = { "d:" + it.key.hostId + it.key.paneId }) { item ->
-                    AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, showPane = item.key in dupTitles) { onOpen(item.key, null) }
+                    AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, ambiguous = dupTitles, all = allAgents) { onOpen(item.key, null) }
                 }
             }
             if (showQuiet) {
                 if (showDone) item(key = "quiet-label") { SectionLabel(t("空闲 · ${s.quiet.size}", "Idle · ${s.quiet.size}")) }
                 items(s.quiet, key = { "i:" + it.key.hostId + it.key.paneId }) { item ->
-                    AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, showPane = item.key in dupTitles) { onOpen(item.key, null) }
+                    AgentRow(item, ui.nowMs, multiHost = s.hosts.size > 1, ambiguous = dupTitles, all = allAgents) { onOpen(item.key, null) }
                 }
             }
             item(key = "bottom") { Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).height(24.dp)) }
@@ -231,7 +231,7 @@ private fun Header(ui: HomeUi) {
 }
 
 @Composable
-fun AgentRow(item: AgentItem, nowMs: Long, multiHost: Boolean, showPane: Boolean = false, onClick: () -> Unit) {
+fun AgentRow(item: AgentItem, nowMs: Long, multiHost: Boolean, ambiguous: Set<io.github.luxiang0412.kelpie.core.data.attention.AgentKey> = emptySet(), all: List<AgentItem> = emptyList(), onClick: () -> Unit) {
     val c = Kelpie.colors
     Row(
         Modifier
@@ -254,12 +254,7 @@ fun AgentRow(item: AgentItem, nowMs: Long, multiHost: Boolean, showPane: Boolean
                 Text(item.title, style = Kelpie.type.rowTitle, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 Text(item.agentName, style = Kelpie.type.caption, color = c.textSecondary, maxLines = 1)
             }
-            val sub = buildString {
-                if (item.lastSeen) append(t("最后看到 · ", "Last seen · "))
-                append(if (multiHost) item.hostLabel else item.pane.cwd?.replace(Regex("^/home/[^/]+"), "~") ?: item.hostLabel)
-                // 同一台主机上标题重名时，带上 pane 编号区分
-                if (showPane) append(" · ").append(item.pane.paneId)
-            }
+            val sub = (if (item.lastSeen) t("最后看到 · ", "Last seen · ") else "") + RowLabels.subtitle(item, multiHost, ambiguous, all)
             Text(sub, style = Kelpie.type.meta, color = c.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         val trailing = when (item.status) {

@@ -16,6 +16,7 @@ object KelpieIcons {
     val Back = stroke("M15 6l-6 6 6 6", 2f)
     val ChevronRight = stroke("M9 6l6 6-6 6", 2f)
     val ChevronDown = stroke("M6 9l6 6 6-6", 2f)
+    val ChevronUp = stroke("M6 15l6-6 6 6", 2f)
     val Settings = stroke("M4 7h10M18 7h2M4 17h4M12 17h8" + circle(16f, 7f, 2f) + circle(10f, 17f, 2f), 1.8f)
     val Spark = stroke("M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8", 2f)
     val Shield = stroke("M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z", 2f)

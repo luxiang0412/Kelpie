@@ -39,4 +39,10 @@ class ToolTitleTest {
         assertEquals("ls -la", ToolCalls.stripCwd("ls -la", cwd))
         assertEquals("cd /x && ls", ToolCalls.stripCwd("cd /x && ls", null))
     }
+
+    @Test
+    fun `monitor uses its description too`() {
+        val line = """{"type":"assistant","uuid":"a4","message":{"role":"assistant","content":[{"type":"tool_use","id":"t4","name":"Monitor","input":{"description":"PR #480 CI check results","timeout_ms":1800000,"command":"cd /x; prev=\"\"; sleep 60"}}]}}"""
+        assertEquals("PR #480 CI check results", ClaudeTranscriptParser.parse(listOf(line)).single().title)
+    }
 }

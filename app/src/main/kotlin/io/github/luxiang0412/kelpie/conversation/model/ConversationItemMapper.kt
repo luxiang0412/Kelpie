@@ -30,7 +30,11 @@ sealed interface ConversationItem {
         val title: String? = null,
     ) : ConversationItem
 
-    data class Unknown(override val index: Int, val text: String) : ConversationItem
+    /**
+     * 说明类条目（后台任务通知、过大未加载等）：第一行是标题，其余是内容。
+     * [count] > 1 表示连续几条同标题的说明被折叠成了这一条（见 [NoticeFold]）。
+     */
+    data class Unknown(override val index: Int, val text: String, val count: Int = 1) : ConversationItem
 }
 
 /**
