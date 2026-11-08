@@ -33,6 +33,8 @@ class HostRepository(context: Context) {
         val herdrBin: String = "/home/luxiang/.local/bin/herdr",
         /** 审批请求目录，和 hook 的 KELPIE_APPROVALS_DIR 一致（见 [ApprovalsPath]）。 */
         val approvalsDir: String = ApprovalsPath.DEFAULT,
+        /** 停用的主机不连接、不上首页，但配置 / 私钥 / 指纹都留着，随时可以再启用。 */
+        val enabled: Boolean = true,
     ) {
         fun toSshConfig(keyFile: File) = SshConfig(
             hostId = id,
@@ -65,6 +67,7 @@ class HostRepository(context: Context) {
                     session = o.optString("session", "test"),
                     herdrBin = o.optString("herdrBin", DEFAULT_BIN),
                     approvalsDir = o.optString("approvalsDir", ApprovalsPath.DEFAULT),
+                    enabled = o.optBoolean("enabled", true),
                 )
             }
         }.getOrDefault(emptyList())
@@ -75,6 +78,11 @@ class HostRepository(context: Context) {
     fun upsert(cfg: HostConfig) {
         val next = list().filterNot { it.id == cfg.id } + cfg
         save(next)
+    }
+
+    /** 启用 / 停用：原地改，不改变主机顺序（[upsert] 会把主机挪到最后）。 */
+    fun setEnabled(id: String, enabled: Boolean) {
+        save(list().map { if (it.id == id) it.copy(enabled = enabled) else it })
     }
 
     fun remove(id: String) {
@@ -123,7 +131,8 @@ class HostRepository(context: Context) {
                     .put("user", h.user)
                     .put("session", h.session)
                     .put("herdrBin", h.herdrBin)
-                    .put("approvalsDir", h.approvalsDir),
+                    .put("approvalsDir", h.approvalsDir)
+                    .put("enabled", h.enabled),
             )
         }
         prefs.edit().putString(KEY_HOSTS, arr.toString()).apply()

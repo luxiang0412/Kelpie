@@ -120,6 +120,7 @@ object Pairing {
     /**
      * 写入：先私钥、再指纹、最后配置（配置一变连接层就会去连，那时前两样必须已经就位）。
      * 没带私钥的二维码只能更新已有主机（沿用它的私钥）。
+     * 重新配对一台停用的主机会把它启用：扫码就是要用它。
      */
     fun apply(repo: HostRepository, trustFileFor: (String) -> File, p: PairingPayload, existing: HostRepository.HostConfig?): Result<String> = runCatching {
         val id = existing?.id ?: repo.newId()

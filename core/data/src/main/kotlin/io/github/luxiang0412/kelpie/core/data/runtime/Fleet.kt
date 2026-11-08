@@ -125,7 +125,9 @@ class Fleet(
     /** 某台主机当前（或最后看到的）全部 pane。 */
     fun panes(hostId: String): List<Pane> = inputs.value[hostId]?.panes.orEmpty()
 
-    private suspend fun sync(list: List<HostRepository.HostConfig>) = lock.withLock {
+    private suspend fun sync(all: List<HostRepository.HostConfig>) = lock.withLock {
+        // 停用的主机当作不存在：不建连接；运行中的被停用 → 和删除一样停掉、从首页拿走
+        val list = all.filter { it.enabled }
         val ids = list.map { it.id }.toSet()
         val next = LinkedHashMap(runtimes)
         // 删除 / 配置变化的主机：停掉

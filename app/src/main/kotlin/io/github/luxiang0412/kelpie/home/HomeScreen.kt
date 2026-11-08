@@ -121,7 +121,9 @@ fun HomeScreen(
             item(key = "header") { Box(Modifier.padding(bottom = 16.dp)) { Header(ui) } }
 
             if (s.noHosts) {
-                item(key = "empty") { NoHosts(onAddHost) }
+                item(key = "empty") {
+                    if (ui.disabledHosts > 0) AllDisabled(onSettings) else NoHosts(onAddHost)
+                }
             }
 
             items(ui.entries, key = { it.stableKey }) { e ->
@@ -194,6 +196,7 @@ private fun Header(ui: HomeUi) {
     val s = ui.state
     val n = ui.waitingAgents
     val title = when {
+        s.noHosts && ui.disabledHosts > 0 -> t("主机都已停用", "All hosts are disabled")
         s.noHosts -> t("还没有主机", "No hosts yet")
         s.loading -> t("正在连接…", "Connecting…")
         n > 0 -> t("$n 个 agent 在等你", (if (n == 1) "1 agent is waiting for you" else "$n agents waiting for you"))
@@ -201,6 +204,7 @@ private fun Header(ui: HomeUi) {
     }
     val total = s.hosts.size
     val (dot, sub) = when {
+        s.noHosts && ui.disabledHosts > 0 -> null to t("在设置里打开要连接的主机", "Turn on the hosts you want to connect in Settings")
         s.noHosts -> null to t("添加一台运行 herdr 的电脑，就能在这里看到它的 agent", "Add a computer running herdr to see its agents here")
         ui.banner is Banner.PhoneOffline || (ui.banner != null && ui.onlineHosts == 0) -> {
             val at = s.hosts.maxOfOrNull { it.fetchedAtMs } ?: 0
@@ -306,6 +310,13 @@ private fun UnknownSendRow(title: String, onClick: () -> Unit) {
         Icon(KelpieIcons.Info, null, tint = c.warning, modifier = Modifier.size(18.dp))
         Text(t("1 条发送结果无法确认 · $title", "1 send couldn't be confirmed · $title"), style = Kelpie.type.label, color = c.textPrimary, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         Icon(KelpieIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+private fun AllDisabled(onSettings: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        KelpieButton(t("去设置", "Open Settings"), onSettings, Modifier.fillMaxWidth(), height = KelpieSize.primaryButton, leading = KelpieIcons.Settings)
     }
 }
 

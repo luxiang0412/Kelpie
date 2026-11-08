@@ -116,6 +116,7 @@ fun HostEditRoute(hostId: String?, onDone: () -> Unit, onPair: (String) -> Unit 
                 host = host.trim(), port = p!!, user = user.trim(), session = session.trim(),
                 herdrBin = bin.trim().ifBlank { "/home/${user.trim()}/.local/bin/herdr" },
                 approvalsDir = ApprovalsPath.normalize(approvalsDir).getOrThrow(),
+                enabled = existing?.enabled ?: true,
             ),
         )
         onDone()

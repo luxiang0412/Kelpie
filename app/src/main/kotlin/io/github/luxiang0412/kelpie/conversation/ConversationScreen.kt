@@ -8,12 +8,14 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import io.github.luxiang0412.kelpie.conversation.model.ConversationSearch
@@ -65,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
@@ -114,6 +117,7 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
     var query by rememberSaveable { mutableStateOf("") }
     var matchPos by rememberSaveable { mutableStateOf(0) }
     var fullTool by remember { mutableStateOf<ConversationItem.Tool?>(null) }
+    var copying by remember { mutableStateOf<ConversationItem?>(null) }
     val context = LocalContext.current
     val c = Kelpie.colors
     val now = remember(items, item) { System.currentTimeMillis() }
@@ -180,6 +184,7 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
                     loading = s is Source.Locating,
                     highlight = current,
                     onFullTool = { fullTool = it },
+                    onCopy = { copying = it },
                     answer = answer,
                     // 只有 Claude、在线、而且是最后一道还没答的选择题，才能在手机上回答
                     onAnswer = if (online && item?.lastSeen != true && item?.pane?.agent?.startsWith("claude") == true) { tool -> answerBlocked = null; answering = tool } else null,
@@ -216,6 +221,7 @@ fun ConversationRoute(hostId: String, paneId: String, prefill: String?, onBack: 
     }
 
     fullTool?.let { tool -> FullToolOutput(tool, onDismiss = { fullTool = null }) }
+    copying?.let { m -> MessageTextSheet(m, onDismiss = { copying = null }) }
 
     answering?.let { tool ->
         AnswerSheet(
@@ -279,6 +285,8 @@ internal fun MessageList(
     loading: Boolean,
     highlight: Int? = null,
     onFullTool: (ConversationItem.Tool) -> Unit = {},
+    /** 长按消息：打开全文（可复制 / 选择）。 */
+    onCopy: (ConversationItem) -> Unit = {},
     answer: io.github.luxiang0412.kelpie.core.data.runtime.AnswerRecord? = null,
     onAnswer: ((ConversationItem.Tool) -> Unit)? = null,
     onTerminal: () -> Unit = {},
@@ -317,7 +325,7 @@ internal fun MessageList(
         }
         items(reversed, key = { "m" + it.index }, contentType = { it::class }) { m ->
             val hl = if (m.index == highlight) Modifier.border(2.dp, c.attention, RoundedCornerShape(KelpieRadius.m)).padding(4.dp) else Modifier
-            Box(hl) { when (m) {
+            Box(hl.then(if (copyText(m) != null) Modifier.longPressCopy { onCopy(m) } else Modifier)) { when (m) {
                 is ConversationItem.User -> Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     UserBubble(m.text)
                     if (m.index == items.getOrNull(lastUserIdx)?.index && receipt != null && m.text.trim() == receipt.text) ReceiptLine(receipt)
@@ -529,6 +537,74 @@ private fun TerminalText(terminal: String?, modifier: Modifier) {
 
 private const val PREVIEW_CHARS = 4_000
 
+/** 能长按复制的消息的原文（Assistant 是 Markdown 源码）；工具卡片点开有自己的复制。 */
+private fun copyText(m: ConversationItem): String? = when (m) {
+    is ConversationItem.User -> m.text
+    is ConversationItem.Assistant -> m.text
+    is ConversationItem.Thinking -> m.text
+    is ConversationItem.Unknown -> m.text
+    else -> null
+}?.takeIf { it.isNotBlank() }
+
+/**
+ * 长按 → [onLongPress]。不用 combinedClickable：它会把整条消息变成一个可点的按钮（涟漪、读屏念“按钮”），
+ * 还会抢走消息里代码块“复制”、思考过程展开这些子控件的点击。读屏用户通过自定义操作“复制”拿到同样的功能。
+ */
+@Composable
+private fun Modifier.longPressCopy(onLongPress: () -> Unit): Modifier {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val label = t("复制", "Copy")
+    return this
+        .pointerInput(onLongPress) {
+            detectTapGestures(onLongPress = {
+                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                onLongPress()
+            })
+        }
+        .semantics { onLongClick(label) { onLongPress(); true } }
+}
+
+/** 一条消息的全文：顶部“复制全部”，正文可以选择一部分复制。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MessageTextSheet(m: ConversationItem, onDismiss: () -> Unit) {
+    val c = Kelpie.colors
+    val context = LocalContext.current
+    val text = copyText(m) ?: return
+    val title = when (m) {
+        is ConversationItem.User -> t("你的消息", "Your message")
+        is ConversationItem.Thinking -> t("思考过程", "Thinking")
+        is ConversationItem.Assistant -> t("回复", "Reply")
+        else -> t("说明", "Note")
+    }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = c.surface,
+        shape = RoundedCornerShape(topStart = KelpieRadius.sheet, topEnd = KelpieRadius.sheet),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = Kelpie.type.headline, color = c.textPrimary)
+                    Text(t("长按文字可以只选一部分", "Long-press the text to select part of it"), style = Kelpie.type.caption, color = c.textSecondary)
+                }
+                KelpieChip(t("复制全部", "Copy all"), onClick = { copyText(context, title, text); onDismiss() }, container = c.surfaceSubtle, height = KelpieSize.chipSmall)
+            }
+            Box(Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(RoundedCornerShape(KelpieRadius.l)).background(c.surfaceSubtle)) {
+                SelectionContainer {
+                    Text(
+                        text.take(200_000) + if (text.length > 200_000) t("\n…（只显示前 200 KB，复制全部可得全文）", "\n… (first 200 KB shown; Copy all for the full text)") else "",
+                        style = Kelpie.type.body,
+                        color = c.textPrimary,
+                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
 private fun copyText(context: Context, label: String, text: String) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     cm.setPrimaryClip(ClipData.newPlainText(label, text))
@@ -605,7 +681,10 @@ internal fun FullToolOutput(tool: ConversationItem.Tool, onDismiss: () -> Unit) 
                 KelpieChip(t("复制", "Copy"), onClick = { copyText(context, tool.name, result) }, container = c.surfaceSubtle, height = KelpieSize.chipSmall)
             }
             if (tool.argumentsSummary.isNotBlank()) {
-                Text(tool.argumentsSummary, style = Kelpie.type.codeSmall, color = c.textPrimary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(tool.argumentsSummary, style = Kelpie.type.codeSmall, color = c.textPrimary, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    KelpieChip(t("复制命令", "Copy command"), onClick = { copyText(context, tool.name, tool.argumentsSummary) }, container = c.surfaceSubtle, height = KelpieSize.chipSmall)
+                }
             }
             Box(Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(RoundedCornerShape(KelpieRadius.l)).background(c.codeBlockBg)) {
                 // 很长的输出（上 MB）只渲染前 200 KB，复制按钮给的是全文

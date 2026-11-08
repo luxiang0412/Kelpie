@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
@@ -70,6 +72,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         else io.github.luxiang0412.kelpie.platform.MonitorService.stop(app)
     }
     fun retry(id: String) = c.fleet.reconnect(id)
+    fun setEnabled(id: String, enabled: Boolean) = c.hosts.setEnabled(id, enabled)
 }
 
 @Composable
@@ -93,9 +96,10 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
                 hosts.forEachIndexed { i, h ->
                     val link = links[h.id]
                     val count = home.hosts.firstOrNull { it.hostId == h.id }?.panes?.count { it.agent != null } ?: 0
-                    val dot = when (link?.reach) {
-                        HostReach.Online -> c.done
-                        HostReach.Unreachable -> c.warning
+                    val dot = when {
+                        !h.enabled -> c.idle
+                        link?.reach == HostReach.Online -> c.done
+                        link?.reach == HostReach.Unreachable -> c.warning
                         else -> c.idle
                     }
                     if (i > 0) Divider()
@@ -106,15 +110,24 @@ fun SettingsRoute(onBack: () -> Unit, onEditHost: (String?) -> Unit, vm: Setting
                     ) {
                         Dot(dot, 8.dp)
                         Column(Modifier.weight(1f)) {
-                            Text(h.label, style = Kelpie.type.rowTitle, color = c.textPrimary)
-                            val sub = (link?.text ?: t("未连接", "Not connected")) + if (link?.reach == HostReach.Online) t(" · $count 个 agent", " · " + plural(count, "agent")) else ""
+                            Text(h.label, style = Kelpie.type.rowTitle, color = if (h.enabled) c.textPrimary else c.textSecondary)
+                            val sub = if (!h.enabled) t("已停用 · 不连接", "Disabled · not connecting")
+                            else (link?.text ?: t("未连接", "Not connected")) + if (link?.reach == HostReach.Online) t(" · $count 个 agent", " · " + plural(count, "agent")) else ""
                             Text(sub, style = Kelpie.type.meta, color = c.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
-                        if (link?.reach == HostReach.Unreachable) {
+                        if (h.enabled && link?.reach == HostReach.Unreachable) {
                             KelpieChip(t("立即重试", "Retry now"), onClick = { vm.retry(h.id) }, container = c.surface, border = c.outline, height = KelpieSize.chipSmall)
-                        } else {
-                            Icon(KelpieIcons.ChevronRight, null, tint = c.iconMuted, modifier = Modifier.size(18.dp))
                         }
+                        // 启用 / 停用：开关自己是一个点击目标，行的其他部分仍然是“编辑”
+                        Switch(
+                            checked = h.enabled,
+                            onCheckedChange = { vm.setEnabled(h.id, it) },
+                            modifier = Modifier.semantics { contentDescription = t("连接 ${h.label}", "Connect ${h.label}") },
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = c.primary, checkedThumbColor = c.onPrimary,
+                                uncheckedTrackColor = c.surfaceRaised, uncheckedThumbColor = c.iconMuted, uncheckedBorderColor = c.outline,
+                            ),
+                        )
                     }
                 }
                 if (hosts.isNotEmpty()) Divider()

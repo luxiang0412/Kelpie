@@ -50,6 +50,8 @@ data class HomeUi(
     val banner: Banner?,
     val onlineHosts: Int,
     val nowMs: Long,
+    /** 停用的主机数（不在 [HomeState.hosts] 里）。全部停用时首页不能说“还没有主机”。 */
+    val disabledHosts: Int = 0,
 )
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
@@ -65,11 +67,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val ui: StateFlow<HomeUi> = combine(
         combine(c.fleet.home, c.previews.map, c.approvals.items, ::Triple),
         c.sender.records,
-        c.fleet.links,
+        combine(c.fleet.links, c.hosts.hosts, ::Pair),
         network.online,
         ticker,
-    ) { (home, previews, approvals), sends, links, phoneOnline, _ ->
+    ) { (home, previews, approvals), sends, (links, hosts), phoneOnline, _ ->
         build(home, previews, approvals, sends, links, phoneOnline, System.currentTimeMillis())
+            .copy(disabledHosts = hosts.count { !it.enabled })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), build(c.fleet.home.value, emptyMap(), emptyList(), emptyMap(), emptyMap(), true, System.currentTimeMillis()))
 
     fun answerHostKey(accept: Boolean) = c.fleet.answerHostKey(accept)
