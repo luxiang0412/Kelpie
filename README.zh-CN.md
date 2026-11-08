@@ -9,6 +9,7 @@
 
 - **首页**：所有主机、所有 agent 按注意力排序：在等你 → 工作中 → 刚完成 → 空闲。在等你的直接显示它问了什么、要运行什么。
 - **对话**：读 Claude Code / Codex / Pi 的结构化对话；对话内搜索，查看工具完整输出；补发指令，带送达回执。
+- **在手机上操作**：在选定的目录里新开 Claude Code / Codex / Pi（可选跳过权限确认）；中断正在工作的 agent（按一次 Esc，按住确认）。
 - **审批**：agent 要运行命令时，在手机上按住允许或拒绝（Claude Code / Codex，hook 见 [`companion/`](companion/)）。
 - **配对**：开发机上运行脚本生成二维码，手机扫一下就添加好主机；主机指纹固定，不做首次信任（TOFU）。
 - 后台通知（MIUI 可用）、中英文（跟随系统，也可以在设置里固定）、日夜间主题。
@@ -21,7 +22,7 @@
 <img src="docs/images/home-dark.png" width="19%" alt="夜间主题（示例数据）">
 </p>
 
-当前版本 **0.5.1**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
+当前版本 **0.6.0**，更新说明见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ## 安装与使用
 

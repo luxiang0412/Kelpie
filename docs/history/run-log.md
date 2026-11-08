@@ -373,3 +373,9 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 | 21:35:53 | 手机 debug 包 → `test` | 「新开 agent」Pi + `~/spike-sandbox`：建 `wF`，启动 `spike-sandbox-pi-l479`，App 直接进了它的对话（无提示词，未调用模型） | 成功 |
 | 21:37 | `test` 会话 / 手机 | `workspace close wF`；debug 包的 session 改回 `default`（原文件写回） | 已恢复 |
 | 21:42:32 | `test` 会话 | 建 `wG`，`agent start kelpie-args --kind pi -- --no-session`（核对 `args` 会原样传给 agent；`--no-session` 不写会话文件） | 返回 argv `["pi","--no-session"]`；21:42:37 关掉 `wG` |
+
+## 发版 0.6.0（2026-11-08 21:58，用户要求）
+
+- 版本 0.5.1（versionCode 8）→ 0.6.0（9）；`test`、`lintDebug`、`assembleRelease` 通过；签名证书 SHA-256 与 0.5.1 一致（fe8d7dea…76d2ea）。
+- `dist/kelpie-0.6.0.apk`，SHA-256 147bd649…f8b4。
+- 手机：`install -r dist/kelpie-0.6.0.apk` 覆盖安装，版本 0.6.0 / 9，启动正常，两台主机在线。数据库 v3 → v6 迁移在这次首次启动时执行。

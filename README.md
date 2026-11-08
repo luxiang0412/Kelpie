@@ -9,6 +9,7 @@ It is **not** a mobile SSH terminal, and it is not an official herdr project.
 
 - **Home**: every agent on every host, sorted by what needs you: waiting on you → working → just finished → idle. Agents that are waiting show what they asked or what they want to run.
 - **Conversation**: read Claude Code / Codex / Pi sessions as structured conversations; search inside a conversation, open full tool output, and send follow-up instructions with a delivery receipt.
+- **Act from the phone**: start a new Claude Code / Codex / Pi in a directory you pick (optionally with permission prompts skipped), or interrupt a working agent (one Esc, press and hold to confirm).
 - **Approvals**: when an agent wants to run a command, press and hold to allow it, or deny it, from the phone (Claude Code / Codex; the hook is in [`companion/`](companion/)).
 - **Pairing**: run a script on the dev machine to show a QR code, scan it and the host is added. Host keys are pinned; there is no trust-on-first-use.
 - Background notifications (works on MIUI), Chinese and English UI (follows the system, or pick one in Settings), light and dark themes.
@@ -21,7 +22,7 @@ It is **not** a mobile SSH terminal, and it is not an official herdr project.
 <img src="docs/images/home-dark.png" width="19%" alt="Dark theme (sample data)">
 </p>
 
-Current version: **0.5.1**. See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
+Current version: **0.6.0**. See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
 
 ## Install and use
 
