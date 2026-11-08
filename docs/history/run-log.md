@@ -372,3 +372,4 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 | 21:35 | 手机 debug 包 → `test` | 「新开 agent」填不存在的目录 `//nope-kelpie`：只读 stat 后拦下，“目录不存在”，没建 workspace | 符合预期 |
 | 21:35:53 | 手机 debug 包 → `test` | 「新开 agent」Pi + `~/spike-sandbox`：建 `wF`，启动 `spike-sandbox-pi-l479`，App 直接进了它的对话（无提示词，未调用模型） | 成功 |
 | 21:37 | `test` 会话 / 手机 | `workspace close wF`；debug 包的 session 改回 `default`（原文件写回） | 已恢复 |
+| 21:42:32 | `test` 会话 | 建 `wG`，`agent start kelpie-args --kind pi -- --no-session`（核对 `args` 会原样传给 agent；`--no-session` 不写会话文件） | 返回 argv `["pi","--no-session"]`；21:42:37 关掉 `wG` |

@@ -23,6 +23,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,15 +56,22 @@ fun NewAgentSheet(
     hosts: List<HostInput>,
     launch: LaunchRecord?,
     blocked: String?,
-    onStart: (hostId: String, dir: String, kind: String) -> Unit,
+    onStart: (hostId: String, dir: String, kind: String, skipPermissions: Boolean) -> Unit,
     onDismiss: () -> Unit,
     /** 用户改了选择：上一次的错误提示不再对应现在的输入，清掉。 */
     onEdit: () -> Unit = {},
+    initialHost: String? = null,
+    initialKind: String = NewAgent.KINDS.first().first,
+    /** 每种 agent 上次是否跳过权限确认（记住用户的习惯）。 */
+    lastSkip: (String) -> Boolean = { false },
 ) {
     val c = Kelpie.colors
     val online = hosts.filter { it.reach == HostReach.Online }
-    var hostId by rememberSaveable { mutableStateOf(online.firstOrNull()?.hostId) }
-    var kind by rememberSaveable { mutableStateOf(NewAgent.KINDS.first().first) }
+    // 默认：上次用的主机（还在线的话），否则 agent 最多的那台
+    var hostId by rememberSaveable { mutableStateOf(online.firstOrNull { it.hostId == initialHost }?.hostId ?: online.maxByOrNull { h -> h.panes.count { it.agent != null } }?.hostId) }
+    var kind by rememberSaveable { mutableStateOf(initialKind.takeIf { k -> NewAgent.KINDS.any { it.first == k } } ?: NewAgent.KINDS.first().first) }
+    var skip by rememberSaveable { mutableStateOf(lastSkip(kind)) }
+    val skipArgs = NewAgent.skipPermissionsArgs(kind)
     var dir by rememberSaveable { mutableStateOf("") }
     val host = online.firstOrNull { it.hostId == hostId } ?: online.firstOrNull()
     val busy = launch?.state == LaunchState.Sending
@@ -85,7 +97,25 @@ fun NewAgentSheet(
             }
             Label(t("Agent", "Agent"))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                NewAgent.KINDS.forEach { (k, name) -> Choice(name, k == kind, !busy) { kind = k; onEdit() } }
+                NewAgent.KINDS.forEach { (k, name) -> Choice(name, k == kind, !busy) { kind = k; skip = lastSkip(k); onEdit() } }
+            }
+            if (skipArgs != null) {
+                Row(
+                    Modifier.fillMaxWidth().toggleable(value = skip, enabled = !busy, role = Role.Switch) { skip = it; onEdit() },
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(t("跳过权限确认", "Skip permission prompts"), style = Kelpie.type.body, color = c.textPrimary)
+                        Text(skipArgs.joinToString(" "), style = Kelpie.type.code.copy(fontSize = Kelpie.type.caption.fontSize), color = if (skip) c.warning else c.textTertiary)
+                    }
+                    Switch(
+                        checked = skip, onCheckedChange = null, enabled = !busy,
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = c.primary, checkedThumbColor = c.onPrimary,
+                            uncheckedTrackColor = c.surfaceRaised, uncheckedThumbColor = c.iconMuted, uncheckedBorderColor = c.outline,
+                        ),
+                    )
+                }
             }
             Label(t("目录", "Directory"))
             Box(Modifier.fillMaxWidth().kelpieCard(c.surfaceRaised, KelpieRadius.m).heightIn(min = 48.dp).padding(horizontal = 14.dp, vertical = 13.dp)) {
@@ -107,6 +137,10 @@ fun NewAgentSheet(
                   "Creates a herdr workspace on ${host.label} (the computer keeps its focus) and starts ${NewAgent.KINDS.first { it.first == kind }.second} in this directory."),
                 style = Kelpie.type.caption, color = c.textSecondary,
             )
+            if (skip && skipArgs != null) {
+                Text(t("它运行命令、改文件都不会再问你，手机上也不会收到审批。", "It will run commands and edit files without asking; no approvals will reach the phone."),
+                    style = Kelpie.type.caption, color = c.warning)
+            }
             val status = blocked ?: when (val s = launch?.state) {
                 is LaunchState.Failed -> s.message
                 is LaunchState.Unknown -> s.reason
@@ -117,7 +151,7 @@ fun NewAgentSheet(
                 KelpieButton(t("取消", "Cancel"), onDismiss, Modifier.weight(1f), primary = false)
                 KelpieButton(
                     if (busy) t("正在启动…", "Starting…") else t("启动", "Start"),
-                    { onStart(host.hostId, dir, kind) },
+                    { onStart(host.hostId, dir, kind, skip && skipArgs != null) },
                     Modifier.weight(1.4f), enabled = !busy && dir.isNotBlank(),
                 )
             }

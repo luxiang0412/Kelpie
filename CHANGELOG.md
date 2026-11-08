@@ -12,6 +12,9 @@
 - 首页右上角“+”：在一台在线主机上新开 Claude Code / Codex / Pi。选目录（可以点主机上已有的目录），
   App 先确认目录存在，再新建一个 herdr workspace（电脑上不切过去）并启动 agent，成功后直接进它的对话。
   失败时关掉刚建的空 workspace；结果不确定时不重试，提示去哪看。
+- 新开 Claude Code / Codex 时可以选“跳过权限确认”，分别加 `--dangerously-skip-permissions` /
+  `--dangerously-bypass-approvals-and-sandbox`。每种 agent 记住上次的选择；打开时有醒目提示。
+- 审批 hook：Claude 处在跳过权限模式（`bypassPermissions`）时不再把命令发到手机上审批。
 - 对话里 agent 正在工作时，状态行右边有“中断”：确认后按住 600ms，相当于在终端里按一次 Esc。
   有回执；结果不确定时不会自动重发；它已经停下或目标变了就不发。
 - 对话里往上翻时，底部浮出“回到最新”；期间有新消息时显示“N 条新消息”。

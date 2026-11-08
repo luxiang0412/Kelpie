@@ -89,11 +89,12 @@ class HerdrApi(
      * 在一个停在 shell 提示符的 pane 里启动 agent（写操作）。
      * herdr 等到 agent 可以输入才返回；[name] 在一个会话里必须唯一（否则 `agent_name_taken`）。
      */
-    suspend fun startAgent(paneId: String, kind: String, name: String, readyTimeoutMs: Long = 45_000) {
+    suspend fun startAgent(paneId: String, kind: String, name: String, args: List<String> = emptyList(), readyTimeoutMs: Long = 45_000) {
         val params = buildJsonObject {
             put("name", name)
             put("kind", kind)
             put("pane_id", paneId)
+            if (args.isNotEmpty()) put("args", JsonArray(args.map { JsonPrimitive(it) }))
             put("timeout_ms", JsonPrimitive(readyTimeoutMs))
         }
         requireResult(request("agent.start", params, readyTimeoutMs + 15_000))

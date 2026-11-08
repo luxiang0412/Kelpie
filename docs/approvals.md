@@ -16,6 +16,7 @@
 4. 手机写 `<id>.answer`（request_id + nonce + allow/deny）；hook 校验后返回 `permissionDecision`；
 5. 超时 / 校验失败 / hook 出错 → 返回 `ask`，退回 Claude 自己的终端确认。**任何异常都不会变成放行。**
 6. 无论怎样结束（回答、超时、被 Esc 取消、进程被杀），都删除请求文件并清除 token。
+7. Claude 以 `--dangerously-skip-permissions` 启动时（hook 输入里 `permission_mode` 是 `bypassPermissions`），hook 什么都不做直接退出：用户已经选择不被问，手机上也不会出现审批。Codex 用 `--dangerously-bypass-approvals-and-sandbox` 时本来就不会触发 PermissionRequest。
 
 ## 实验结果
 

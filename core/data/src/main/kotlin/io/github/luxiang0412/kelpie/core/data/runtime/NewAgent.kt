@@ -7,6 +7,19 @@ object NewAgent {
     /** herdr `agent.start --kind` 的值 → 界面上的名字。只放 App 能读对话的三种。 */
     val KINDS: List<Pair<String, String>> = listOf("claude" to "Claude Code", "codex" to "Codex", "pi" to "Pi")
 
+    /**
+     * “跳过权限确认”对应的启动参数；null = 这种 agent 没有这个开关（Pi 本来就不问）。
+     * 只放这两个固定参数，不让用户随便拼命令行。
+     */
+    fun skipPermissionsArgs(kind: String): List<String>? = when (kind) {
+        "claude" -> listOf("--dangerously-skip-permissions")
+        "codex" -> listOf("--dangerously-bypass-approvals-and-sandbox")
+        else -> null
+    }
+
+    fun args(kind: String, skipPermissions: Boolean): List<String> =
+        if (skipPermissions) skipPermissionsArgs(kind).orEmpty() else emptyList()
+
     /** 用户填的目录：绝对路径或 `~/…`；去掉结尾的 `/`。 */
     fun normalizeDir(raw: String): Result<String> = runCatching {
         val s = raw.trim()

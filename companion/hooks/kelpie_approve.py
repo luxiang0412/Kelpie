@@ -137,6 +137,9 @@ def main() -> None:
     CODEX = hook.get("hook_event_name") == "PermissionRequest"
     agent = "codex" if CODEX else "claude"
     tool = str(hook.get("tool_name") or "")
+    if not CODEX and hook.get("permission_mode") == "bypassPermissions":
+        # claude --dangerously-skip-permissions：用户已经选择不被问，手机上也不问
+        sys.exit(0)
     if not CODEX:
         tools = {t.strip() for t in os.environ.get("KELPIE_APPROVAL_TOOLS", "Bash").split(",") if t.strip()}
         if tool not in tools:

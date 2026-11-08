@@ -32,4 +32,11 @@ class NewAgentTest {
         val dirs = NewAgent.recentDirs(listOf("/a" to false, "/b" to true, "/a" to true, "/c (deleted)" to true, "rel" to true))
         assertEquals(listOf("/b", "/a"), dirs)
     }
+
+    @Test fun skipPermissionsOnlyForClaudeAndCodex() {
+        assertEquals(listOf("--dangerously-skip-permissions"), NewAgent.args("claude", true))
+        assertEquals(listOf("--dangerously-bypass-approvals-and-sandbox"), NewAgent.args("codex", true))
+        assertEquals(emptyList<String>(), NewAgent.args("pi", true))
+        assertEquals(emptyList<String>(), NewAgent.args("claude", false))
+    }
 }

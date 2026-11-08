@@ -60,7 +60,7 @@ sealed interface LaunchState {
     data class Unknown(val reason: String) : LaunchState
 }
 
-data class LaunchRecord(val id: String, val hostId: String, val dir: String, val kind: String, val state: LaunchState, val atMs: Long)
+data class LaunchRecord(val id: String, val hostId: String, val dir: String, val kind: String, val state: LaunchState, val atMs: Long, val args: List<String> = emptyList())
 
 data class AnswerRecord(val id: String, val key: AgentKey, val callId: String?, val state: AnswerState, val atMs: Long)
 
@@ -251,7 +251,7 @@ class Sender(
      * 先用 SFTP 确认目录存在（只读）。一次只开一个；任何一步结果不确定都**不重做**。
      * agent 没启动起来（herdr 明确报错）时关掉刚建的空 workspace；不确定时留着，告诉用户去哪看。
      */
-    fun launch(hostId: String, dir: String, kind: String): SendBlocked? {
+    fun launch(hostId: String, dir: String, kind: String, skipPermissions: Boolean = false): SendBlocked? {
         if (_launch.value?.state == LaunchState.Sending) return SendBlocked("busy", t("上一个还在启动", "The previous one is still starting"), false)
         if (NewAgent.KINDS.none { it.first == kind }) return SendBlocked("kind", t("不支持的 agent", "Unsupported agent"), false)
         val wanted = NewAgent.normalizeDir(dir).getOrElse { return SendBlocked("dir", it.message ?: "", false) }
@@ -261,8 +261,9 @@ class Sender(
         val api = rt?.api()
         if (conn == null || api == null) return SendBlocked("not_connected", t("主机未连接", "Host not connected"), false)
 
+        val args = NewAgent.args(kind, skipPermissions)
         val token = "l${clock()}"
-        fun set(s: LaunchState, path: String = wanted) { _launch.value = LaunchRecord(token, hostId, path, kind, s, clock()) }
+        fun set(s: LaunchState, path: String = wanted) { _launch.value = LaunchRecord(token, hostId, path, kind, s, clock(), args) }
         set(LaunchState.Sending)
         scope.launch {
             // 1. 目录（只读）
@@ -279,7 +280,7 @@ class Sender(
                 set(LaunchState.Failed(t("读不到目录：", "Couldn't check the directory: ") + (e.message ?: e.javaClass.simpleName))); return@launch
             }
             // 2. workspace
-            val rec = ledger.begin(LAUNCH_METHOD, "$hostId/+new", "$kind $path".toByteArray())
+            val rec = ledger.begin(LAUNCH_METHOD, "$hostId/+new", (listOf(kind, path) + args).joinToString(" ").toByteArray())
             val id = rec.clientRequestId
             launchLedgerId = id
             val ws = try {
@@ -298,7 +299,7 @@ class Sender(
             }
             // 3. agent
             try {
-                api.startAgent(ws.paneId, kind, NewAgent.name(path, kind, clock()))
+                api.startAgent(ws.paneId, kind, NewAgent.name(path, kind, clock()), args)
                 ledger.accept(id, "agent_started:${ws.paneId}")
                 set(LaunchState.Started(ws.paneId), path)
             } catch (e: kotlinx.coroutines.CancellationException) {

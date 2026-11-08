@@ -97,7 +97,8 @@ fun HomeRoute(
     if (newAgent) {
         NewAgentSheet(
             hosts = ui.state.hosts, launch = launch, blocked = launchBlocked,
-            onStart = { h, d, k -> launchBlocked = vm.startAgent(h, d, k) },
+            initialHost = vm.lastHost(), initialKind = vm.lastKind(), lastSkip = vm::lastSkip,
+            onStart = { h, d, k, skip -> launchBlocked = vm.startAgent(h, d, k, skip) },
             onDismiss = { newAgent = false },
             onEdit = { launchBlocked = null; if (launch?.state !is io.github.luxiang0412.kelpie.core.data.runtime.LaunchState.Sending && launch != null) vm.dismissLaunch() },
         )

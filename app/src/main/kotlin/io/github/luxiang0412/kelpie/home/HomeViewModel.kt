@@ -79,7 +79,16 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val launch = c.sender.launch
 
     /** 新开 agent。返回拦下的原因（null = 已开始，看 [launch]）。 */
-    fun startAgent(hostId: String, dir: String, kind: String): String? = c.sender.launch(hostId, dir, kind)?.message
+    fun startAgent(hostId: String, dir: String, kind: String, skipPermissions: Boolean): String? {
+        prefs.edit().putString(NewAgentPrefs.HOST, hostId).putString(NewAgentPrefs.KIND, kind).putBoolean(NewAgentPrefs.SKIP + kind, skipPermissions).apply()
+        return c.sender.launch(hostId, dir, kind, skipPermissions)?.message
+    }
+
+    /** 上次新开用的主机、agent 种类，和每种 agent 上次“跳过权限确认”的选择。 */
+    private val prefs = app.getSharedPreferences("kelpie-prefs", android.content.Context.MODE_PRIVATE)
+    fun lastHost(): String? = prefs.getString(NewAgentPrefs.HOST, null)
+    fun lastKind(): String = prefs.getString(NewAgentPrefs.KIND, null) ?: io.github.luxiang0412.kelpie.core.data.runtime.NewAgent.KINDS.first().first
+    fun lastSkip(kind: String): Boolean = prefs.getBoolean(NewAgentPrefs.SKIP + kind, false)
 
     fun dismissLaunch() = c.sender.dismissLaunch()
 
@@ -147,4 +156,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
     }
+}
+
+private object NewAgentPrefs {
+    const val HOST = "newAgent.host"
+    const val KIND = "newAgent.kind"
+    const val SKIP = "newAgent.skipPermissions."
 }
