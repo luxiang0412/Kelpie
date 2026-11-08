@@ -379,3 +379,4 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 版本 0.5.1（versionCode 8）→ 0.6.0（9）；`test`、`lintDebug`、`assembleRelease` 通过；签名证书 SHA-256 与 0.5.1 一致（fe8d7dea…76d2ea）。
 - `dist/kelpie-0.6.0.apk`，SHA-256 147bd649…f8b4。
 - 手机：`install -r dist/kelpie-0.6.0.apk` 覆盖安装，版本 0.6.0 / 9，启动正常，两台主机在线。数据库 v3 → v6 迁移在这次首次启动时执行。
+- 22:0x 用户确认发布到 GitHub：`git push origin main`（3fe0bc2..37fa4bc）和 tag `kelpie-v0.6.0`；`gh release create kelpie-v0.6.0` 附 `kelpie-0.6.0.apk`，设为 Latest，下载回来核对 SHA-256 一致。
