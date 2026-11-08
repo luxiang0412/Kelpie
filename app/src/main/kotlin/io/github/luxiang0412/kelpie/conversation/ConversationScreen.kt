@@ -19,6 +19,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import io.github.luxiang0412.kelpie.conversation.model.ConversationSearch
+import io.github.luxiang0412.kelpie.core.herdr.ToolCalls
 import io.github.luxiang0412.kelpie.core.herdr.t
 
 import androidx.compose.animation.animateContentSize
@@ -335,7 +336,7 @@ internal fun MessageList(
                 is ConversationItem.Tool -> if (m.questions.isNotEmpty()) {
                     val last = m.result == null && m.index == lastToolIndex
                     AskQuestionCard(m, answer, onAnswer = if (last && onAnswer != null) ({ onAnswer(m) }) else null, onTerminal = onTerminal, onDismissAnswer = onDismissAnswer)
-                } else ToolCard(m, onFull = { onFullTool(m) })
+                } else ToolCard(m, cwd = agent?.pane?.cwd, onFull = { onFullTool(m) })
                 is ConversationItem.Unknown -> Text(m.text, style = Kelpie.type.caption, color = c.textTertiary)
             } }
         }
@@ -412,9 +413,11 @@ private fun ThinkingRow(text: String) {
 }
 
 @Composable
-private fun ToolCard(t: ConversationItem.Tool, onFull: () -> Unit) {
+private fun ToolCard(t: ConversationItem.Tool, cwd: String?, onFull: () -> Unit) {
     val c = Kelpie.colors
     var open by rememberSaveable(t.index) { mutableStateOf(false) }
+    // 有一句话说明就显示说明；没有就显示命令，去掉开头指向会话目录的 `cd … &&`
+    val command = remember(t.argumentsSummary, cwd) { ToolCalls.stripCwd(t.argumentsSummary, cwd, homeOf(cwd)) }
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(KelpieRadius.l))
@@ -429,14 +432,23 @@ private fun ToolCard(t: ConversationItem.Tool, onFull: () -> Unit) {
         ) {
             Icon(if (t.name.contains("edit", true) || t.name.contains("write", true)) KelpieIcons.File else KelpieIcons.Prompt, null, tint = c.iconMuted, modifier = Modifier.size(16.dp))
             Text(
-                t.argumentsSummary.ifBlank { t.name },
-                style = Kelpie.type.codeSmall, color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                t.title ?: command.ifBlank { t.name },
+                style = if (t.title != null) Kelpie.type.meta else Kelpie.type.codeSmall,
+                color = c.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
             when {
                 t.result == null -> Text(t("运行中", "Running"), style = Kelpie.type.caption, color = c.workingText)
                 t.resultError -> Text(t("出错", "Error"), style = Kelpie.type.caption, color = c.error)
                 else -> Icon(KelpieIcons.Check, t("完成", "Done"), tint = c.done, modifier = Modifier.size(14.dp))
             }
+        }
+        // 标题是说明时，展开后先给出命令本身（完整的，不去 cd）
+        if (open && t.title != null && t.argumentsSummary.isNotBlank()) {
+            Text(
+                t.argumentsSummary,
+                style = Kelpie.type.codeSmall, color = c.textPrimary, maxLines = 6, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().background(c.cardHeaderBg).padding(horizontal = 12.dp, vertical = 8.dp),
+            )
         }
         if (open && t.result != null) {
             Text(
@@ -537,6 +549,9 @@ private fun TerminalText(terminal: String?, modifier: Modifier) {
 }
 
 private const val PREVIEW_CHARS = 4_000
+
+/** 从工作目录推出家目录（`cd ~/…` 也算回到会话目录）：/home/<user> 或 /root。 */
+private fun homeOf(cwd: String?): String? = cwd?.let { Regex("^(/home/[^/]+|/root)(?=/|$)").find(it)?.value }
 
 /** 能长按复制的消息的原文（Assistant 是 Markdown 源码）；工具卡片点开有自己的复制。 */
 private fun copyText(m: ConversationItem): String? = when (m) {
@@ -673,7 +688,7 @@ internal fun FullToolOutput(tool: ConversationItem.Tool, onDismiss: () -> Unit) 
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text(tool.name, style = Kelpie.type.headline, color = c.textPrimary)
+                    Text(tool.title ?: tool.name, style = Kelpie.type.headline, color = c.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(
                         t("${result.lines().size} 行 · ${result.length} 字符", "${result.lines().size} lines · ${result.length} chars"),
                         style = Kelpie.type.caption, color = c.textSecondary,

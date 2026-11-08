@@ -62,6 +62,33 @@ object ToolCalls {
         return cap(s)
     }
 
+    /**
+     * 卡片标题：Claude 的 Bash / PowerShell 调用自带一句 `description`（例如 “Check PR CI status”），
+     * 比命令本身好认得多（命令常常以 `cd /很长的路径 &&` 开头，截断后一排卡片看起来都一样）。
+     */
+    fun title(name: String, input: JsonElement?): String? {
+        val o = input as? JsonObject ?: return null
+        return when (name) {
+            "Bash", "PowerShell", "BashOutput" -> o.str("description")?.trim()?.takeIf { it.isNotEmpty() }?.let(::cap)
+            else -> null
+        }
+    }
+
+    private val CD_PREFIX = Regex("""^\s*cd\s+("[^"]+"|'[^']+'|\S+)\s*(&&|;)\s*""")
+
+    /**
+     * 去掉开头的 `cd <会话工作目录> &&`：它对看的人没有信息量，只会把真正的命令挤到截断之外。
+     * 只去掉指向 [cwd] 本身的（`~` 按 [home] 展开）；cd 到别处的保留。
+     */
+    fun stripCwd(command: String, cwd: String?, home: String? = null): String {
+        if (cwd.isNullOrBlank()) return command
+        val m = CD_PREFIX.find(command) ?: return command
+        var dir = m.groupValues[1].trim('"', '\'')
+        if (home != null && (dir == "~" || dir.startsWith("~/"))) dir = home + dir.removePrefix("~")
+        val norm = { p: String -> p.trimEnd('/').ifEmpty { "/" } }
+        return if (norm(dir) == norm(cwd)) command.substring(m.range.last + 1).ifBlank { command } else command
+    }
+
     /** 优先级：命令 > 文件 > 搜索词（Grep/Glob 也带 path，要排在它前面） > 路径 > 地址 > 描述。 */
     private val KEYS = listOf("command", "cmd", "file_path", "notebook_path", "pattern", "path", "url", "query", "description", "prompt")
 

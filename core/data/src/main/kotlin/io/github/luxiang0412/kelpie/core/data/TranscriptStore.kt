@@ -30,6 +30,7 @@ class TranscriptStore(private val dao: TranscriptDao) {
                     timestamp = r.timestamp,
                     questions = questions,
                     answers = answers,
+                    title = r.title,
                 )
             }
         }
@@ -51,6 +52,7 @@ class TranscriptStore(private val dao: TranscriptDao) {
                     toolCallId = m.toolCallId,
                     timestamp = m.timestamp,
                     structured = ToolCalls.encode(m.questions, m.answers),
+                    title = m.title,
                 )
             },
         )

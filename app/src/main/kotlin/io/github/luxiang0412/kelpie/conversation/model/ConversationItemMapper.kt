@@ -26,6 +26,8 @@ sealed interface ConversationItem {
         /** AskUserQuestion 的问题（来自调用）与回答（来自结果）；其他工具为空 / null。 */
         val questions: List<AskQuestion> = emptyList(),
         val answers: Map<String, String>? = null,
+        /** 一句话说明（Claude Bash 的 description）；有它时卡片显示它，命令放到展开 / 全屏里。 */
+        val title: String? = null,
     ) : ConversationItem
 
     data class Unknown(override val index: Int, val text: String) : ConversationItem

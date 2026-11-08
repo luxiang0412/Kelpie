@@ -99,6 +99,7 @@ object ClaudeTranscriptParser {
                             ToolCalls.summary(name, input),
                             toolName = name,
                             questions = ToolCalls.questions(name, input),
+                            title = ToolCalls.title(name, input),
                             timestamp = ts,
                             toolCallId = id,
                             id = uuid,

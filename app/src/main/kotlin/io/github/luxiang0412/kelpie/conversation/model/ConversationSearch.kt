@@ -6,7 +6,7 @@ object ConversationSearch {
         is ConversationItem.User -> item.text
         is ConversationItem.Assistant -> item.text
         is ConversationItem.Thinking -> item.text
-        is ConversationItem.Tool -> item.name + "\n" + item.argumentsSummary + "\n" + item.result.orEmpty()
+        is ConversationItem.Tool -> item.name + "\n" + item.title.orEmpty() + "\n" + item.argumentsSummary + "\n" + item.result.orEmpty()
         is ConversationItem.Unknown -> item.text
     }
 

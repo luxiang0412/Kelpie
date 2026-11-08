@@ -60,6 +60,8 @@ data class TranscriptMessageEntity(
     val timestamp: Long?,
     /** AskUserQuestion 的问题 / 回答（[io.github.luxiang0412.kelpie.core.herdr.ToolCalls.encode]），其他消息为 null。v2 起。 */
     val structured: String? = null,
+    /** 工具调用的一句话说明（[io.github.luxiang0412.kelpie.core.herdr.ChatMessage.title]）。v6 起。 */
+    val title: String? = null,
 )
 
 @Entity(tableName = "transcript_cursor", primaryKeys = ["hostId", "path"])
@@ -153,7 +155,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {
@@ -164,7 +166,7 @@ abstract class BoardDatabase : RoomDatabase() {
         /** 新工程从 version 1 起步；以后每次加字段都写显式迁移，绝不清库。 */
         fun build(context: android.content.Context): BoardDatabase =
             androidx.room.Room.databaseBuilder(context, BoardDatabase::class.java, "kelpie-board.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
 
         /**
@@ -211,6 +213,15 @@ abstract class BoardDatabase : RoomDatabase() {
          */
         val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        }
+
+        /** 5 → 6：消息加 `title`（工具卡片的一句话说明）。旧缓存没有它，清掉重读。 */
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transcript_messages ADD COLUMN title TEXT")
                 db.execSQL("DELETE FROM transcript_messages")
                 db.execSQL("DELETE FROM transcript_cursor")
             }

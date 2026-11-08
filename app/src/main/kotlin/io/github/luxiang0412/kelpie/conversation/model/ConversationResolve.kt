@@ -94,6 +94,7 @@ object ConversationResolve {
             index = entry.index,
             name = entry.call?.toolName ?: entry.result?.toolName ?: "tool",
             argumentsSummary = entry.call?.text ?: "",
+            title = entry.call?.title,
             result = entry.result?.text,
             resultError = entry.result?.text?.let(ConversationItemMapper::looksLikeError) ?: false,
             // 只有双方都带 toolCallId 且相等，才是精确配对

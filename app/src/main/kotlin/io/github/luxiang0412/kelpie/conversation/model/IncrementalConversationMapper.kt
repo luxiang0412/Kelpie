@@ -207,6 +207,7 @@ class IncrementalConversationMapper {
             pairedById = false,
             callId = m.toolCallId,
             questions = m.questions,
+            title = m.title,
         )
         else -> ConversationItem.Unknown(index, m.text)
     }

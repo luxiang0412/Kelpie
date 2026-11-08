@@ -24,6 +24,8 @@ data class ChatMessage(
     val questions: List<AskQuestion> = emptyList(),
     /** TOOL_RESULT：AskUserQuestion 的回答（问题原文 → 选项 / 文字）；不是这个工具时为 null。 */
     val answers: Map<String, String>? = null,
+    /** TOOL_CALL：给人看的一句话（Claude Bash 的 `description`）；没有时卡片显示命令本身。 */
+    val title: String? = null,
 ) {
     /** NOTICE：App 自己插入的说明（例如某条记录过大没有加载），不来自会话文件；界面显示成灰色小字。 */
     enum class Kind { USER, ASSISTANT, THINKING, TOOL_CALL, TOOL_RESULT, SYSTEM, NOTICE }
