@@ -1,6 +1,7 @@
 package io.github.luxiang0412.kelpie.core.herdr
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -128,5 +129,58 @@ class ClaudeTranscriptParserTest {
         assertEquals("没有标签", ClaudeTranscriptParser.unwrapPasted("没有标签"))
         val line = """{"type":"user","uuid":"u","message":{"role":"user","content":[{"type":"text","text":${kotlinx.serialization.json.JsonPrimitive(raw)}}]}}"""
         assertEquals("用 AskUserQuestion 问我\n问完等我。", ClaudeTranscriptParser.parse(listOf(line)).single().text)
+    }
+
+    // ---- 2026-11-08 真机样本（xn-ontology 会话，正文有删减）----
+
+    @Test
+    fun `task notification becomes a notice, not a user bubble`() {
+        val line = """{"type":"user","uuid":"n1","origin":{"kind":"task-notification","producer":"session-task"},"message":{"role":"user","content":"<task-notification>\n<task-id>bmrll6b1l</task-id>\n<summary>Monitor event: \"PR #480 CI check results\"</summary>\n<event>cli: pass\ndocs: pass</event>\nIf this event is something the user would act on now, send a PushNotification. Routine or benign output doesn't need one.\n</task-notification>"}}"""
+        val m = ClaudeTranscriptParser.parse(listOf(line)).single()
+        assertEquals(ChatMessage.Kind.NOTICE, m.kind)
+        assertTrue(m.text, m.text.contains("Monitor event: \"PR #480 CI check results\""))
+        assertTrue(m.text, m.text.contains("cli: pass\ndocs: pass"))
+        assertFalse(m.text, m.text.contains("task-id") || m.text.contains("PushNotification"))
+    }
+
+    @Test
+    fun `agent finished notification keeps only the summary, unescaped`() {
+        val xml = "<task-notification>\n<task-id>a1005179794479806</task-id>\n<output-file>/tmp/x.output</output-file>\n<status>completed</status>\n<summary>Agent \"62 site: intelligent-build &amp; co\" finished</summary>\n<note>A task-notification fires each time…</note>\n<result>long report</result>\n</task-notification>"
+        assertEquals(t("后台任务 · ", "Background task · ") + "Agent \"62 site: intelligent-build & co\" finished", ClaudeTranscriptParser.taskNotice(xml))
+    }
+
+    @Test
+    fun `task notification is recognised even without origin`() {
+        val line = """{"type":"user","uuid":"n2","message":{"role":"user","content":[{"type":"text","text":"<task-notification>\n<summary>Background command \"sleep\" completed</summary>\n</task-notification>"}]}}"""
+        assertEquals(ChatMessage.Kind.NOTICE, ClaudeTranscriptParser.parse(listOf(line)).single().kind)
+    }
+
+    @Test
+    fun `meta user lines are skipped`() {
+        val lines = listOf(
+            """{"type":"user","uuid":"m1","isMeta":true,"message":{"role":"user","content":"[Image: original 1080x2400, displayed at 900x2000. Multiply coordinates by 1.20 to map to original image.]"}}""",
+            """{"type":"user","uuid":"m2","isMeta":true,"message":{"role":"user","content":[{"type":"text","text":"<local-command-caveat>The command below was run directly</local-command-caveat>"}]}}""",
+            """{"type":"user","uuid":"h1","origin":{"kind":"human"},"message":{"role":"user","content":"可以，改吧"}}""",
+        )
+        val msgs = ClaudeTranscriptParser.parse(lines)
+        assertEquals(listOf("可以，改吧"), msgs.map { it.text })
+        assertEquals(ChatMessage.Kind.USER, msgs.single().kind)
+    }
+
+    @Test
+    fun `tool_reference result says which tool was loaded`() {
+        val line = """{"type":"user","uuid":"r1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_016JX","content":[{"type":"tool_reference","tool_name":"Monitor"}]}]}}"""
+        val m = ClaudeTranscriptParser.parse(listOf(line)).single()
+        assertEquals(ChatMessage.Kind.TOOL_RESULT, m.kind)
+        assertEquals("toolu_016JX", m.toolCallId)
+        assertEquals(t("已加载 ", "Loaded ") + "Monitor", m.text)
+    }
+
+    @Test
+    fun `empty tool result still closes the card`() {
+        val line = """{"type":"user","uuid":"r2","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_2","content":""}]}}"""
+        val m = ClaudeTranscriptParser.parse(listOf(line)).single()
+        assertEquals("toolu_2", m.toolCallId)
+        assertEquals(t("（无输出）", "(no output)"), m.text)
     }
 }

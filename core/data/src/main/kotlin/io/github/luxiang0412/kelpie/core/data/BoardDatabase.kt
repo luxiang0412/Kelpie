@@ -153,7 +153,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {
@@ -164,7 +164,7 @@ abstract class BoardDatabase : RoomDatabase() {
         /** 新工程从 version 1 起步；以后每次加字段都写显式迁移，绝不清库。 */
         fun build(context: android.content.Context): BoardDatabase =
             androidx.room.Room.databaseBuilder(context, BoardDatabase::class.java, "kelpie-board.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
 
         /**
@@ -199,6 +199,18 @@ abstract class BoardDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transcript_cursor ADD COLUMN truncated INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        }
+
+        /**
+         * 4 → 5：表结构不变，只清 transcript 缓存和游标。
+         * Claude 解析器改了：后台任务通知（`<task-notification>`）以前存成了用户消息、`isMeta` 行也当成了用户消息、
+         * 没有文字的工具结果被丢掉（卡片一直“运行中”）。缓存里是旧解析结果，要重读才会变对。
+         */
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("DELETE FROM transcript_messages")
                 db.execSQL("DELETE FROM transcript_cursor")
             }

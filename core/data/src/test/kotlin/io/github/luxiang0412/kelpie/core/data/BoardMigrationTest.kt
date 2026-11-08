@@ -12,7 +12,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * v3 → v4 迁移：用 v3 的表结构手工建库（v3 没有导出 schema），再用正式的 [BoardDatabase.build] 打开。
+ * v3 → 最新版本的迁移：用 v3 的表结构手工建库（v3 没有导出 schema），再用正式的 [BoardDatabase.build] 打开。
  * Room 打开时会按 v4 的实体校验表结构，列 / 默认值对不上会直接抛异常。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -20,7 +20,7 @@ import org.robolectric.annotation.Config
 class BoardMigrationTest {
 
     @Test
-    fun `v3 database opens as v4, keeps panes and clears transcript cache`() = runBlocking {
+    fun `v3 database opens at the latest version, keeps panes and clears transcript cache`() = runBlocking {
         val ctx = RuntimeEnvironment.getApplication()
         val file = ctx.getDatabasePath("kelpie-board.db").also { it.parentFile?.mkdirs(); it.delete() }
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->

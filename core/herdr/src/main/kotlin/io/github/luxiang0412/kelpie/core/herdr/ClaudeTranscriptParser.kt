@@ -21,6 +21,12 @@ import kotlinx.serialization.json.jsonObject
  *   - 结果通过 `tool_use_id` 关联（pi 用 `toolCallId`）
  *   - 工具结果行挂在 user 角色下
  *   - 存在大量非消息事件（mode/api-request/…），必须忽略
+ *   - user 角色里还有 Claude Code 自己写的东西，不是用户说的话（2026-11-08 实测）：
+ *     - `origin.kind == "task-notification"`：后台任务 / Monitor 的事件，正文是 `<task-notification>` XML
+ *       → 一行说明（[ChatMessage.Kind.NOTICE]），不再显示成用户气泡；
+ *     - `isMeta: true`：图片尺寸说明、`<local-command-caveat>`、粘贴图片的路径等 → 跳过
+ *   - tool_result 可能没有文字（ToolSearch 的 `tool_reference`、没有输出的命令）→ 照样给结果，
+ *     否则工具卡片会一直显示“运行中”
  *
  * 解析原则：不认识的类型一律跳过，绝不抛异常。
  */
@@ -46,13 +52,24 @@ object ClaudeTranscriptParser {
             val uuid = (obj["uuid"] as? JsonPrimitive)?.content
             val parentUuid = (obj["parentUuid"] as? JsonPrimitive)?.content?.takeIf { it != "null" }
 
+            val isMeta = (obj["isMeta"] as? JsonPrimitive)?.content == "true"
+            val origin = (obj["origin"] as? JsonObject)?.get("kind")?.let { (it as? JsonPrimitive)?.content }
             val blocks = (msg["content"] as? JsonArray)?.filterIsInstance<JsonObject>().orEmpty()
+
+            /** user 角色的一段文字 → 用户气泡 / 后台任务说明 / 跳过。 */
+            fun userText(text: String) {
+                if (text.isBlank() || isMeta) return
+                if (origin == "task-notification" || text.trimStart().startsWith("<task-notification>")) {
+                    out += ChatMessage(ChatMessage.Kind.NOTICE, taskNotice(text), timestamp = ts, id = uuid, parentId = null)
+                } else {
+                    out += ChatMessage(ChatMessage.Kind.USER, unwrapPasted(text), timestamp = ts, id = uuid, parentId = null)
+                }
+            }
+
             if (blocks.isEmpty()) {
                 // content 可能是纯字符串
                 val text = (msg["content"] as? JsonPrimitive)?.content
-                if (!text.isNullOrBlank() && role == "user") {
-                    out += ChatMessage(ChatMessage.Kind.USER, unwrapPasted(text), timestamp = ts, id = uuid, parentId = null)
-                }
+                if (text != null && role == "user") userText(text)
                 return@forEach
             }
 
@@ -62,8 +79,8 @@ object ClaudeTranscriptParser {
                     "text" -> {
                         val text = (b["text"] as? JsonPrimitive)?.content ?: return@forEach
                         if (text.isBlank()) return@forEach
-                        val kind = if (role == "assistant") ChatMessage.Kind.ASSISTANT else ChatMessage.Kind.USER
-                        out += ChatMessage(kind, if (kind == ChatMessage.Kind.USER) unwrapPasted(text) else text, timestamp = ts, id = uuid, parentId = null)
+                        if (role == "assistant") out += ChatMessage(ChatMessage.Kind.ASSISTANT, text, timestamp = ts, id = uuid, parentId = null)
+                        else userText(text)
                     }
 
                     "thinking" -> {
@@ -93,8 +110,7 @@ object ClaudeTranscriptParser {
 
                     "tool_result" -> {
                         val id = (b["tool_use_id"] as? JsonPrimitive)?.content
-                        val text = textOfResult(b)
-                        if (text.isBlank()) return@forEach
+                        val text = textOfResult(b).ifBlank { emptyResult(b) }
                         out += ChatMessage(
                             ChatMessage.Kind.TOOL_RESULT,
                             text,
@@ -124,6 +140,35 @@ object ClaudeTranscriptParser {
      */
     fun unwrapPasted(text: String): String =
         if (!text.contains("<pasted_content")) text else PASTED.replace(text) { it.groupValues[1] }.trim()
+
+    private val TAG = Regex("""<(summary|event)>([\s\S]*?)</\1>""")
+
+    /**
+     * `<task-notification>` → 一行说明：“后台任务 · {summary}”，有 `<event>` 时附在下一行（过长截断）。
+     * 其他标签（task-id、output-file、usage、给模型看的提示语）都不显示。
+     */
+    fun taskNotice(xml: String): String {
+        val tags = TAG.findAll(xml).associate { it.groupValues[1] to unescape(it.groupValues[2].trim()) }
+        val summary = tags["summary"]?.takeIf { it.isNotBlank() } ?: t("后台任务有新消息", "Background task update")
+        val event = tags["event"]?.takeIf { it.isNotBlank() }?.let { if (it.length > 400) it.take(400) + "…" else it }
+        val head = t("后台任务 · ", "Background task · ") + summary
+        return if (event == null) head else head + "\n" + event
+    }
+
+    private fun unescape(s: String): String =
+        s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
+
+    /** 没有文字的工具结果：ToolSearch 加载工具 → “已加载 X”；图片 → “[图片]”；其他 → “（无输出）”。 */
+    private fun emptyResult(b: JsonObject): String {
+        val parts = (b["content"] as? JsonArray)?.filterIsInstance<JsonObject>().orEmpty()
+        val tools = parts.filter { (it["type"] as? JsonPrimitive)?.content == "tool_reference" }
+            .mapNotNull { (it["tool_name"] as? JsonPrimitive)?.content }
+        return when {
+            tools.isNotEmpty() -> t("已加载 ", "Loaded ") + tools.joinToString(", ")
+            parts.any { (it["type"] as? JsonPrimitive)?.content == "image" } -> t("[图片]", "[image]")
+            else -> t("（无输出）", "(no output)")
+        }
+    }
 
     /** tool_result.content 可能是字符串，也可能是 [{type:text,text:...}] 数组。 */
     private fun textOfResult(b: JsonObject): String {
