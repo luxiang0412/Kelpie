@@ -83,14 +83,34 @@ class Previews(
                 (resolver.resolve(conn, pane.cwd, pane.agentSessionId) as? ClaudeSessionResolver.Result.Found)?.path
             } else null
         if (path != null) {
-            val msgs = loader.load(conn, path, maxBytes = 96 * 1024, maxMessages = 30)
-            fromTranscript(msgs)?.let { return it }
+            fromTranscript(loadTurn(conn, path))?.let { return it }
         }
         val screen = fleet.runtime(item.key.hostId)?.api()?.readPane(pane.paneId, "recent", 40) ?: return null
         return fromScreen(screen)
     }
 
+    /**
+     * 读到能确定“这一轮”为止：窗口从 96KB 起逐级放大，直到读到这一轮的用户消息（或已经 30 条）。
+     * 以前固定 96KB：Claude 会话末尾常有 100KB 以上的一行（大段工具输出），丢掉开头半行后什么都没有，
+     * 只能退回读终端屏幕；用户消息不在窗口里时“这一轮”也会算成整个窗口。
+     */
+    private suspend fun loadTurn(conn: io.github.luxiang0412.kelpie.core.ssh.SshConnection, path: String): List<ChatMessage> {
+        var msgs = emptyList<ChatMessage>()
+        for (window in PREVIEW_WINDOWS) {
+            msgs = loader.load(conn, path, maxBytes = window, maxMessages = PREVIEW_MESSAGES)
+            if (turnComplete(msgs)) break
+        }
+        return msgs
+    }
+
     companion object {
+        val PREVIEW_WINDOWS = listOf(96 * 1024, 512 * 1024, 2 * 1024 * 1024)
+        const val PREVIEW_MESSAGES = 30
+
+        /** 窗口够了：读到了用户消息（这一轮有起点），或者消息已经攒满。 */
+        fun turnComplete(msgs: List<ChatMessage>): Boolean =
+            msgs.size >= PREVIEW_MESSAGES || msgs.any { it.kind == ChatMessage.Kind.USER }
+
         /**
          * 只看**这一轮**（最后一条用户消息之后）：取最后一条助手输出；最后是还没出结果的工具调用时，
          * 带上工具名和参数摘要。Claude 弹权限框时常常这一轮没有任何正文，以前会拿上一轮的回复来充数。

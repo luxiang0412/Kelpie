@@ -55,6 +55,8 @@ class AppContainer(app: Application) {
 
     init {
         scope.launch { runCatching { sender.restore(pendingSink.load()) } }
+        // 很久没看的会话缓存清掉（打开时会重新回填尾部），库不再只增不减
+        scope.launch { runCatching { transcripts.pruneStale() } }
         // 阻塞预览只跟着首页的“等你处理”走
         scope.launch { fleet.home.collect { previews.sync(it.needsYou) } }
         notifier.start(fleet, scope)

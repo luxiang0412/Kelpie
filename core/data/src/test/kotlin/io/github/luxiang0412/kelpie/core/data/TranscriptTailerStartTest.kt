@@ -2,6 +2,7 @@ package io.github.luxiang0412.kelpie.core.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** 回填起点：小于上限的文件必须从头读（否则会丢掉首条 user 消息，导致对话缺上下文）。 */
@@ -85,5 +86,27 @@ class TranscriptTailerStartTest {
     @Test
     fun `replaced small file is reread from the start`() {
         assertEquals(TranscriptTailer.Plan(0, reset = true), TranscriptTailer.plan(5000, "old", "new", 6000))
+    }
+
+    @Test
+    fun `oversize line from a Claude tool result attaches to its tool card`() {
+        val head = """{"parentUuid":"a","type":"user","message":{"role":"user","content":[{"tool_use_id":"toolu_01ABC","type":"tool_result","content":"xxxx"""
+        val m = TranscriptTailer.oversizeNotice(head, 18L * 1024 * 1024)
+        assertEquals(io.github.luxiang0412.kelpie.core.herdr.ChatMessage.Kind.TOOL_RESULT, m.kind)
+        assertEquals("toolu_01ABC", m.toolCallId)
+        assertTrue(m.text, m.text.contains("18.0"))
+    }
+
+    @Test
+    fun `oversize line from Codex uses call_id`() {
+        val head = """{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_9","output":"yyy"""
+        assertEquals("call_9", TranscriptTailer.oversizeNotice(head, 17L * 1024 * 1024).toolCallId)
+    }
+
+    @Test
+    fun `oversize line without a tool id becomes a notice`() {
+        val m = TranscriptTailer.oversizeNotice("""{"type":"user","message":{"content":[{"type":"image","source":{"data":"iVBOR""", 20L * 1024 * 1024)
+        assertEquals(io.github.luxiang0412.kelpie.core.herdr.ChatMessage.Kind.NOTICE, m.kind)
+        assertNull(m.toolCallId)
     }
 }

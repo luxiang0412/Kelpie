@@ -57,6 +57,21 @@ class TranscriptStore(private val dao: TranscriptDao) {
         return messages.size
     }
 
+    /**
+     * 只保留最近 [keep] 条：超过 keep + [slack] 才删，一次删回 keep 条。
+     * 不每条都删：删掉开头会让对话页整体重建（下标全变），攒一批再删，重建频率就低了。
+     * 返回是否删过（删过 = 更早的消息不在本地了，UI 要如实提示）。
+     */
+    suspend fun trim(hostId: String, path: String, keep: Int = KEEP_MESSAGES, slack: Int = TRIM_SLACK): Boolean {
+        if (dao.count(hostId, path) <= keep + slack) return false
+        dao.deleteBefore(hostId, path, dao.maxSeq(hostId, path) + 1 - keep)
+        return true
+    }
+
+    /** 清掉 [maxAgeMs] 内没有更新过的会话缓存（打开对话时会重新回填）。 */
+    suspend fun pruneStale(nowMs: Long = System.currentTimeMillis(), maxAgeMs: Long = STALE_AFTER_MS): Int =
+        dao.pruneStale(nowMs - maxAgeMs)
+
     suspend fun reset(hostId: String, path: String) {
         dao.clearMessages(hostId, path)
         dao.clearCursor(hostId, path)
@@ -72,5 +87,11 @@ class TranscriptStore(private val dao: TranscriptDao) {
 
     suspend fun clearHost(hostId: String) {
         dao.clearHost(hostId)
+    }
+
+    companion object {
+        const val KEEP_MESSAGES = 2000
+        const val TRIM_SLACK = 500
+        const val STALE_AFTER_MS = 14L * 24 * 60 * 60 * 1000
     }
 }

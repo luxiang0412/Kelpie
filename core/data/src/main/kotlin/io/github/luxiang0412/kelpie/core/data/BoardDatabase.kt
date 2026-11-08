@@ -88,6 +88,23 @@ interface TranscriptDao {
     @Query("DELETE FROM transcript_messages WHERE hostId = :hostId AND path = :path")
     suspend fun clearMessages(hostId: String, path: String)
 
+    @Query("SELECT COUNT(*) FROM transcript_messages WHERE hostId = :hostId AND path = :path")
+    suspend fun count(hostId: String, path: String): Int
+
+    @Query("DELETE FROM transcript_messages WHERE hostId = :hostId AND path = :path AND seq < :seq")
+    suspend fun deleteBefore(hostId: String, path: String, seq: Int)
+
+    @Query("SELECT * FROM transcript_cursor WHERE updatedAtMs < :beforeMs")
+    suspend fun staleCursors(beforeMs: Long): List<TranscriptCursorEntity>
+
+    /** 清掉很久没更新的会话缓存（消息 + 游标）。返回清掉的会话数。 */
+    @Transaction
+    suspend fun pruneStale(beforeMs: Long): Int {
+        val stale = staleCursors(beforeMs)
+        stale.forEach { clearMessages(it.hostId, it.path); clearCursor(it.hostId, it.path) }
+        return stale.size
+    }
+
     @Query("SELECT * FROM transcript_cursor WHERE hostId = :hostId AND path = :path")
     suspend fun cursor(hostId: String, path: String): TranscriptCursorEntity?
 

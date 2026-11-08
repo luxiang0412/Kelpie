@@ -1,6 +1,8 @@
 package io.github.luxiang0412.kelpie.core.data
 
+import io.github.luxiang0412.kelpie.core.herdr.ChatMessage
 import io.github.luxiang0412.kelpie.core.herdr.JsonlChunker
+import io.github.luxiang0412.kelpie.core.herdr.t
 import io.github.luxiang0412.kelpie.core.ssh.SshConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,7 +22,8 @@ import java.util.EnumSet
  * - **有界读取**：单次最多读 [maxDeltaBytes]，避免长会话一次性拉爆；
  * - **落后太多就跳到尾部**：游标离文件末尾超过 [catchUpBytes]（很久没打开 / 文件被替换），
  *   不再从旧位置每次 2MB 慢慢追（700MB 的会话要追几十分钟），而是清空、按首次打开只回填尾部；
- * - **超长行**：窗口里一个换行都没有时，把这一行完整读进来（≤ [maxLineBytes]），更长的跳过。
+ * - **超长行**：窗口里一个换行都没有时，把这一行完整读进来（≤ [maxLineBytes]），更长的跳过并留一条说明；
+ * - **本地只留最近一段**：每次追加后裁剪（[TranscriptStore.trim]），裁过就标记“更早的消息没有加载”。
  */
 class TranscriptTailer(
     private val conn: SshConnection,
@@ -44,6 +47,16 @@ class TranscriptTailer(
         val client = sftp ?: conn.sharedSftp().also { sftp = it }
         val size = client.stat(path).size
         val cursor = store.cursor(hostId, path)
+        if (cursor != null && size == cursor.offset) {
+            // 大小没变：没有新内容，只花一次 stat（以前每次还要开两次文件读头部和数据）。
+            // 同样大小的替换极少见；文件一变长就会走到下面的头部校验。
+            backfillTruncated = cursor.truncated
+            // updatedAtMs 表示“最近还在看”，过期清理按它算；不用每次写，一小时刷新一次就够
+            if (System.currentTimeMillis() - cursor.updatedAtMs > 60 * 60 * 1000L) {
+                store.saveCursor(hostId, path, cursor.offset, cursor.headHash, cursor.truncated)
+            }
+            return@withContext 0
+        }
         val headHash = readHeadHash(client, size)
         val plan = plan(cursor?.offset, cursor?.headHash, headHash, size, backfillBytes, catchUpBytes)
         var start = plan.start
@@ -77,14 +90,21 @@ class TranscriptTailer(
                 read = readFully(client, start, buf)
                 chunk = JsonlChunker.consume(start, buf, 0, read)
             } else {
-                // 超过上限的单行直接跳过（不解析），游标越过它
-                store.saveCursor(hostId, path, end, headHash, truncated)
-                return@withContext 0
+                // 超过上限的单行不解析，游标越过它；留一条说明，能认出是哪个工具的结果就挂到那张卡片上
+                val head = ByteArray(OVERSIZE_PEEK)
+                val n = readFully(client, start, head)
+                val added = store.append(hostId, path, listOf(oversizeNotice(String(head, 0, n, Charsets.UTF_8), end - start)))
+                val trimmed = store.trim(hostId, path)
+                backfillTruncated = truncated || trimmed
+                store.saveCursor(hostId, path, end, headHash, backfillTruncated)
+                return@withContext added
             }
         }
         val messages = io.github.luxiang0412.kelpie.core.herdr.TranscriptParser.parse(path, chunk.lines)
         val added = store.append(hostId, path, messages)
-        store.saveCursor(hostId, path, chunk.nextOffset, headHash, truncated)
+        val trimmed = store.trim(hostId, path)
+        backfillTruncated = truncated || trimmed
+        store.saveCursor(hostId, path, chunk.nextOffset, headHash, backfillTruncated)
         added
     }
 
@@ -99,6 +119,22 @@ class TranscriptTailer(
         const val DEFAULT_BACKFILL: Int = 1024 * 1024
         const val DEFAULT_CATCH_UP: Long = 8L * 1024 * 1024
         const val DEFAULT_MAX_LINE: Int = 16 * 1024 * 1024
+        private const val OVERSIZE_PEEK = 64 * 1024
+
+        /** Claude `tool_use_id` / Codex `call_id` / Pi `toolCallId`：在超大行的开头找它是哪个工具调用的结果。 */
+        private val TOOL_ID = Regex("\"(?:tool_use_id|call_id|toolCallId)\"\\s*:\\s*\"([^\"]{1,200})\"")
+
+        /**
+         * 超过 [DEFAULT_MAX_LINE] 没有加载的一行 → 一条说明。
+         * [head] 是这一行开头的一段；认出工具调用 id 就当成那个工具的结果（卡片不再一直显示“运行中”）。
+         */
+        fun oversizeNotice(head: String, bytes: Long): ChatMessage {
+            val mb = "%.1f".format(java.util.Locale.ROOT, bytes / (1024.0 * 1024))
+            val text = t("这条记录有 $mb MB，太大了，没有加载", "This record is $mb MB, too large to load")
+            val id = TOOL_ID.find(head)?.groupValues?.get(1)
+            return if (id != null) ChatMessage(ChatMessage.Kind.TOOL_RESULT, text, toolCallId = id)
+            else ChatMessage(ChatMessage.Kind.NOTICE, text)
+        }
 
         fun plan(
             cursorOffset: Long?,

@@ -3,7 +3,9 @@ package io.github.luxiang0412.kelpie.core.data.runtime
 import io.github.luxiang0412.kelpie.core.herdr.ChatMessage
 import io.github.luxiang0412.kelpie.core.herdr.ChatMessage.Kind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PreviewsTest {
@@ -124,5 +126,15 @@ class PreviewsTest {
 
     @Test fun codexPromptNeedsOptions() {
         assertNull(Previews.codexPrompt("  Would you like to run the following command?\n  $ ls\n"))
+    }
+
+    @Test
+    fun `preview window grows until the turn has its user message`() {
+        fun msg(k: ChatMessage.Kind) = ChatMessage(k, "x")
+        // 96KB 里只有半行 / 只有工具输出 → 不够，继续放大
+        assertFalse(Previews.turnComplete(emptyList()))
+        assertFalse(Previews.turnComplete(listOf(msg(ChatMessage.Kind.TOOL_RESULT), msg(ChatMessage.Kind.ASSISTANT))))
+        assertTrue(Previews.turnComplete(listOf(msg(ChatMessage.Kind.USER), msg(ChatMessage.Kind.TOOL_CALL))))
+        assertTrue(Previews.turnComplete(List(Previews.PREVIEW_MESSAGES) { msg(ChatMessage.Kind.ASSISTANT) }))
     }
 }

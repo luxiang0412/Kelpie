@@ -332,7 +332,7 @@ internal fun MessageList(
             } }
         }
         if (truncated) item(key = "truncated") {
-            Text(t("更早的消息没有加载（只取最近 1 MB）", "Older messages not loaded (last 1 MB only)"), style = Kelpie.type.caption, color = c.textTertiary, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            Text(t("更早的消息没有加载（只保留最近一段）", "Older messages not loaded (only the recent part is kept)"), style = Kelpie.type.caption, color = c.textTertiary, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
         }
         if (loading && items.isEmpty()) item(key = "loading") {
             Text(t("正在读取会话…", "Loading conversation…"), style = Kelpie.type.meta, color = c.textSecondary)
