@@ -501,8 +501,9 @@ private fun Composer(
                 )
             }
             val can = enabled && text.isNotBlank() && !sending
+            // 多行时贴底：和最后一行对齐，不悬在输入框中间（单行时最小高度刚好等于按钮，位置不变）
             Box(
-                Modifier.size(KelpieSize.sendButton).clip(CircleShape).background(if (can) c.primary else c.outline)
+                Modifier.align(Alignment.Bottom).size(KelpieSize.sendButton).clip(CircleShape).background(if (can) c.primary else c.outline)
                     .clickable(enabled = can, onClickLabel = t("发送", "Send"), onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) { Icon(KelpieIcons.Send, t("发送", "Send"), tint = if (can) c.onPrimary else c.textTertiary, modifier = Modifier.size(20.dp)) }
