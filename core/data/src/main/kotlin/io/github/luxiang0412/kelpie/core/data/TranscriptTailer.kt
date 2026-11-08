@@ -17,7 +17,10 @@ import java.util.EnumSet
  * - **文件身份**：每次 sync 取文件头 64 字节的 hash；变化 → 视为被替换，清空重读；
  * - **截断**：size < offset → 清空重读；
  * - **句柄复用**：SFTP client 在 tailer 生命周期内复用，close 时释放；
- * - **有界读取**：单次最多读 [maxDeltaBytes]，避免长会话一次性拉爆。
+ * - **有界读取**：单次最多读 [maxDeltaBytes]，避免长会话一次性拉爆；
+ * - **落后太多就跳到尾部**：游标离文件末尾超过 [catchUpBytes]（很久没打开 / 文件被替换），
+ *   不再从旧位置每次 2MB 慢慢追（700MB 的会话要追几十分钟），而是清空、按首次打开只回填尾部；
+ * - **超长行**：窗口里一个换行都没有时，把这一行完整读进来（≤ [maxLineBytes]），更长的跳过。
  */
 class TranscriptTailer(
     private val conn: SshConnection,
@@ -26,6 +29,8 @@ class TranscriptTailer(
     private val path: String,
     private val backfillBytes: Int = DEFAULT_BACKFILL,
     private val maxDeltaBytes: Int = 2 * 1024 * 1024,
+    private val catchUpBytes: Long = DEFAULT_CATCH_UP,
+    private val maxLineBytes: Int = DEFAULT_MAX_LINE,
 ) : Closeable {
 
     private var sftp: SFTPClient? = null
@@ -39,30 +44,15 @@ class TranscriptTailer(
         val client = sftp ?: conn.sharedSftp().also { sftp = it }
         val size = client.stat(path).size
         val cursor = store.cursor(hostId, path)
-        var start = cursor?.offset ?: 0L
         val headHash = readHeadHash(client, size)
-        var reset = false
+        val plan = plan(cursor?.offset, cursor?.headHash, headHash, size, backfillBytes, catchUpBytes)
+        var start = plan.start
 
-        if (cursor == null) {
-            // 首次：只回填尾部，避免把整个大文件拉下来
-            start = initialStart(size, backfillBytes)
+        if (plan.reset) {
             // 从中间起读时必须跳到下一行行首，避免把半行 JSON 当数据
             if (start > 0) start = skipToLineStart(client, start, size)
             backfillTruncated = start > 0
-            reset = true
-        } else {
-            if (size < start) reset = true
-            if (!reset && cursor.headHash != null && headHash != null && cursor.headHash != headHash) {
-                reset = true
-            }
-        }
-        if (reset) {
             store.reset(hostId, path)
-            if (cursor == null) {
-                // 首次回填时 start 已定位到尾部
-            } else {
-                start = 0L
-            }
         }
         if (size <= start) {
             store.saveCursor(hostId, path, start.coerceAtMost(size), headHash)
@@ -70,23 +60,35 @@ class TranscriptTailer(
         }
 
         val want = minOf(size - start, maxDeltaBytes.toLong()).toInt()
-        val buf = ByteArray(want)
-        var read = 0
-        client.open(path, EnumSet.of(OpenMode.READ)).use { f ->
-            while (read < want) {
-                val n = f.read(start + read, buf, read, want - read)
-                if (n <= 0) break
-                read += n
-            }
-        }
+        var buf = ByteArray(want)
+        var read = readFully(client, start, buf)
         if (read <= 0) return@withContext 0
 
-        val chunk = JsonlChunker.consume(start, buf, 0, read)
+        var chunk = JsonlChunker.consume(start, buf, 0, read)
+        if (chunk.lines.isEmpty() && read == maxDeltaBytes) {
+            // 整个窗口里没有换行：一行比 maxDeltaBytes 还长（大段工具输出）。
+            // 以前 offset 原地不动，之后每次都读同一段，永远追不上。
+            val end = client.open(path, EnumSet.of(OpenMode.READ)).use { f ->
+                findLineEnd(start + read, size, read = { at, b -> readFully(f, at, b) })
+            } ?: return@withContext 0 // 这一行还没写完，下次再来
+            if (end - start <= maxLineBytes) {
+                buf = ByteArray((end - start).toInt())
+                read = readFully(client, start, buf)
+                chunk = JsonlChunker.consume(start, buf, 0, read)
+            } else {
+                // 超过上限的单行直接跳过（不解析），游标越过它
+                store.saveCursor(hostId, path, end, headHash)
+                return@withContext 0
+            }
+        }
         val messages = io.github.luxiang0412.kelpie.core.herdr.TranscriptParser.parse(path, chunk.lines)
         val added = store.append(hostId, path, messages)
         store.saveCursor(hostId, path, chunk.nextOffset, headHash)
         added
     }
+
+    /** 本次 sync 从哪里读。[reset] = 清空本地缓存后从 [start] 重新回填（[start] 可能落在行中间）。 */
+    data class Plan(val start: Long, val reset: Boolean)
 
     companion object {
         /** 首次回填的起始偏移：默认只看尾部 [backfillBytes]，文件更小则从头读。 */
@@ -94,40 +96,62 @@ class TranscriptTailer(
             if (size <= backfillBytes) 0L else size - backfillBytes
 
         const val DEFAULT_BACKFILL: Int = 1024 * 1024
+        const val DEFAULT_CATCH_UP: Long = 8L * 1024 * 1024
+        const val DEFAULT_MAX_LINE: Int = 16 * 1024 * 1024
+
+        fun plan(
+            cursorOffset: Long?,
+            cursorHead: String?,
+            head: String?,
+            size: Long,
+            backfillBytes: Int = DEFAULT_BACKFILL,
+            catchUpBytes: Long = DEFAULT_CATCH_UP,
+        ): Plan {
+            val fresh = Plan(initialStart(size, backfillBytes), reset = true)
+            if (cursorOffset == null) return fresh
+            if (size < cursorOffset) return fresh // 截断
+            if (cursorHead != null && head != null && cursorHead != head) return fresh // 被替换
+            if (size - cursorOffset > catchUpBytes) return fresh // 落后太多
+            return Plan(cursorOffset, reset = false)
+        }
 
         /**
-         * 从 [offset] 起找下一个换行之后的位置，按 [step] 分块一直往后找，最多找 [limit] 字节；
-         * 找不到（文件剩下的部分是一整行、或者超过 limit）返回 [size]。
-         *
-         * 以前只探 8KB：Claude / Pi 会话里常有几十上百 KB 的一行（大段工具输出），
-         * 起点落在这样的行里就直接返回文件末尾，回填一条消息都没有。
-         * [read] = 从某个偏移读进缓冲区，返回读到的字节数（≤0 表示读不到）。
+         * 从 [offset] 起找下一个换行，返回换行之后的位置；直到 [size] 都没有换行（行还没写完）返回 null。
+         * 不设上限；能区分“换行恰好是最后一个字节”和“没有换行”。
          */
-        fun findLineStart(offset: Long, size: Long, read: (Long, ByteArray) -> Int, step: Int = 64 * 1024, limit: Long = 2L * 1024 * 1024): Long {
+        fun findLineEnd(offset: Long, size: Long, read: (Long, ByteArray) -> Int, step: Int = 64 * 1024): Long? {
             var pos = offset
-            val end = minOf(size, offset + limit)
-            while (pos < end) {
-                val buf = ByteArray(minOf(step.toLong(), end - pos).toInt())
+            while (pos < size) {
+                val buf = ByteArray(minOf(step.toLong(), size - pos).toInt())
                 val n = read(pos, buf)
-                if (n <= 0) break
+                if (n <= 0) return null
                 for (i in 0 until n) if (buf[i] == 0x0A.toByte()) return pos + i + 1
                 pos += n
             }
-            return size
+            return null
         }
     }
 
+    private fun readFully(client: SFTPClient, at: Long, buf: ByteArray): Int =
+        client.open(path, EnumSet.of(OpenMode.READ)).use { f -> readFully(f, at, buf) }
+
+    private fun readFully(f: net.schmizz.sshj.sftp.RemoteFile, at: Long, buf: ByteArray): Int {
+        var got = 0
+        while (got < buf.size) {
+            val n = f.read(at + got, buf, got, buf.size - got)
+            if (n <= 0) break
+            got += n
+        }
+        return got
+    }
+
+    /**
+     * 回填起点 → 下一行行首。不设上限：Claude / Pi 会话里常有几百 KB 甚至几 MB 的一行，
+     * 以前只探 8KB（后来 2MB），起点落在这样的行里就直接跳到文件末尾，回填一条消息都没有。
+     */
     private fun skipToLineStart(client: SFTPClient, offset: Long, size: Long): Long =
         client.open(path, EnumSet.of(OpenMode.READ)).use { f ->
-            findLineStart(offset, size, read = { at, buf ->
-                var got = 0
-                while (got < buf.size) {
-                    val n = f.read(at + got, buf, got, buf.size - got)
-                    if (n <= 0) break
-                    got += n
-                }
-                got
-            })
+            findLineEnd(offset, size, read = { at, buf -> readFully(f, at, buf) }) ?: size
         }
 
     private fun readHeadHash(client: SFTPClient, size: Long): String? {
