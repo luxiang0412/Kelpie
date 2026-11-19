@@ -11,8 +11,8 @@ android {
     namespace = "io.github.luxiang0412.kelpie"
     defaultConfig {
         applicationId = "io.github.luxiang0412.kelpie"
-        versionCode = 9
-        versionName = "0.6.0"
+        versionCode = 10
+        versionName = "0.6.1"
     }
     buildFeatures { buildConfig = true }
     val keystorePropsFile = rootProject.file("keystore.properties")

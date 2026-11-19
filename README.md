@@ -22,7 +22,7 @@ It is **not** a mobile SSH terminal, and it is not an official herdr project.
 <img src="docs/images/home-dark.png" width="19%" alt="Dark theme (sample data)">
 </p>
 
-Current version: **0.6.0**. See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
+Current version: **0.6.1**. See [`CHANGELOG.md`](CHANGELOG.md) for release notes.
 
 ## Install and use
 
