@@ -122,58 +122,65 @@ private fun RenderBlock(block: MdBlock, textColor: androidx.compose.ui.graphics.
             color = textColor,
         )
 
+        // 连续的引用行是一块：一条完整的竖线；空的 `>` 行分段，段间 8dp
         is MdBlock.Quote -> Row(Modifier.height(IntrinsicSize.Min)) {
             Box(Modifier.width(2.dp).fillMaxHeight().background(palette.outlineCard))
             Spacer(Modifier.width(12.dp))
-            Text(
-                text = inline(block.spans, highlight),
-                style = MdBodySmall,
-                color = palette.textSecondary,
-            )
-        }
-
-        // 列表悬挂缩进：标记占固定列宽，正文左缘对齐，换行后不会顶到标记下面
-        is MdBlock.Bullets -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            block.items.forEach { item ->
-                Row {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                block.paragraphs.forEach { spans ->
                     Text(
-                        "•",
+                        text = inline(spans, highlight),
+                        style = MdBodySmall,
                         color = palette.textSecondary,
-                        modifier = Modifier.width(20.dp),
-                        textAlign = TextAlign.Start,
-                    )
-                    Text(
-                        inline(item),
-                        style = MdBody,
-                        color = textColor,
-                        modifier = Modifier.weight(1f),
                     )
                 }
             }
         }
 
-        is MdBlock.Ordered -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            block.items.forEachIndexed { i, item ->
-                Row {
-                    Text(
-                        "${block.start + i}.",
-                        color = palette.textSecondary,
-                        modifier = Modifier.width(28.dp),
-                        textAlign = TextAlign.Start,
-                    )
-                    Text(
-                        inline(item),
-                        style = MdBody,
-                        color = textColor,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+        // 列表悬挂缩进：标记占固定列宽，这一项的内容（文字、子列表、代码块）都在右边一列，左缘对齐。
+        // 子列表在这一列里，所以自然右移一个标记宽度（20dp），子项的标记对齐父项文字。
+        is MdBlock.Bullets -> ListBlock(block.items, textColor, highlight, markerWidth = 20.dp) {
+            when (block.depth) {
+                0 -> "•"
+                1 -> "◦"
+                else -> "▪"
             }
         }
+
+        is MdBlock.Ordered -> ListBlock(block.items, textColor, highlight, markerWidth = 28.dp) { i -> "${block.start + i}." }
+
+        MdBlock.Rule -> Box(Modifier.fillMaxWidth().height(1.dp).background(palette.outline))
 
         is MdBlock.CodeFence -> CodeBlock(block)
 
         is MdBlock.Table -> TableBlock(block, textColor, highlight)
+    }
+}
+
+@Composable
+private fun ListBlock(
+    items: List<ListItem>,
+    textColor: androidx.compose.ui.graphics.Color,
+    highlight: String?,
+    markerWidth: androidx.compose.ui.unit.Dp,
+    marker: (Int) -> String,
+) {
+    val palette = LocalKelpieColors.current
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        items.forEachIndexed { i, item ->
+            Row {
+                Text(
+                    marker(i),
+                    style = MdBody,
+                    color = palette.textSecondary,
+                    modifier = Modifier.width(markerWidth),
+                    textAlign = TextAlign.Start,
+                )
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    item.blocks.forEach { RenderBlock(it, textColor, highlight) }
+                }
+            }
+        }
     }
 }
 

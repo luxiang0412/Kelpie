@@ -85,4 +85,13 @@ class MarkdownTableTest {
         assertTrue(text.contains("名称"))
         assertTrue(text.contains("a | 1"))
     }
+
+    @Test fun brInCell_becomesLineBreak_butNotInCode() {
+        val src = "| PR | 内容 |\n|---|---|\n| 日志 | • 请求 ID<br>• 堆栈<BR/>• 预览<br /> `a<br>b` |"
+        val block = MarkdownParser.parse(src).single() as MdBlock.Table
+        assertEquals(
+            listOf(MdSpan.Text("• 请求 ID\n• 堆栈\n• 预览\n "), MdSpan.Code("a<br>b")),
+            block.rows.single()[1],
+        )
+    }
 }

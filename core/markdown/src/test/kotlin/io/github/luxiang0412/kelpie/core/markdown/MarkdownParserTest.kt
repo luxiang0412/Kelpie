@@ -6,6 +6,9 @@ import org.junit.Test
 
 class MarkdownParserTest {
 
+    private fun item(text: String, vararg more: MdBlock) =
+        ListItem(listOf(MdBlock.Paragraph(listOf(MdSpan.Text(text)))) + more)
+
     @Test fun headings_byLevel() {
         val b = MarkdownParser.parse("# 一级\n\n### 三级标题")
         assertEquals(2, b.size)
@@ -21,13 +24,13 @@ class MarkdownParserTest {
 
     @Test fun bullets_and_ordered() {
         val b = MarkdownParser.parse("- a\n- b\n\n3. x\n4. y")
-        assertEquals(MdBlock.Bullets(listOf(listOf(MdSpan.Text("a")), listOf(MdSpan.Text("b")))), b[0])
-        assertEquals(MdBlock.Ordered(3, listOf(listOf(MdSpan.Text("x")), listOf(MdSpan.Text("y")))), b[1])
+        assertEquals(MdBlock.Bullets(listOf(item("a"), item("b"))), b[0])
+        assertEquals(MdBlock.Ordered(3, listOf(item("x"), item("y"))), b[1])
     }
 
     @Test fun quote_block() {
         val b = MarkdownParser.parse("> 引用内容")
-        assertEquals(MdBlock.Quote(listOf(MdSpan.Text("引用内容"))), b.single())
+        assertEquals(MdBlock.Quote(listOf(listOf(MdSpan.Text("引用内容")))), b.single())
     }
 
     @Test fun codeFence_keepsContentVerbatim() {
@@ -104,5 +107,66 @@ class MarkdownParserTest {
         val ms = (System.nanoTime() - start) / 1_000_000
         assertEquals(400 * 3, blocks.size)
         assertTrue("解析 400 段耗时 ${ms}ms", ms < 400)
+    }
+
+    // ---- 2026-11-20：按画板补的写法（例子照真实回复的写法编的）----
+
+    @Test fun nestedBullets_twoSpaces() {
+        val b = MarkdownParser.parse("- **测试**：通过\n- 新改动：\n  - 小结列了两个工具\n  - 日志没有报错\n- 回退：31 秒")
+        val list = b.single() as MdBlock.Bullets
+        assertEquals(3, list.items.size)
+        assertEquals(MdBlock.Bullets(listOf(item("小结列了两个工具"), item("日志没有报错")), depth = 1), list.items[1].blocks[1])
+    }
+
+    @Test fun bulletsUnderOrdered_withTwoOrThreeSpaces() {
+        for (pad in listOf("  ", "   ")) {
+            val list = MarkdownParser.parse("1. 第一步\n${pad}- 细节 a\n${pad}- 细节 b\n2. 第二步").single() as MdBlock.Ordered
+            assertEquals(2, list.items.size)
+            assertEquals(MdBlock.Bullets(listOf(item("细节 a"), item("细节 b")), depth = 1), list.items[0].blocks[1])
+        }
+    }
+
+    @Test fun deeperThanThreeLevels_mergesIntoThird() {
+        val src = "- a\n  - b\n    - c\n      - d\n    - e"
+        val l0 = MarkdownParser.parse(src).single() as MdBlock.Bullets
+        val l1 = l0.items[0].blocks[1] as MdBlock.Bullets
+        val l2 = l1.items[0].blocks[1] as MdBlock.Bullets
+        assertEquals(2, l2.depth)
+        assertEquals(listOf(item("c"), item("d"), item("e")), l2.items)
+    }
+
+    @Test fun continuationAndCodeFence_belongToTheItem() {
+        val src = "1. 先搜请求 ID：\n   ```\n   docker logs api | grep req\n\n   sort -u\n   ```\n2. 再搜一遍。\n   注意：只保留 7 天。\n\n后面的段落"
+        val b = MarkdownParser.parse(src)
+        assertEquals(2, b.size)
+        val list = b[0] as MdBlock.Ordered
+        assertEquals(2, list.items.size)
+        assertEquals(MdBlock.CodeFence(null, "docker logs api | grep req\n\nsort -u", true), list.items[0].blocks[1])
+        assertEquals(MdBlock.Paragraph(listOf(MdSpan.Text("再搜一遍。\n注意：只保留 7 天。"))), list.items[1].blocks.single())
+        assertEquals(MdBlock.Paragraph(listOf(MdSpan.Text("后面的段落"))), b[1])
+    }
+
+    @Test fun blankLineThenSibling_startsANewListLikeBefore() {
+        val b = MarkdownParser.parse("1. a\n\n2. b")
+        assertEquals(listOf(MdBlock.Ordered(1, listOf(item("a"))), MdBlock.Ordered(2, listOf(item("b")))), b)
+    }
+
+    @Test fun rules() {
+        for (r in listOf("---", "***", "___", "- - -", "* * *")) {
+            assertEquals(r, listOf(MdBlock.Paragraph(listOf(MdSpan.Text("上"))), MdBlock.Rule, MdBlock.Paragraph(listOf(MdSpan.Text("下")))), MarkdownParser.parse("上\n\n$r\n\n下"))
+        }
+        assertTrue(MarkdownParser.parse("--").single() is MdBlock.Paragraph)
+    }
+
+    @Test fun multiLineQuote_isOneBlock_emptyLineSplitsParagraphs() {
+        val b = MarkdownParser.parse("> 离开电脑后？\n>\n> 我做了个 App。\n> · 按谁在等你排序")
+        assertEquals(
+            MdBlock.Quote(listOf(listOf(MdSpan.Text("离开电脑后？")), listOf(MdSpan.Text("我做了个 App。\n· 按谁在等你排序")))),
+            b.single(),
+        )
+    }
+
+    @Test fun nestedList_plainText() {
+        assertEquals("• a\n  • b\n• c", MarkdownParser.toPlainText("- a\n  - b\n- c"))
     }
 }
