@@ -8,7 +8,9 @@ package io.github.luxiang0412.kelpie.core.herdr
  *
  * 实测规则（2026-11-01 远端核对）：
  *   cwd  `/home/luxiang/project/work/xn-ontology`
- *   dir  `-home-luxiang-project-work-xn-ontology`   ← 绝对路径把 `/` 换成 `-`
+ *   dir  `-home-luxiang-project-work-xn-ontology`   ← 绝对路径里所有非字母数字的字符都换成 `-`
+ *   cwd  `/home/luxiang/project/work/my_app` → `-home-luxiang-project-work-my-app`（2026-11-20 实测：
+ *   下划线、点、空格、中文也会换掉；以前只换 `/`，带下划线的目录全部找不到）
  *
  * 三重校验（任何一条不满足就**放弃**，绝不错挂会话）：
  *  1. 目录名必须与 `slugFor(cwd)` 完全相等（不做模糊匹配）
@@ -17,9 +19,16 @@ package io.github.luxiang0412.kelpie.core.herdr
  */
 object ClaudeSessionLocator {
 
-    /** `/a/b/c` → `-a-b-c`（Claude Code 的 projects 目录命名规则）。 */
-    fun slugFor(cwd: String): String =
-        cwd.trim().trimEnd('/').replace('/', '-').ifEmpty { "-" }
+    /**
+     * `/a/b_c` → `-a-b-c`（Claude Code 的 projects 目录命名规则：非 ASCII 字母数字一律换成 `-`）。
+     * 按 UTF-16 单元逐个替换，和 Claude Code（JS）的行为一致：emoji 这类代理对会变成两个 `-`。
+     */
+    fun slugFor(cwd: String): String {
+        val path = cwd.trim().trimEnd('/').ifEmpty { "/" }
+        return buildString(path.length) {
+            path.forEach { c -> append(if (c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9') c else '-') }
+        }
+    }
 
     data class Candidate(val path: String, val mtimeMs: Long)
 

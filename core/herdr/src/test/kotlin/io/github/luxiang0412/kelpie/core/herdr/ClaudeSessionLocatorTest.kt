@@ -23,6 +23,18 @@ class ClaudeSessionLocatorTest {
     }
 
     @Test
+    fun slug_replacesEveryNonAlphanumeric() {
+        // 2026-11-20 真机：带下划线的目录以前找不到，App 只能显示终端画面
+        assertEquals(
+            "-home-luxiang-project-work-my-app",
+            ClaudeSessionLocator.slugFor("/home/luxiang/project/work/my_app"),
+        )
+        assertEquals("-srv-a-b-c-v1-2", ClaudeSessionLocator.slugFor("/srv/a.b c/v1.2"))
+        assertEquals("-home-u-----", ClaudeSessionLocator.slugFor("/home/u/项目文件"))
+        assertEquals("-", ClaudeSessionLocator.slugFor("/"))
+    }
+
+    @Test
     fun pickLatest_prefersNewestWithinWindow() {
         val now = 1_000 * H
         val picked = ClaudeSessionLocator.pickLatest(
