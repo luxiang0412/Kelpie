@@ -155,7 +155,7 @@ interface BoardDao {
 
 @Database(
     entities = [PaneEntity::class, SessionMetaEntity::class, TranscriptMessageEntity::class, TranscriptCursorEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class BoardDatabase : RoomDatabase() {
@@ -166,7 +166,7 @@ abstract class BoardDatabase : RoomDatabase() {
         /** 新工程从 version 1 起步；以后每次加字段都写显式迁移，绝不清库。 */
         fun build(context: android.content.Context): BoardDatabase =
             androidx.room.Room.databaseBuilder(context, BoardDatabase::class.java, "kelpie-board.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build()
 
         /**
@@ -222,6 +222,18 @@ abstract class BoardDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE transcript_messages ADD COLUMN title TEXT")
+                db.execSQL("DELETE FROM transcript_messages")
+                db.execSQL("DELETE FROM transcript_cursor")
+            }
+        }
+
+        /**
+         * 6 → 7（0.6.1）：表结构不变，只清 transcript 缓存和游标。
+         * Claude 解析器改了：上下文压缩的摘要以前存成了用户消息、`/命令` 和 `!命令` 存成了带标签的原文；
+         * Pi 的压缩以前不产生消息。缓存里是旧解析结果，要重读才会变对。
+         */
+        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 db.execSQL("DELETE FROM transcript_messages")
                 db.execSQL("DELETE FROM transcript_cursor")
             }

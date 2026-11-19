@@ -44,7 +44,38 @@ class BoardMigrationTest {
         }
     }
 
+    @Test
+    fun `v6 database (0_6_0) opens at the latest version, keeps panes and clears transcript cache`() = runBlocking {
+        val ctx = RuntimeEnvironment.getApplication()
+        val file = ctx.getDatabasePath("kelpie-board.db").also { it.parentFile?.mkdirs(); it.delete() }
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            V6_SCHEMA.forEach(db::execSQL)
+            db.execSQL("INSERT INTO panes VALUES ('h','test','p1',NULL,'w','t',NULL,'IDLE',NULL,NULL,1,NULL,NULL,0)")
+            db.execSQL("INSERT INTO transcript_messages VALUES ('h','/f',0,'USER','This session is being continued…',NULL,NULL,NULL,NULL,NULL,NULL,NULL)")
+            db.execSQL("INSERT INTO transcript_cursor VALUES ('h','/f',300000000,'hash',0,1)")
+            db.version = 6
+        }
+
+        val board = BoardDatabase.build(ctx)
+        try {
+            assertEquals(1, board.boardDao().all().size)
+            assertEquals(-1, board.transcriptDao().maxSeq("h", "/f"))
+            assertNull(board.transcriptDao().cursor("h", "/f"))
+        } finally {
+            board.close()
+        }
+    }
+
     private companion object {
+        /** 0.6.0 的库：v3 + structured（已有）+ 游标 truncated（v4）+ 消息 title（v6）。 */
+        val V6_SCHEMA by lazy {
+            listOf(
+                V3_SCHEMA[0],
+                V3_SCHEMA[1],
+                V3_SCHEMA[2].replace("`structured` TEXT,", "`structured` TEXT, `title` TEXT,"),
+                V3_SCHEMA[3].replace("`updatedAtMs` INTEGER NOT NULL,", "`updatedAtMs` INTEGER NOT NULL, `truncated` INTEGER NOT NULL DEFAULT 0,"),
+            )
+        }
         val V3_SCHEMA = listOf(
             "CREATE TABLE IF NOT EXISTS `panes` (`hostId` TEXT NOT NULL, `session` TEXT NOT NULL, `paneId` TEXT NOT NULL, `terminalId` TEXT, `workspaceId` TEXT NOT NULL, `tabId` TEXT NOT NULL, `agent` TEXT, `status` TEXT NOT NULL, `title` TEXT, `cwd` TEXT, `revision` INTEGER NOT NULL, `agentSessionPath` TEXT, `agentSessionId` TEXT, `updatedAtMs` INTEGER NOT NULL, PRIMARY KEY(`hostId`, `session`, `paneId`))",
             "CREATE TABLE IF NOT EXISTS `session_meta` (`hostId` TEXT NOT NULL, `session` TEXT NOT NULL, `version` TEXT NOT NULL, `protocol` INTEGER NOT NULL, `fetchedAtMs` INTEGER NOT NULL, `stale` INTEGER NOT NULL, `lastError` TEXT, PRIMARY KEY(`hostId`, `session`))",
