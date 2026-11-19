@@ -36,7 +36,8 @@ data class ChatMessage(
  *
  * 结构（实测 2026-10-31）：
  *   顶层 { id, parentId, timestamp, type, message }
- *   type ∈ session / model_change / thinking_level_change / message / ...
+ *   type ∈ session / model_change / thinking_level_change / context_edit / compaction / message / ...
+ *   compaction → 一行“上下文已压缩”；其余非消息记录跳过（分支回溯会越过它们，见 ConversationBranch）
  *   message.role ∈ system / user / assistant / toolResult
  *   message.content 是分片数组：[{type:"text"|"thinking"|"toolCall"|...}]
  *
@@ -53,6 +54,18 @@ object PiTranscriptParser {
             if (t.isEmpty()) return@forEach
             val obj = runCatching { json.parseToJsonElement(t).jsonObject }.getOrNull() ?: return@forEach
             val type = obj.str("type") ?: return@forEach
+            if (type == "compaction") {
+                // 上下文压缩（2026-11-20 实测：{id, parentId, summary, firstKeptEntryId, …}）；摘要是写给模型看的，不显示。
+                // 带上 id / parentId，分支回溯能从这里接到压缩之前的消息。
+                out += ChatMessage(
+                    ChatMessage.Kind.NOTICE,
+                    t("上下文已压缩", "Context compacted"),
+                    timestamp = obj.str("timestamp")?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() },
+                    id = obj.str("id"),
+                    parentId = obj.str("parentId"),
+                )
+                return@forEach
+            }
             if (type != "message") return@forEach
             val msg = obj["message"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: return@forEach
             val role = msg.str("role") ?: return@forEach

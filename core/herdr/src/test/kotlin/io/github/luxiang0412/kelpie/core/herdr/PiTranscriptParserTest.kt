@@ -55,4 +55,19 @@ class PiTranscriptParserTest {
         assertEquals(10, msgs.size)
         assertEquals("m1", msgs.first().text)
     }
+
+    @Test
+    fun `compaction becomes a notice that keeps its place in the tree`() {
+        val out = PiTranscriptParser.parse(
+            listOf(
+                """{"type":"compaction","id":"cp","parentId":"u2","timestamp":"2026-11-17T21:43:38.093Z","summary":"## Goal\nBuild the app","firstKeptEntryId":"u2","tokensBefore":180000}""",
+                """{"type":"model_change","id":"mc","parentId":"cp","modelId":"m2"}""",
+            ),
+        )
+        val n = out.single()
+        assertEquals(ChatMessage.Kind.NOTICE, n.kind)
+        assertEquals(t("上下文已压缩", "Context compacted"), n.text)
+        assertEquals("cp", n.id)
+        assertEquals("u2", n.parentId)
+    }
 }
