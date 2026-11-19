@@ -26,12 +26,17 @@ import io.github.luxiang0412.kelpie.core.designsystem.KelpieTheme
  * 长对话性能 Fixture（debug / minified 包）：确定性生成 N 条消息，直接渲染对话页的消息列表。
  *   adb shell am start -n io.github.luxiang0412.kelpie.min/io.github.luxiang0412.kelpie.FixtureActivity --ei count 2000
  * 不连远端、不写数据库、不用随机数，可重复对比。
+ *
+ * `--ez markdown_board true`：改为显示 Markdown 画板的五组例子（嵌套列表、列表项下的代码块、分隔线、
+ * 多行引用、表格 `<br>`），真机截图和画板逐项对照用；不影响性能基准用的默认内容。
  */
 class FixtureActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val items = ConversationItemMapper.map(Fixtures.messages(intent.getIntExtra("count", 500)))
+        val messages = if (intent.getBooleanExtra("markdown_board", false)) Fixtures.markdownBoard()
+        else Fixtures.messages(intent.getIntExtra("count", 500))
+        val items = ConversationItemMapper.map(messages)
         val prefs = container.prefs
         JankMonitor.attach(this, "fixture")
         setContent {
@@ -54,6 +59,18 @@ object Fixtures {
     val LONG_TEXT = (1..12).joinToString("\n") {
         "这是第 $it 段用于测量长文本排版的说明文字，中英文混排 Mixed CJK and Latin content $it，"
     }
+
+    /** Markdown 画板（2026-11-20）的五组例子，和画板上的文字一致。 */
+    fun markdownBoard(): List<ChatMessage> = listOf(
+        "**结果**\n- **测试**：后端 434 项、前端 140 项通过。\n- **新改动**：\n  - 小结列了两个工具，两门课都和目录一致。\n" +
+            "  - 32 条导师回复，审核都没有删改。\n  - 日志没有报错。\n- **回退**：31 秒，旧会话能打开。",
+        "1. 拿到这个会话的所有请求 ID，可以从日志里先搜出来：\n   ```\n   docker logs api 2>&1 | grep req_id | sort -u\n   ```\n" +
+            "2. 用这些 ID 再搜一遍，就能看到每轮的完整日志。\n   注意：日志只保留 7 天。",
+        "没有 GPU 直通，H.264 软编码，所以 CPU 占用会比硬件编码高。\n\n---\n\n**一句话总结**：Chromium 156，LinuxServer 镜像，Selkies 串流。",
+        "**X（中文）**\n\n> 离开电脑后，想知道开发机上的 agent 是不是在等我确认？\n>\n> 我做了个 Android App：Kelpie。\n" +
+            "> · 所有 agent 按“谁在等你”排序\n> · 在手机上按住允许或拒绝",
+        "| PR | 内容 |\n|---|---|\n| **日志和请求 ID** | • 请求 ID 由服务端生成<br>• ERROR 日志带上堆栈<br>• 去掉 MQ 正文预览 |",
+    ).map { ChatMessage(ChatMessage.Kind.ASSISTANT, it) }
 
     fun messages(count: Int): List<ChatMessage> {
         val out = ArrayList<ChatMessage>(count)
