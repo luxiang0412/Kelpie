@@ -62,6 +62,8 @@ Kelpie 是一个纯客户端：没有自己的服务器，也不需要在开发�
 1. **定位文件**（`*SessionLocator` / `*SessionResolver`）：
    - 优先用 herdr 上报的会话 id（`agent_session`）去找文件；
    - 没有 id 时，按工作目录找最近的交互式会话；
+   - Claude 的会话目录名由工作目录得出：所有非字母数字的字符（`/`、`_`、`.`、空格、中文…）都换成 `-`，
+     例如 `/home/u/my_app` → `~/.claude/projects/-home-u-my-app/`（0.6.1 以前只换 `/`，带下划线的目录找不到）；
    - 同一个目录下有多个 Codex 时不猜，只显示终端画面。
 2. **增量读取**（`TranscriptTailer`，SFTP）：
    - 记住读到的字节位置，只在换行处前进；
@@ -69,8 +71,14 @@ Kelpie 是一个纯客户端：没有自己的服务器，也不需要在开发�
    - 每次最多读一段，长会话不会一次全拉下来。
 3. **解析**：`TranscriptParser` 按路径选择 `ClaudeTranscriptParser`、`CodexTranscriptParser` 或 `PiTranscriptParser`，统一成消息、工具调用、工具结果。
    agent 注入的上下文（环境信息、AGENTS.md 等）会被过滤掉。
+   不是对话本身的内容变成一行灰色说明：Claude / Pi 的上下文压缩（“上下文已压缩”，摘要不显示）、Claude 的后台任务通知、
+   终端里直接执行的 `/命令` 和 `!命令` 的输出（命令本身按用户消息显示）。
+   Pi 的会话是一棵树，对话页从最后一条沿父节点回溯出当前分支（`ConversationBranch`）；父节点是压缩、切换模型这类
+   非消息记录时接着回溯前一条，同一条记录拆出的几条消息（思考 + 文字 + 工具调用）一起保留。
 4. **缓存与显示**：解析结果存进 Room（`transcript_messages`、`transcript_cursor`），对话页只订阅 Room，网络层只负责把新读到的字节变成消息；所以离线也能看已经读过的历史。
    对话页的增量映射（`IncrementalConversationMapper`）只重新计算变化的部分，2000 条消息的对话也能流畅滚动。
+   缓存里存的是解析后的结果：解析器的输出变了，要给 `BoardDatabase` 加一个只清 `transcript_messages` / `transcript_cursor`
+   的迁移（例如 v6 → v7），否则看过的会话还显示旧结果。
 5. **找不到对话记录时**，对话页显示终端最近的输出（`pane.read`）。
 
 ## 发送：写操作不是幂等的
@@ -146,9 +154,10 @@ CI 用 `tools/i18n_literals.py --check` 检查有没有漏包的中文字面量�
 
 | 层 | 内容 |
 | --- | --- |
-| 单元测试（JVM） | 协议编解码、三种对话记录的解析和定位、增量读取、首页排序和时长、写操作台账、配对链接、Markdown 解析和表格、对话分支和搜索、配色对比度（日夜两套） |
+| 单元测试（JVM） | 协议编解码、三种对话记录的解析和定位、增量读取、首页排序和时长、写操作台账、配对链接、Markdown 解析（嵌套列表、表格、分隔线、引用）、对话分支和搜索、数据库迁移、配色对比度（日夜两套） |
 | 截图回归 | Roborazzi + Robolectric，首页 5 种状态（日间 / 夜间 / 中英文 / 离线），JVM 上跑，不需要设备 |
 | 性能 | Macrobenchmark（模拟器）；真机上用 `FixtureActivity` 的 2000 条消息测滚动，JankStats 打到 logcat |
+| Markdown 显示 | `FixtureActivity --ez markdown_board true` 显示几种容易出错的写法，真机截图对照 |
 | 真机 | MIUI 手机连两台测试主机手动走查；minified 包和正式包用同样的 R8 配置 |
 
 ## 已知限制

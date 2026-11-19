@@ -81,7 +81,7 @@ MIUI 第一次用 adb 安装一个新包名时会拦截（`INSTALL_FAILED_USER_R
 | `tools/profdump2baseline.py` | 把 `cmd package dump-profiles` 的输出转成 `app/src/main/baseline-prof.txt` |
 | `tools/check_doc_links.py` | 检查文档里的路径引用是否还存在 |
 | `tools/i18n_literals.py` | 找出 Kotlin 里含中文的字面量，按映射表包成 `t("中文", "English")`；`--check` 只检查（CI 用） |
-| `FixtureActivity`（debug / minified） | `am start -n <pkg>/io.github.luxiang0412.kelpie.FixtureActivity --ei count 2000`：确定性长对话，用来测滚动 |
+| `FixtureActivity`（debug / minified） | `am start -n <pkg>/io.github.luxiang0412.kelpie.FixtureActivity --ei count 2000`：确定性长对话，用来测滚动；<br>`--ez markdown_board true`：改为显示嵌套列表、列表项里的代码块、分隔线、多行引用、表格 `<br>` 五组例子，改 Markdown 渲染后真机截图对照 |
 
 ### 刷新基线配置（baseline profile）
 

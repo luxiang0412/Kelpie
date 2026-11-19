@@ -380,3 +380,18 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - `dist/kelpie-0.6.0.apk`，SHA-256 147bd649…f8b4。
 - 手机：`install -r dist/kelpie-0.6.0.apk` 覆盖安装，版本 0.6.0 / 9，启动正常，两台主机在线。数据库 v3 → v6 迁移在这次首次启动时执行。
 - 22:0x 用户确认发布到 GitHub：`git push origin main`（3fe0bc2..37fa4bc）和 tag `kelpie-v0.6.0`；`gh release create kelpie-v0.6.0` 附 `kelpie-0.6.0.apk`，设为 Latest，下载回来核对 SHA-256 一致。
+
+## 会话显示修复 + 发版 0.6.1（2026-11-20，用户要求）
+
+- 开发机：只读。读了 `~/.claude/projects`、`~/.codex/sessions`、`~/.pi/agent/sessions` 里的会话文件做统计和比对，没有往任何 pane 发送、没有建 workspace、没有改文件。
+- 手机（在局域网里，无线调试端口中途变了一次）：在正式包和 debug 包里打开了 8 个真实会话，只看不发。
+- 06:59 debug 包覆盖安装当时的代码（0.5.1-debug → 0.6.0-debug），07:15 再装一次（含 Markdown 改动）。
+- 07:00–07:05 debug 包主机地址 `10.144.144.2` 在局域网里连不上，临时改成开发机的局域网地址；App 要求确认指纹，
+  显示的指纹与本机 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` 一致后才信任。
+  核对完把地址改回 `10.144.144.2`（回到 10.144.144.x 网络时可能要再确认一次同一个指纹）。
+- 版本 0.6.0（versionCode 9）→ 0.6.1（10）；`test`、`lintDebug`、`assembleRelease` 分开依次跑都通过
+  （放在同一条命令里时 `core:data` 的 lint 读到 KSP 正在清理的临时文件而失败，与代码无关）；签名证书 SHA-256 与 0.6.0 一致（fe8d7dea…76d2ea）。
+- `dist/kelpie-0.6.1.apk`，SHA-256 078870d5…5beb。
+- 07:41 手机：`install -r dist/kelpie-0.6.1.apk` 覆盖安装，版本 0.6.1 / 10，启动正常，主机在线；数据库 v6 → v7 迁移（清空对话缓存）在这次首次启动时执行。
+  逐个打开之前有问题的 4 个会话：对话、“上下文已压缩”说明、嵌套列表、分隔线显示正常。
+- 未推送，未发布到 GitHub。

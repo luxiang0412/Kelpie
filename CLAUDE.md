@@ -71,6 +71,8 @@ There is no server component. Everything goes over SSH (sshj, `core:ssh`) to eac
 - **Parsers** in `core:herdr`:
   - `ClaudeTranscriptParser`, `CodexTranscriptParser` and `PiTranscriptParser`, behind `TranscriptParser`, which routes by path. Paths under `/.codex/sessions/` or named `rollout-*` go to the Codex parser.
   - Session locators find the file. For Claude and Codex, herdr's `agent_session` id is used first, then the cwd plus recency as a fallback.
+  - Claude's project dir is the cwd with **every** non-alphanumeric character replaced by `-` (`my_app` → `my-app`), not just `/`.
+  - Transcripts are cached already parsed (Room). When a parser change alters its output, add a `BoardDatabase` migration that only clears `transcript_messages` and `transcript_cursor`, or sessions already viewed keep the old result.
   - `CodexSessionResolver` refuses to guess when several Codex panes share a cwd.
 - **Reading**: `TranscriptTailer` reads files incrementally over SFTP. It keeps a byte offset that only advances at newlines, detects file replacement via a hash of the file head, resets on truncation, and caps the bytes read per sync.
 
@@ -104,7 +106,7 @@ UI copy is written inline as `t("中文", "English")` and `plural(n, "agent")` f
 
 `app/src/debug` (also compiled into `minified`) holds two entry points:
 - `DebugHooks`: imports `provision.json` plus key files pushed to the app's external files dir, then deletes them.
-- `FixtureActivity`: a deterministic 2000-message conversation for scroll and jank tests.
+- `FixtureActivity`: a deterministic 2000-message conversation for scroll and jank tests. `--ez markdown_board true` shows the markdown cases instead (nested lists, code in list items, rules, multi-line quotes, `<br>` in tables) for on-device screenshot checks.
 
 `app/src/release` has a no-op `DebugHooks`.
 
@@ -125,5 +127,5 @@ UI copy is written inline as `t("中文", "English")` and `plural(n, "agent")` f
 - **Remote writes**: every write to a dev machine (sending to panes, creating tabs, changing files) is logged in `docs/history/run-log.md`. That file is append-only.
 - **Test targets**: only use herdr sessions named `test`, on `ssh://luxiang@10.144.144.2` (Claude / Codex / Pi) and `ssh://luxiang@10.144.144.3` (Pi). Treat agents running in this repo's cwd as read-only.
 - **Agent configs on the dev machines**: never modify the real `~/.claude` or `~/.codex` there, and never copy credentials such as `~/.claude/.credentials.json` or `~/.codex/auth.json`. Hook experiments use isolated config dirs under `~/spike-sandbox/`.
-- **Test phone**: `adb -s 10.144.144.6:42407` (MIUI). The first adb install of a new package name needs approval on the phone. Restore any device settings you change.
+- **Test phone** (MIUI): `adb -s 10.144.144.6:42407` over the 10.144.144.x network. On another network the phone and the dev machine have different addresses, and the wireless-debugging port changes after each reconnect, so check `adb devices`; the debug app's host is set to `10.144.144.2`, which may not be reachable there. The first adb install of a new package name needs approval on the phone. Restore any device settings you change.
 - Docs live in `docs/`, indexed in `docs/README.md`. `docs/architecture.md` is the Chinese architecture overview, `docs/development.md` the full developer guide; `docs/setup.md` covers dev-machine and phone setup.
