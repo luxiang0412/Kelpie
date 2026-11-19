@@ -25,6 +25,14 @@ import kotlinx.serialization.json.jsonObject
  *     - `origin.kind == "task-notification"`：后台任务 / Monitor 的事件，正文是 `<task-notification>` XML
  *       → 一行说明（[ChatMessage.Kind.NOTICE]），不再显示成用户气泡；
  *     - `isMeta: true`：图片尺寸说明、`<local-command-caveat>`、粘贴图片的路径等 → 跳过
+ *   - 上下文压缩（2026-11-20 实测）：先写一行 `type=system, subtype=compact_boundary`
+ *     （`compactMetadata.trigger` = auto / manual），紧接一行 `isCompactSummary: true` 的 user 消息，
+ *     正文是写给模型看的长摘要（“This session is being continued …”）
+ *     → 前者变成一行说明“上下文已压缩”，摘要不显示（以前整段显示成用户气泡）；
+ *   - 用户在终端里敲的 `/命令` 和 `!命令`（2026-11-20 实测）：
+ *     `<command-name>/x</command-name><command-message>…<command-args>a</command-args>`（顺序不固定）
+ *     → 用户气泡 `/x a`；`<bash-input>cmd</bash-input>` → 用户气泡 `! cmd`；
+ *     它们的输出 `<local-command-stdout>` / `<bash-stdout>` / `<bash-stderr>` → 一行说明，没有内容就不显示
  *   - tool_result 可能没有文字（ToolSearch 的 `tool_reference`、没有输出的命令）→ 照样给结果，
  *     否则工具卡片会一直显示“运行中”
  *
@@ -45,6 +53,12 @@ object ClaudeTranscriptParser {
             if (type != "user" && type != "assistant" && type != "system") return@forEach
             // 子代理（sidechain）不进入主对话
             if ((obj["isSidechain"] as? JsonPrimitive)?.content == "true") return@forEach
+            if (type == "system" && (obj["subtype"] as? JsonPrimitive)?.content == "compact_boundary") {
+                out += compactNotice(obj)
+                return@forEach
+            }
+            // 压缩摘要是写给模型看的，上面已经留了一行说明
+            if ((obj["isCompactSummary"] as? JsonPrimitive)?.content == "true") return@forEach
 
             val msg = obj["message"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: return@forEach
             val role = (msg["role"] as? JsonPrimitive)?.content ?: type
@@ -59,7 +73,10 @@ object ClaudeTranscriptParser {
             /** user 角色的一段文字 → 用户气泡 / 后台任务说明 / 跳过。 */
             fun userText(text: String) {
                 if (text.isBlank() || isMeta) return
-                if (origin == "task-notification" || text.trimStart().startsWith("<task-notification>")) {
+                val local = localCommand(text)
+                if (local != null) {
+                    if (local.second.isNotBlank()) out += ChatMessage(local.first, local.second, timestamp = ts, id = uuid, parentId = null)
+                } else if (origin == "task-notification" || text.trimStart().startsWith("<task-notification>")) {
                     out += ChatMessage(ChatMessage.Kind.NOTICE, taskNotice(text), timestamp = ts, id = uuid, parentId = null)
                 } else {
                     out += ChatMessage(ChatMessage.Kind.USER, unwrapPasted(text), timestamp = ts, id = uuid, parentId = null)
@@ -141,6 +158,51 @@ object ClaudeTranscriptParser {
      */
     fun unwrapPasted(text: String): String =
         if (!text.contains("<pasted_content")) text else PASTED.replace(text) { it.groupValues[1] }.trim()
+
+    private fun compactNotice(obj: JsonObject): ChatMessage {
+        val trigger = ((obj["compactMetadata"] as? JsonObject)?.get("trigger") as? JsonPrimitive)?.content
+        val text = when (trigger) {
+            "auto" -> t("上下文已压缩（自动）", "Context compacted (auto)")
+            "manual" -> t("上下文已压缩（手动）", "Context compacted (manual)")
+            else -> t("上下文已压缩", "Context compacted")
+        }
+        val ts = (obj["timestamp"] as? JsonPrimitive)?.content?.let { parseIsoMillis(it) }
+        val uuid = (obj["uuid"] as? JsonPrimitive)?.content
+        return ChatMessage(ChatMessage.Kind.NOTICE, text, timestamp = ts, id = uuid, parentId = null)
+    }
+
+    private fun tag(text: String, name: String): String? =
+        Regex("""<$name>([\s\S]*?)</$name>""").find(text)?.groupValues?.get(1)
+
+    private val ANSI = Regex("""\u001B\[[0-9;?]*[A-Za-z]""")
+    private val NO_OUTPUT = setOf("(no content)", "(Bash completed with no output)")
+
+    /**
+     * 用户在终端里直接执行的 `/命令`、`!命令` 及其输出 → (种类, 文字)；文字为空表示不显示。
+     * 不是这类内容返回 null。
+     */
+    fun localCommand(text: String): Pair<ChatMessage.Kind, String>? {
+        val s = text.trimStart()
+        if (!s.startsWith("<")) return null
+        if (s.startsWith("<command-name>") || s.startsWith("<command-message>")) {
+            val name = tag(s, "command-name")?.trim()
+            if (name != null) {
+                val args = tag(s, "command-args")?.trim().orEmpty()
+                return ChatMessage.Kind.USER to (name + if (args.isEmpty()) "" else " $args")
+            }
+        }
+        if (s.startsWith("<bash-input>")) tag(s, "bash-input")?.let { return ChatMessage.Kind.USER to "! " + it.trim() }
+        val output = when {
+            s.startsWith("<local-command-stdout>") || s.startsWith("<local-command-stderr>") ->
+                listOfNotNull(tag(s, "local-command-stdout"), tag(s, "local-command-stderr"))
+            s.startsWith("<bash-stdout>") || s.startsWith("<bash-stderr>") ->
+                listOfNotNull(tag(s, "bash-stdout"), tag(s, "bash-stderr"))
+            else -> return null
+        }
+        val body = output.map { ANSI.replace(it, "").trim() }.filter { it.isNotEmpty() && it !in NO_OUTPUT }
+            .joinToString("\n").let { if (it.length > 400) it.take(400) + "…" else it }
+        return ChatMessage.Kind.NOTICE to if (body.isEmpty()) "" else t("命令输出", "Command output") + "\n" + body
+    }
 
     private val TAG = Regex("""<(summary|event)>([\s\S]*?)</\1>""")
 

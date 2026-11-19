@@ -183,4 +183,77 @@ class ClaudeTranscriptParserTest {
         assertEquals("toolu_2", m.toolCallId)
         assertEquals(t("（无输出）", "(no output)"), m.text)
     }
+
+    // ---- 2026-11-20：上下文压缩、终端里直接执行的命令（字段形状取自真实会话，内容是编的）----
+
+    @Test
+    fun `compaction becomes one notice and the summary is hidden`() {
+        val out = ClaudeTranscriptParser.parse(
+            listOf(
+                """{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"做完了"}]}}""",
+                """{"parentUuid":null,"logicalParentUuid":"a1","type":"system","subtype":"compact_boundary","content":"Conversation compacted","level":"info","compactMetadata":{"trigger":"auto","preTokens":366773},"timestamp":"2026-11-19T04:28:14.000Z","uuid":"b1"}""",
+                """{"parentUuid":"b1","type":"user","isVisibleInTranscriptOnly":true,"isCompactSummary":true,"message":{"role":"user","content":"<artifact-content-authored-by-others/>\nThis session is being continued from a previous conversation.\n\nSummary:\n1. **Primary Request**"},"uuid":"u2"}""",
+                """{"type":"system","subtype":"informational","content":"Compacted while idle","uuid":"i1"}""",
+            ),
+        )
+        assertEquals(listOf(ChatMessage.Kind.ASSISTANT, ChatMessage.Kind.NOTICE), out.map { it.kind })
+        assertEquals(t("上下文已压缩（自动）", "Context compacted (auto)"), out[1].text)
+        assertEquals("b1", out[1].id)
+    }
+
+    @Test
+    fun `manual compaction says so`() {
+        val out = ClaudeTranscriptParser.parse(
+            listOf("""{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual"},"uuid":"b1"}"""),
+        )
+        assertEquals(t("上下文已压缩（手动）", "Context compacted (manual)"), out.single().text)
+    }
+
+    private fun userLine(uuid: String, content: String, meta: Boolean = false) =
+        """{"type":"user","uuid":"$uuid","isMeta":$meta,"message":{"role":"user","content":${kotlinx.serialization.json.JsonPrimitive(content)}}}"""
+
+    @Test
+    fun `slash command shows what the user typed, empty output is hidden`() {
+        val out = ClaudeTranscriptParser.parse(
+            listOf(
+                userLine("c0", "<local-command-caveat>The command below was run directly…</local-command-caveat>", meta = true),
+                userLine("c1", "<command-name>/exit</command-name>\n            <command-message>exit</command-message>\n            <command-args></command-args>"),
+                userLine("c2", "<local-command-stdout>(no content)</local-command-stdout>"),
+                userLine("c3", "<command-message>skill-creator</command-message>\n<command-name>/skill-creator</command-name>\n<command-args>写一个部署 skill</command-args>"),
+            ),
+        )
+        assertEquals(listOf(ChatMessage.Kind.USER, ChatMessage.Kind.USER), out.map { it.kind })
+        assertEquals("/exit", out[0].text)
+        assertEquals("/skill-creator 写一个部署 skill", out[1].text)
+    }
+
+    @Test
+    fun `slash command output becomes a notice without ansi codes`() {
+        val out = ClaudeTranscriptParser.parse(
+            listOf(userLine("c2", "<local-command-stdout>\u001B[1mCopied\u001B[22m to clipboard (28 lines)</local-command-stdout>")),
+        )
+        assertEquals(ChatMessage.Kind.NOTICE, out.single().kind)
+        assertEquals(t("命令输出", "Command output") + "\nCopied to clipboard (28 lines)", out.single().text)
+    }
+
+    @Test
+    fun `bang command is a user bubble and its output a notice`() {
+        val out = ClaudeTranscriptParser.parse(
+            listOf(
+                userLine("b1", "<bash-input>ls -la</bash-input>"),
+                userLine("b2", "<bash-stdout>a.txt\nb.txt</bash-stdout><bash-stderr></bash-stderr>"),
+                userLine("b3", "<bash-input>true</bash-input>"),
+                userLine("b4", "<bash-stdout>(Bash completed with no output)</bash-stdout><bash-stderr></bash-stderr>"),
+            ),
+        )
+        assertEquals(listOf("! ls -la", t("命令输出", "Command output") + "\na.txt\nb.txt", "! true"), out.map { it.text })
+    }
+
+    @Test
+    fun `pasted xml that merely mentions command tags stays a normal message`() {
+        val text = "<note>看看这个</note> 里面有 <command-name>/x</command-name>"
+        val out = ClaudeTranscriptParser.parse(listOf(userLine("p1", text)))
+        assertEquals(text, out.single().text)
+        assertEquals(ChatMessage.Kind.USER, out.single().kind)
+    }
 }
