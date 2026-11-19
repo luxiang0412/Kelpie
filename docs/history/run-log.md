@@ -395,3 +395,8 @@ OpenRouter 用量：0.1256 → 0.1400 美元。
 - 07:41 手机：`install -r dist/kelpie-0.6.1.apk` 覆盖安装，版本 0.6.1 / 10，启动正常，主机在线；数据库 v6 → v7 迁移（清空对话缓存）在这次首次启动时执行。
   逐个打开之前有问题的 4 个会话：对话、“上下文已压缩”说明、嵌套列表、分隔线显示正常。
 - 未推送，未发布到 GitHub。
+- 07:50 用户确认发布到 GitHub。推送前先清理了还没推送的 8 个提交（公开仓库）：把工作项目的目录名换成通用例子 `my_app`，
+  去掉局域网 IP、会话标题和主机指纹（`git filter-branch` 只改 `origin/main..main`）；用新标签重新构建 release，
+  APK 内容与 `dist/kelpie-0.6.1.apk` 逐文件一致（签名目录除外）。
+  `git push origin main`（30d6bf7..48efd9f）和 tag `kelpie-v0.6.1`；`gh release create kelpie-v0.6.1` 附 `kelpie-0.6.1.apk`，
+  设为 Latest，下载回来核对 SHA-256 一致。
